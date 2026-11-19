@@ -10,7 +10,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from subtitulos import eventos as ev
-from subtitulos.archivos import buscar_videos
+from subtitulos.archivos import buscar_en_varias
 from subtitulos.eventos import Resultado
 
 _EJEMPLOS = [
@@ -65,7 +65,7 @@ class TrabajadorDemo(QObject):
 
     def __init__(self, ruta, parent=None):
         super().__init__(parent)
-        self.ruta = Path(ruta)
+        self.rutas = list(ruta) if isinstance(ruta, (list, tuple)) else [Path(ruta)]
         self._cancelado = False
         self._resultados = []
         self._timer = QTimer(self)
@@ -75,7 +75,7 @@ class TrabajadorDemo(QObject):
     def empezar(self):
         self._t0 = time.monotonic()
         try:
-            self._videos = buscar_videos(self.ruta)[:500]
+            self._videos = buscar_en_varias(self.rutas)[:500]
         except OSError:
             self._videos = []
         self._i = 0

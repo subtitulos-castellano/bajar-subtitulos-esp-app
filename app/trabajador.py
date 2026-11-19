@@ -71,7 +71,8 @@ class Trabajador(QObject):
 
     def __init__(self, ruta, opciones, credenciales, parent=None):
         super().__init__(parent)
-        self.ruta = Path(ruta)
+        # Una ruta, o una lista (vídeos sueltos y carpetas soltados a la vez: una sola búsqueda).
+        self.ruta = [Path(r) for r in ruta] if isinstance(ruta, (list, tuple)) else Path(ruta)
         self.opciones = opciones
         self.credenciales = credenciales
         self.resultados = []

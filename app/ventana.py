@@ -314,8 +314,9 @@ class Ventana(QMainWindow):
     # ---------- Cola y trabajo ----------
 
     def procesar(self, rutas):
-        """Añade rutas a la cola y empieza si no hay nada en marcha. Sin preguntas."""
-        self.cola.extend(rutas)
+        """Lo soltado de una vez (vídeos sueltos, carpetas o ambos) es una sola búsqueda, como si todo
+        estuviera en la misma carpeta. Va a la cola y empieza si no hay nada en marcha. Sin preguntas."""
+        self.cola.append(list(rutas))
         if self.trabajador is None:
             self._siguiente()
         else:
@@ -326,7 +327,8 @@ class Ventana(QMainWindow):
             self.trabajador = None
             self._actualizar_nav()
             return
-        ruta = self.cola.pop(0)
+        lote = self.cola.pop(0)
+        ruta = lote[0] if len(lote) == 1 else lote
         self.inicio.poner_cola(len(self.cola))
         opciones = self.config.opciones       # las preferencias de este momento valen para toda la tanda
         if self.demo:
@@ -346,7 +348,7 @@ class Ventana(QMainWindow):
         t.detalle.connect(de_esta(self.inicio.al_detalle))
         t.resultado.connect(de_esta(self.inicio.al_resultado))
         t.terminado.connect(de_esta(self._terminado))
-        self.inicio.empezar(ruta, demo=self.demo, simulacion=opciones.dry_run)
+        self.inicio.empezar(lote, demo=self.demo, simulacion=opciones.dry_run)
         self.hay_busqueda = True
         self.paginas.setCurrentIndex(0)
         self.nav_botones[BUSCANDO].setChecked(True)

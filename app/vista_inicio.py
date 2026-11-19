@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QHeaderView, QL
                                QPushButton, QStackedLayout, QTableView, QVBoxLayout, QWidget)
 
 from subtitulos import eventos as ev
+from subtitulos.archivos import carpeta_comun
 from subtitulos.texto import visible
 
 from . import iconos, tema
@@ -141,7 +142,8 @@ class VistaInicio(QWidget):
         self.pila.addWidget(self._reposo())
         self.pila.addWidget(self._progreso())
         self.pila.addWidget(self._resumen())
-        self.ruta_actual = None
+        self.ruta_actual = None       # carpeta que contiene lo soltado ('Abrir carpeta')
+        self.lote = []                # lo soltado: vídeos y carpetas (una sola búsqueda)
         self.demo = False
         self.simulacion = False
         self.errores = []
@@ -275,8 +277,9 @@ class VistaInicio(QWidget):
         self.b_cancelar.setText('  Cancelando…')
         self.cancelar.emit()
 
-    def empezar(self, ruta, demo=False, simulacion=False):
-        self.ruta_actual = Path(ruta)
+    def empezar(self, rutas, demo=False, simulacion=False):
+        self.lote = [Path(r) for r in rutas] if isinstance(rutas, (list, tuple)) else [Path(rutas)]
+        self.ruta_actual = carpeta_comun(self.lote)
         self.demo = demo
         self.simulacion = simulacion
         self.errores = []
@@ -289,13 +292,18 @@ class VistaInicio(QWidget):
         self.b_cancelar.setEnabled(True)
         self.b_cancelar.setText('  Cancelar')
         self.banner_demo_p.setVisible(demo)
-        self.p_ruta.setText(self._ruta_corta(self.ruta_actual))
+        self.p_ruta.setText(self._ruta_corta())
         self.p_estado.setText('Buscando vídeos…')
         self.pila.setCurrentIndex(1)
 
-    def _ruta_corta(self, ruta):
+    def _ruta_corta(self):
+        """Lo soltado, para mostrarlo: la ruta, o 'N elementos de <carpeta>' si son varios."""
+        if len(self.lote) == 1:
+            texto = str(self.lote[0])
+        else:
+            texto = f'{len(self.lote)} elementos de {self.ruta_actual}'
         fm = QFontMetrics(self.p_ruta.font())
-        return fm.elidedText(str(ruta), Qt.ElideMiddle, max(300, self.width() - 2 * MARGEN))
+        return fm.elidedText(texto, Qt.ElideMiddle, max(300, self.width() - 2 * MARGEN))
 
     def al_iniciar(self, videos):
         """Lista completa de vídeos, todos 'En espera'. Con uno solo, la barra se anima mientras trabaja."""
@@ -355,7 +363,7 @@ class VistaInicio(QWidget):
         self.b_pendientes = boton('  Procesar pendientes', 'reloj')
         self.b_pendientes.setToolTip('Vuelve a revisar la misma carpeta: los vídeos ya resueltos se saltan '
                                      'enseguida y se buscan los pendientes.')
-        self.b_pendientes.clicked.connect(lambda: self.repetir.emit([self.ruta_actual]))
+        self.b_pendientes.clicked.connect(lambda: self.repetir.emit(list(self.lote)))
         cab.addWidget(self.b_pendientes, 0, Qt.AlignVCenter)
         cab.addWidget(self.b_copiar, 0, Qt.AlignVCenter)
         cab.addWidget(self.b_abrir, 0, Qt.AlignVCenter)
@@ -427,7 +435,7 @@ class VistaInicio(QWidget):
             videos = f'{n} de {total} vídeos revisados'
         else:
             videos = f'{n} vídeo{"s" if n != 1 else ""} revisado{"s" if n != 1 else ""}'
-        self.r_sub.setText(f'{videos} en {_duracion(segundos)}  ·  {self._ruta_corta(self.ruta_actual)}')
+        self.r_sub.setText(f'{videos} en {_duracion(segundos)}  ·  {self._ruta_corta()}')
         self.banner_demo_r.setVisible(self.demo)
         self.banner_sim_resumen.setVisible(self.simulacion)
         self.banner_error.texto.setText(

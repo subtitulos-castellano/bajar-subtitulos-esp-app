@@ -259,6 +259,25 @@ class Eventos(ConSimulacion):
         self.assertEqual(self.backups(), [])
 
 
+class VariasRutas(ConSimulacion):
+    def test_videos_sueltos_y_carpetas_en_una_sola_lista(self):
+        g = Grabadora()
+        rutas = [self.videos / 'd_red_cast.avi', self.videos / 'sub', self.videos / 'c_incrustado.mkv',
+                 self.videos / 'd_red_cast.avi']                           # repetido: una sola vez
+        resumen = nucleo.procesar(rutas, Opciones(max_videos=1), g, credenciales={})
+        self.assertEqual([p.name for p in g.videos], ['d_red_cast.avi', 'k_lat_incrustado.mkv',
+                                                      'c_incrustado.mkv'])
+        self.assertEqual(g.progreso, [(1, 3, 'd_red_cast.avi'), (2, 3, 'k_lat_incrustado.mkv'),
+                                      (3, 3, 'c_incrustado.mkv')])
+        # El límite cuenta sobre el conjunto: d_red_cast busca en internet; k_lat_incrustado ya no.
+        self.assertEqual([r.categoria for r in resumen], [nucleo.CASTELLANO, nucleo.PENDIENTE, nucleo.CASTELLANO])
+
+    def test_carpeta_comun(self):
+        from subtitulos.archivos import carpeta_comun
+        self.assertEqual(carpeta_comun([self.videos / 'a_ya.mkv', self.videos / 'sub']), self.videos)
+        self.assertEqual(carpeta_comun([self.videos / 'sub' / 'k_lat_incrustado.mkv']), self.videos / 'sub')
+
+
 class Cancelar(ConSimulacion):
     def test_cancelar_entre_videos(self):
         g = Grabadora(cancelar_tras=3)

@@ -30,7 +30,7 @@ from subliminal.core import ProviderPool
 from subliminal.score import compute_score, episode_scores, movie_scores
 from subliminal.video import Episode
 
-from .archivos import HOME, VIDEO_EXT, buscar_videos  # noqa: F401
+from .archivos import HOME, VIDEO_EXT, buscar_en_varias, buscar_videos  # noqa: F401
 from .eventos import (CASTELLANO, INGLES, LATINO, NO_ENCONTRADO, PENDIENTE, SIN_CAMBIOS,  # noqa: F401
                       YA_CASTELLANO, Eventos, Resultado)
 from .opciones import MAX_DESCARGAS, Opciones
@@ -186,6 +186,9 @@ class _Cancelado(Exception):
 def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=None):
     """Busca y guarda subtítulos para un vídeo o para todos los de una carpeta (recursivo).
 
+    `ruta` también puede ser una lista de vídeos y carpetas: se revisan todos juntos, como si
+    estuvieran en la misma carpeta (el límite de vídeos cuenta sobre el conjunto).
+
     - `opciones`: `Opciones` (por defecto, las de la CLI sin parámetros).
     - `eventos`: `Eventos` que recibe el progreso, las líneas informativas y los resultados.
     - `cancelado`: función sin argumentos; si devuelve True, se para en el siguiente punto de
@@ -221,7 +224,10 @@ def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=Non
     configs = leer_credenciales() if credenciales is None else credenciales
     providers = [p for p in PROVIDERS if p != 'opensubtitles' or 'opensubtitles' in configs]
 
-    videos = buscar_videos(Path(ruta))
+    if isinstance(ruta, (list, tuple)):
+        videos = buscar_en_varias(ruta)
+    else:
+        videos = buscar_videos(Path(ruta))
     eventos.inicio(videos)
     resultados = []
 

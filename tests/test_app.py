@@ -211,8 +211,9 @@ class VentanaCompleta(test_nucleo.ConSimulacion):
             config.opciones = Opciones(max_videos=7)
             v = Ventana(config)
             v.mostrar()
-            v.procesar([self.videos, self.videos / 'c_incrustado.mkv'])    # el segundo, a la cola
-            self.assertEqual(v.cola, [self.videos / 'c_incrustado.mkv'])
+            v.procesar([self.videos])
+            v.procesar([self.videos / 'c_incrustado.mkv'])                  # soltado después: a la cola
+            self.assertEqual(v.cola, [[self.videos / 'c_incrustado.mkv']])
             esperar(lambda: v.trabajador is None)
             self.assertEqual(v.inicio.pila.currentIndex(), 2)                # resumen
             self.assertEqual([r.nombre for r in v.inicio.modelo.filas], ['c_incrustado.mkv'])
@@ -376,6 +377,20 @@ class MenuLateralYTabla(test_nucleo.ConSimulacion):
         esperar(lambda: v.trabajador is None)
         self.assertEqual(animada, [True])
         self.assertFalse(v.inicio.barra.trabajando)
+
+
+    def test_varios_videos_sueltos_son_una_sola_busqueda(self):
+        v = self.v
+        sueltos = [self.videos / 'z_pend.avi', self.videos / 'c_incrustado.mkv', self.videos / 'a_ya.mkv']
+        filas = []
+        v.procesar(sueltos)                                   # se sueltan los tres a la vez
+        self.assertEqual(v.cola, [])                          # nada en cola: una sola búsqueda
+        v.trabajador.video.connect(lambda *a: filas.append(len(v.inicio.modelo.filas)))
+        esperar(lambda: v.trabajador is None)
+        self.assertEqual(filas, [3, 3, 3])                   # los tres en la tabla desde el principio
+        self.assertEqual([f.nombre for f in v.inicio.modelo.filas], ['z_pend.avi', 'c_incrustado.mkv', 'a_ya.mkv'])
+        self.assertIn('3 elementos de', v.inicio.r_sub.text())
+        self.assertEqual(v.inicio.ruta_actual, self.videos)   # 'Abrir carpeta' abre la que los contiene
 
 
 class PosicionDeLaVentana(unittest.TestCase):
