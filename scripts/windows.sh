@@ -6,6 +6,7 @@
 #   scripts/windows.sh app [args...]      abre la app
 #   scripts/windows.sh python [args...]   ejecuta el Python del venv de Windows
 #   scripts/windows.sh sync               solo copia el código
+#   scripts/windows.sh compilar           .exe, zip portable (e instalador si hay Inno Setup) en dist/
 #
 # Variables: WIN_DEV (carpeta de Windows, por defecto C:\Users\<usuario>\dev\bajar-subtitulos-esp-app)
 #            WIN_PYTHON (Python de Windows para crear el venv, por defecto py.exe -3.14)
@@ -20,7 +21,7 @@ PY_VENV="$DEST/.venv/Scripts/python.exe"
 sync() {
     mkdir -p "$DEST"
     rsync -a --delete --exclude .git --exclude .venv --exclude __pycache__ \
-        --exclude build --exclude dist "$RAIZ/" "$DEST/"
+        --exclude build --exclude dist --exclude packaging/build "$RAIZ/" "$DEST/"
 }
 
 orden="${1:-}"; shift || true
@@ -37,9 +38,15 @@ case "$orden" in
     app)
         sync
         (cd "$DEST" && "$PY_VENV" -I app/main.py "$@") ;;
+    compilar)
+        sync
+        (cd "$DEST" && "$PY_VENV" -m pip install -q -r requirements-build.txt && "$PY_VENV" -I packaging/compilar.py)
+        mkdir -p "$RAIZ/dist"
+        cp "$DEST"/dist/*.zip "$DEST"/dist/*.exe "$RAIZ/dist/" 2>/dev/null || true
+        echo "Resultado en $WIN_DEV\\dist (copia en $RAIZ/dist)" ;;
     python)
         sync
         (cd "$DEST" && "$PY_VENV" "$@") ;;
     *)
-        sed -n '2,12p' "$0"; exit 1 ;;
+        sed -n '2,13p' "$0"; exit 1 ;;
 esac

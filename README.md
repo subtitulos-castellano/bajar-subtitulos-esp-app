@@ -43,7 +43,7 @@ Después se aplican en el módulo correspondiente:
 1. Separar el núcleo (`procesar()`) de la salida por pantalla, sin cambiar el comportamiento de la CLI ✅
 2. Prototipo de la ventana: arrastrar y soltar, y estilo claro/oscuro ✅ (con resultados de demostración)
 3. Interfaz completa: búsqueda real, configuración guardada, cuenta de OpenSubtitles ✅
-4. Empaquetado: `.exe`, instalador y versión portable
+4. Empaquetado: `.exe`, instalador y versión portable ✅
 5. Pruebas en Windows 10 y 11
 6. Documentación y versión 1.0
 
@@ -103,6 +103,29 @@ Preferencias: `%APPDATA%\BajarSubtitulosEsp\config.json`. La contraseña de Open
 Administrador de credenciales de Windows (servicio `BajarSubtitulosESP/opensubtitles`). Las copias
 de seguridad y el `credenciales.json` de la skill (que se puede importar) siguen en
 `%USERPROFILE%\.subtitulos-esp`.
+
+## Compilar y publicar
+
+```bash
+scripts/windows.sh compilar     # en el PC: dist/ con el zip portable (e instalador si hay Inno Setup)
+```
+
+`packaging/compilar.py` hace, en orden:
+
+1. Genera el icono, la versión del `.exe` y los avisos de licencias.
+2. Compila con PyInstaller en modo carpeta, sin UPX.
+3. Ejecuta la **autoprueba del `.exe` empaquetado**: proveedores, idiomas, keyring y una búsqueda sin red con un MKV.
+4. Crea el zip portable y, si está Inno Setup, el instalador (`packaging/instalador.iss`). El instalador
+   es por usuario, sin permisos de administrador.
+
+Para publicar una versión:
+
+1. Sube `__version__` en `app/__init__.py`.
+2. Haz commit.
+3. `git tag vX.Y.Z && git push --tags`.
+
+GitHub Actions (`.github/workflows/compilar.yml`) pasa las pruebas, compila en Windows y crea una
+Release con el instalador y el zip. También se puede lanzar a mano desde *Actions › Compilar*.
 
 ## Pruebas
 

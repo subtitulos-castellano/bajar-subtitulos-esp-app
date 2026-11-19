@@ -16,8 +16,10 @@ from .trabajador import Trabajador
 from .vista_ajustes import VistaAjustes, resumen_preferencias
 from .vista_inicio import VistaInicio
 
+from . import __version__
+
 NOMBRE_APP = 'Bajar Subtítulos ESP'
-VERSION = '0.4'
+VERSION = __version__.removesuffix('.0') if __version__.count('.') == 2 else __version__
 
 INICIO, BUSCANDO, AJUSTES = range(3)
 

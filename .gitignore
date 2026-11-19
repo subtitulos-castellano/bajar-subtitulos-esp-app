@@ -6,3 +6,4 @@ credenciales.json
 venv/
 build/
 dist/
+packaging/build/

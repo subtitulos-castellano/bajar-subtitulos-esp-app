@@ -24,13 +24,101 @@ from PySide6.QtWidgets import QApplication, QScrollArea  # noqa: E402
 from app import tema  # noqa: E402
 
 ID_APP = 'subtitulos-castellano.BajarSubtitulosESP'
+MUTEX = 'BajarSubtitulosESP'     # el instalador (AppMutex) lo usa para pedir que se cierre la app
 
 
 def _id_windows():
-    """Para que Windows agrupe la app en la barra de tareas con su propio icono."""
+    """Para que Windows agrupe la app en la barra de tareas con su propio icono, y para que el
+    instalador sepa si la app está abierta."""
     if sys.platform == 'win32':
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(ID_APP)
+        ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX)
+
+
+def autoprueba(salida, con_red=False):
+    """Comprueba que el ejecutable empaquetado lleva todo lo necesario (sin ventana) y escribe el
+    informe en `salida`. Con `con_red`, además hace una búsqueda real (simulada, sin escribir) contra
+    los proveedores. Devuelve 0 si todo va bien."""
+    import tempfile
+    import traceback
+    lineas, ok = [], True
+
+    def paso(nombre, funcion):
+        nonlocal ok
+        try:
+            lineas.append(f'OK    {nombre}: {funcion()}')
+        except Exception:  # noqa: BLE001 - se informa de cualquier fallo
+            ok = False
+            lineas.append(f'FALLO {nombre}:\n{traceback.format_exc()}')
+
+    from app import __version__
+    lineas.append(f'Bajar Subtítulos ESP {__version__} | Python {sys.version.split()[0]} | '
+                  f'empaquetado: {getattr(sys, "frozen", False)}')
+    paso('núcleo', lambda: __import__('subtitulos.nucleo', fromlist=['x']).PROVIDERS)
+
+    def proveedores():
+        from subliminal.extensions import provider_manager, refiner_manager
+        nombres = sorted(provider_manager.names())
+        faltan = [p for p in __import__('subtitulos.nucleo', fromlist=['x']).PROVIDERS if p not in nombres]
+        if faltan:
+            raise RuntimeError(f'faltan proveedores: {faltan}')
+        for p in ('addic7ed', 'gestdown', 'subtitulamos', 'opensubtitles'):
+            provider_manager[p].plugin                      # que se puedan importar
+        for r in ('hash', 'metadata', 'tvdb'):              # los que usa el núcleo (refine)
+            refiner_manager[r].plugin
+        return f'{len(nombres)} proveedores; refinadores: {sorted(refiner_manager.names())}'
+    paso('refinador metadata (duración del vídeo)',
+         lambda: __import__('subliminal.refiners.metadata', fromlist=['x']).refine.__name__)
+    paso('proveedores', proveedores)
+
+    def idiomas():
+        from babelfish import Language
+        return f"{Language('spa')} {Language.fromietf('es-ES')} {Language.fromopensubtitles('spa')}"
+    paso('idiomas (babelfish)', idiomas)
+    paso('guessit', lambda: dict(__import__('guessit').guessit('Serie.S01E02.720p.WEB-DL.mkv')))
+    paso('keyring', lambda: type(__import__('keyring').get_keyring()).__name__)
+    paso('certificados', lambda: __import__('certifi').where())
+
+    def busqueda_sin_red():
+        from subtitulos import nucleo
+        from subtitulos.opciones import Opciones
+        def el(eid, datos):
+            return eid.to_bytes((eid.bit_length() + 7) // 8, 'big') + b'\x01' + len(datos).to_bytes(7, 'big') + datos
+        texto = 'Vale, tío, ¿qué hacéis vosotros aquí? Os lo dije.'.encode()
+        pista = el(0xAE, el(0xD7, b'\x01') + el(0x86, b'S_TEXT/UTF8') + el(0x22B59C, b'spa'))
+        bloque = el(0xA0, el(0xA1, b'\x81\x00\x00\x00' + texto) + el(0x9B, (2000).to_bytes(2, 'big')))
+        mkv = el(0x1A45DFA3, el(0x4282, b'matroska')) + el(0x18538067, el(0x1654AE6B, pista)
+                                                          + el(0x1F43B675, el(0xE7, b'\x00') + bloque))
+        with tempfile.TemporaryDirectory() as d:
+            ruta = Path(d) / 'Prueba.S01E01.mkv'
+            ruta.write_bytes(mkv)
+            r = nucleo.procesar(ruta, Opciones(), credenciales={})
+            if [x.estado for x in r] != ['CASTELLANO (incrustado)']:
+                raise RuntimeError(f'resultado inesperado: {r}')
+            if ruta.with_suffix('.srt').read_text(encoding='utf-8').count('vosotros') != 1:
+                raise RuntimeError('el .srt guardado no contiene el texto de la pista')
+        return 'MKV con castellano incrustado -> .srt guardado'
+    paso('búsqueda (sin red)', busqueda_sin_red)
+
+    def busqueda_con_red():
+        from subtitulos import nucleo
+        from subtitulos.opciones import Opciones
+        with tempfile.TemporaryDirectory() as d:
+            ruta = Path(d) / 'Breaking.Bad.S01E01.720p.BluRay.x264-DEMAND.avi'
+            ruta.write_bytes(b'\0' * 1024 * 1024)
+            # Mismas credenciales que la CLI (credenciales.json), para poder comparar los resultados.
+            avisos = []
+            eventos = nucleo.Eventos()
+            eventos.detalle = lambda linea: avisos.append(linea)
+            r = nucleo.procesar(ruta, Opciones(dry_run=True), eventos)
+            if not r:
+                raise RuntimeError('sin resultado')
+            return f'{r[0].estado} · {r[0].fuente}' + ''.join(f'\n        {a}' for a in avisos)
+    if con_red:
+        paso('búsqueda real (proveedores, simulación)', busqueda_con_red)
+    Path(salida).write_text('\n'.join(lineas) + '\n', encoding='utf-8')
+    return 0 if ok else 1
 
 
 def capturar(app, ventana, carpeta):
@@ -94,7 +182,11 @@ def main(argv=None):
     ap.add_argument('--captura', metavar='CARPETA')
     ap.add_argument('--config', metavar='ARCHIVO')
     ap.add_argument('--medir-arranque', action='store_true', help=argparse.SUPPRESS)
+    ap.add_argument('--autoprueba', metavar='INFORME', help=argparse.SUPPRESS)
+    ap.add_argument('--con-red', action='store_true', help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    if args.autoprueba:
+        return autoprueba(args.autoprueba, args.con_red)
     _id_windows()
     app = QApplication(sys.argv[:1])
     app.setApplicationName('Bajar Subtítulos ESP')
