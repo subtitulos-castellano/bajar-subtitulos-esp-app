@@ -38,7 +38,7 @@ def capturar(app, ventana, carpeta):
     carpeta = Path(carpeta)
     carpeta.mkdir(parents=True, exist_ok=True)
     ventana.setAttribute(Qt.WA_DontShowOnScreen)
-    ventana.resize(1080, 720)
+    ventana.resize(tema.px(1080), tema.px(720))
     ventana.show()
     resultados = resultados_demo()
     ejemplo = Path('C:/Series/Ejemplo')
@@ -51,12 +51,15 @@ def capturar(app, ventana, carpeta):
     for nombre_tema in ('claro', 'oscuro'):
         ventana.cambiar_tema(nombre_tema)
         ventana.ir(0)
-        ventana.inicio.mostrar_reposo()
         guardar(f'{nombre_tema}_1_reposo')
         ventana.capa.mostrar('Suelta para buscar subtítulos', 'Serie de Ejemplo - Temporada 1')
         guardar(f'{nombre_tema}_2_arrastrando')
         ventana.capa.hide()
         ventana.inicio.empezar(ejemplo, demo=True)
+        ventana.hay_busqueda = True
+        ventana.trabajador = object()          # para ver el menú lateral como durante una búsqueda
+        ventana.nav_botones[1].setChecked(True)
+        ventana._actualizar_nav()
         ventana.inicio.al_iniciar([ejemplo / n for n in NOMBRES_EJEMPLO])
         for i, r in enumerate(resultados[:6], 1):
             ventana.inicio.al_video(i, len(NOMBRES_EJEMPLO), r.video)
@@ -69,12 +72,14 @@ def capturar(app, ventana, carpeta):
         for r in resultados[6:]:
             ventana.inicio.al_resultado(r)
         ventana.inicio.poner_cola(0)
+        ventana.trabajador = None
+        ventana._actualizar_nav()
         ventana.inicio.terminar(resultados, False, 83)
         guardar(f'{nombre_tema}_4_resumen')
         ventana.inicio.tarjetas['latino'].setChecked(True)
         guardar(f'{nombre_tema}_5_resumen_filtrado')
         ventana.inicio.tarjetas['latino'].setChecked(False)
-        ventana.ir(1)
+        ventana.ir(2)
         guardar(f'{nombre_tema}_6_configuracion')
         barra = ventana.ajustes.findChild(QScrollArea).verticalScrollBar()
         barra.setValue(barra.maximum())
@@ -98,13 +103,13 @@ def main(argv=None):
     config = Config(args.config)
     if args.tema:
         config.tema = args.tema
-    tema.aplicar(app, config.tema)
+    tema.aplicar(app, config.tema, config.tamano_texto)
     from app.ventana import Ventana
     ventana = Ventana(config, demo=args.demo or bool(args.captura))
     if args.captura:
         capturar(app, ventana, args.captura)
         return 0
-    ventana.show()
+    ventana.mostrar()
     if not args.demo:
         from app.trabajador import precargar
         QTimer.singleShot(300, precargar)     # subliminal se carga cuando la ventana ya se ve

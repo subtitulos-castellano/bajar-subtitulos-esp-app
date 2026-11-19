@@ -33,7 +33,7 @@ from app import credenciales, tema  # noqa: E402
 from app.componentes import FilaOpcion  # noqa: E402
 from app.config import Config  # noqa: E402
 from app.trabajador import Trabajador  # noqa: E402
-from app.ventana import Ventana, rutas_validas  # noqa: E402
+from app.ventana import AJUSTES, BUSCANDO, INICIO, Ventana, rutas_validas  # noqa: E402
 
 tema.aplicar(APP, 'claro')
 
@@ -188,10 +188,11 @@ class TrabajadorReal(test_nucleo.ConSimulacion):
         self.assertTrue((self.videos / 'd_red_cast.srt').exists())
 
     def test_cancelar(self):
-        s = self.ejecutar(Opciones(), cancelar_tras=2)
+        with mock.patch.object(test_nucleo.nucleo, 'ProviderPool', PoolLento):
+            s = self.ejecutar(Opciones(), cancelar_tras=3)    # cuando d_red_cast espera al proveedor
         resultados, cancelado = s['fin']
         self.assertTrue(cancelado)
-        self.assertEqual(len(resultados), 2)
+        self.assertEqual(len(resultados), 3)
 
     def test_un_error_no_rompe_la_app(self):
         def falla(*a, **k):
@@ -209,6 +210,7 @@ class VentanaCompleta(test_nucleo.ConSimulacion):
             config = Config(Path(d) / 'config.json')
             config.opciones = Opciones(max_videos=7)
             v = Ventana(config)
+            v.mostrar()
             v.procesar([self.videos, self.videos / 'c_incrustado.mkv'])    # el segundo, a la cola
             self.assertEqual(v.cola, [self.videos / 'c_incrustado.mkv'])
             esperar(lambda: v.trabajador is None)
@@ -216,7 +218,7 @@ class VentanaCompleta(test_nucleo.ConSimulacion):
             self.assertEqual([r.nombre for r in v.inicio.modelo.filas], ['c_incrustado.mkv'])
             self.assertTrue(v.inicio.tarjetas[ev.YA_CASTELLANO].isVisibleTo(v.inicio))
             v.close()
-            self.assertTrue(json.loads((Path(d) / 'config.json').read_text(encoding='utf-8'))['geometria'])
+            self.assertGreater(json.loads((Path(d) / 'config.json').read_text(encoding='utf-8'))['ventana']['ancho'], 0)
 
     def test_resumen_con_pendientes(self):
         with tempfile.TemporaryDirectory() as d:
@@ -248,6 +250,191 @@ class VentanaCompleta(test_nucleo.ConSimulacion):
             v.ajustes.restaurar()
             self.assertEqual(Config(ruta).opciones, Opciones())
             v.close()
+
+
+class PoolLento(test_nucleo.PoolFalso):
+    """Proveedor que tarda 3 s en responder."""
+
+    def list_subtitles(self, video, languages):
+        time.sleep(3)
+        return super().list_subtitles(video, languages)
+
+
+class CancelarAlMomento(test_nucleo.ConSimulacion):
+    def test_la_interfaz_no_espera_a_la_consulta_en_curso(self):
+        with mock.patch.object(test_nucleo.nucleo, 'ProviderPool', PoolLento):
+            t = Trabajador(self.videos, Opciones(), {})
+            s = {'fin': None, 'tras_cancelar': []}
+            t.terminado.connect(lambda res, canc, seg: s.__setitem__('fin', (res, canc)))
+
+            def video(i, n, path):
+                if path.name == 'd_red_cast.avi':          # primer vídeo que consulta a internet
+                    QTimerSingleShot(300, cancelar)
+            t.video.connect(video)
+
+            def cancelar():
+                s['pulsado'] = time.monotonic()
+                t.cancelar()
+                s['respuesta'] = time.monotonic() - s['pulsado']
+            t.resultado.connect(lambda r: s['tras_cancelar'].append(r) if 'pulsado' in s else None)
+            t.empezar()
+            esperar(lambda: s['fin'] is not None)
+            self.assertLess(s['respuesta'], 0.1)            # la interfaz se entera al instante
+            resultados, cancelado = s['fin']
+            self.assertTrue(cancelado)
+            self.assertEqual(len(resultados), 3)
+            t.esperar(10)                                   # el hilo termina su consulta y para
+            self.assertFalse(t.activo())
+            self.assertEqual(s['tras_cancelar'], [])        # nada llega a la interfaz después
+            self.assertFalse((self.videos / 'd_red_cast.srt').exists())   # ni se escribe
+
+
+def QTimerSingleShot(ms, funcion):
+    from PySide6.QtCore import QTimer
+    QTimer.singleShot(ms, funcion)
+
+
+class MenuLateralYTabla(test_nucleo.ConSimulacion):
+    def setUp(self):
+        super().setUp()
+        self._d = tempfile.TemporaryDirectory()
+        config = Config(Path(self._d.name) / 'config.json')
+        config.opciones = Opciones(max_videos=7)
+        self.v = Ventana(config)
+
+    def tearDown(self):
+        self.v.close()
+        self._d.cleanup()
+        super().tearDown()
+
+    def test_estados_del_menu(self):
+        v, nav = self.v, self.v.nav_botones
+        self.assertTrue(nav[INICIO].isChecked())
+        self.assertFalse(nav[BUSCANDO].isEnabled())            # sin búsqueda, no se puede pulsar
+        estados = []
+
+        def al_video(*a):
+            estados.append((nav[INICIO].isEnabled(), nav[BUSCANDO].isChecked(), nav[AJUSTES].isEnabled()))
+        v.procesar([self.videos])
+        v.trabajador.video.connect(al_video)
+        esperar(lambda: v.trabajador is None)
+        self.assertTrue(estados)
+        self.assertTrue(all(e == (False, True, False) for e in estados))   # buscando: solo 'Buscando…'
+        self.assertTrue(nav[INICIO].isEnabled() and nav[AJUSTES].isEnabled())
+        self.assertTrue(nav[BUSCANDO].isChecked() and nav[BUSCANDO].isEnabled())
+        v.ir(AJUSTES)
+        v.ir(BUSCANDO)                                          # se puede volver al resumen
+        self.assertEqual(v.inicio.pila.currentIndex(), 2)
+        v.ir(INICIO)
+        self.assertEqual(v.inicio.pila.currentIndex(), 0)       # la pantalla del principio
+        self.assertFalse(nav[BUSCANDO].isEnabled())
+
+    def test_lista_completa_desde_el_principio(self):
+        v = self.v
+        capturas = []
+
+        def al_video(i, total, path):
+            capturas.append([f.categoria for f in v.inicio.modelo.filas])
+        v.procesar([self.videos])
+        v.trabajador.video.connect(al_video)
+        self.assertTrue(v.inicio.detalles_p.boton.isChecked())   # Detalles abierto al empezar
+        esperar(lambda: v.trabajador is None)
+        primera = capturas[0]
+        self.assertEqual(len(primera), 11)                        # todos los vídeos, desde el principio
+        self.assertEqual(primera[0], tema.BUSCANDO)
+        self.assertTrue(all(c == tema.EN_ESPERA for c in primera[1:]))
+        quinta = capturas[4]
+        self.assertEqual(quinta[4], tema.BUSCANDO)
+        self.assertNotIn(tema.EN_ESPERA, quinta[:4])
+        self.assertEqual([f.categoria for f in v.inicio.modelo.filas], CATEGORIAS_S1)
+
+    def test_tras_cancelar_lo_que_falta_queda_no_revisado(self):
+        v = self.v
+        with mock.patch.object(test_nucleo.nucleo, 'ProviderPool', PoolLento):
+            v.procesar([self.videos])
+            # Cancelar mientras d_red_cast espera al proveedor (3 s).
+            v.trabajador.video.connect(lambda i, n, p: v._cancelar() if p.name == 'd_red_cast.avi' else None)
+            inicio = time.monotonic()
+            esperar(lambda: v.trabajador is None)
+            self.assertLess(time.monotonic() - inicio, 2.5)    # no espera a que responda el proveedor
+        cats = [f.categoria for f in v.inicio.modelo.filas]
+        self.assertEqual(cats[:3], [ev.YA_CASTELLANO, ev.YA_CASTELLANO, ev.CASTELLANO])
+        self.assertTrue(all(c == tema.NO_REVISADO for c in cats[3:]))
+        self.assertEqual(v.inicio.r_titulo.text(), 'Cancelado')
+        self.assertEqual(v.inicio.tarjetas[tema.NO_REVISADO].valor, 8)
+        self.assertIn('3 de 11', v.inicio.r_sub.text())
+        time.sleep(3.2)                                        # el hilo acaba su consulta en segundo plano...
+        APP.processEvents()
+        self.assertEqual([f.categoria for f in v.inicio.modelo.filas], cats)    # ...sin tocar el resumen
+        self.assertFalse((self.videos / 'd_red_cast.srt').exists())
+
+    def test_un_solo_video_anima_la_barra(self):
+        v = self.v
+        animada = []
+        v.procesar([self.videos / 'd_red_cast.avi'])
+        v.trabajador.video.connect(lambda *a: animada.append(v.inicio.barra.trabajando))
+        esperar(lambda: v.trabajador is None)
+        self.assertEqual(animada, [True])
+        self.assertFalse(v.inicio.barra.trabajando)
+
+
+class PosicionDeLaVentana(unittest.TestCase):
+    def test_se_recuerda_sin_desplazarse(self):
+        with tempfile.TemporaryDirectory() as d:
+            ruta = Path(d) / 'config.json'
+            c = Config(ruta)
+            c.ventana = {'x': 40, 'y': 30, 'ancho': 1500, 'alto': 950, 'maximizada': False}
+            c.guardar()
+            for _ in range(3):                       # abrir y cerrar varias veces: no debe moverse
+                v = Ventana(Config(ruta))
+                v.mostrar()
+                APP.processEvents()
+                v.close()
+            self.assertEqual(Config(ruta).ventana, c.ventana)
+
+    def test_fuera_de_la_pantalla_no_se_mueve_alli(self):
+        with tempfile.TemporaryDirectory() as d:
+            c = Config(Path(d) / 'config.json')
+            c.ventana = {'x': 50000, 'y': 50000, 'ancho': 900, 'alto': 620, 'maximizada': False}
+            v = Ventana(c)
+            self.assertLess(v.pos().x(), 10000)
+            v.close()
+
+
+class TamanoDelTexto(unittest.TestCase):
+    def tearDown(self):
+        tema.aplicar(APP, 'claro')
+
+    def test_escala_todo(self):
+        tema.aplicar(APP, 'claro', 150)
+        self.assertEqual(tema.px(100), 150)
+        self.assertAlmostEqual(APP.font().pointSizeF(), 15)
+        self.assertIn('font-size: 15.00pt', APP.styleSheet())
+        tema.aplicar(APP, 'claro', 100)
+        self.assertEqual(tema.px(100), 100)
+
+    def test_como_windows_por_defecto(self):
+        tema.aplicar(APP, 'claro', 0)
+        self.assertAlmostEqual(tema.escala(), tema.escala_windows() / 100)
+
+    def test_configuracion(self):
+        with tempfile.TemporaryDirectory() as d:
+            ruta = Path(d) / 'config.json'
+            v = Ventana(Config(ruta))
+            a = v.ajustes
+            a.b_tamano_propio.click()
+            a.tamano.setValue(140)
+            a._aplicar_tamano()                      # (normalmente, 0,4 s después de dejar de cambiarlo)
+            self.assertEqual(Config(ruta).tamano_texto, 140)
+            self.assertEqual(tema.px(100), 140)
+            a.b_tamano_windows.click()
+            self.assertEqual(Config(ruta).tamano_texto, 0)
+            v.close()
+        for valor, esperado in ((300, 0), (50, 0), ('120', 0), (True, 0), (120, 120)):
+            with tempfile.TemporaryDirectory() as d:
+                ruta = Path(d) / 'config.json'
+                ruta.write_text(json.dumps({'tamano_texto': valor}), encoding='utf-8')
+                self.assertEqual(Config(ruta).tamano_texto, esperado)
 
 
 if __name__ == '__main__':

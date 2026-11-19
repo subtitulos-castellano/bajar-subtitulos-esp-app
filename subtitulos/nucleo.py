@@ -23,6 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 from babelfish import Language
+from dogpile.cache.exception import RegionAlreadyConfigured
 from guessit import guessit
 from subliminal import region, refine, scan_video
 from subliminal.core import ProviderPool
@@ -108,11 +109,16 @@ def duracion_ok(texto, video):
     return 0.6 * dur <= fin <= dur + 120
 
 
-def ingles_proveedores(pool, video, max_descargas=MAX_DESCARGAS, detalle=lambda linea: None):
+def _seguir():
+    pass
+
+
+def ingles_proveedores(pool, video, max_descargas=MAX_DESCARGAS, detalle=lambda linea: None, comprobar=_seguir):
     """Busca subtítulos en inglés; descarga por orden de puntuación hasta encontrar uno válido."""
     candidatos = pool.list_subtitles(video, {Language('eng')})
     candidatos.sort(key=lambda s: compute_score(s, video), reverse=True)
     for sub in candidatos[:max_descargas]:
+        comprobar()
         if not pool.download_subtitle(sub) or not sub.content:
             continue
         texto = sub.text
@@ -173,13 +179,18 @@ def _no_cancelado():
     return False
 
 
+class _Cancelado(Exception):
+    """Uso interno: corta procesar() en cuanto se cancela, sin esperar a terminar el vídeo."""
+
+
 def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=None):
     """Busca y guarda subtítulos para un vídeo o para todos los de una carpeta (recursivo).
 
     - `opciones`: `Opciones` (por defecto, las de la CLI sin parámetros).
     - `eventos`: `Eventos` que recibe el progreso, las líneas informativas y los resultados.
-    - `cancelado`: función sin argumentos; si devuelve True, se para antes del siguiente vídeo
-      (o durante la pausa entre vídeos). Lo ya guardado se queda guardado.
+    - `cancelado`: función sin argumentos; si devuelve True, se para en el siguiente punto de
+      control: entre vídeos, durante la pausa, entre consultas a los proveedores y antes de
+      escribir. Tras cancelar no se escribe nada más; lo ya guardado se queda guardado.
     - `credenciales`: configuración de proveedores ({'opensubtitles': {...}}); None = leer
       ~/.subtitulos-esp/credenciales.json.
 
@@ -191,14 +202,22 @@ def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=Non
     detalle = eventos.detalle
     max_descargas = opciones.max_descargas or None  # None: sin límite
 
+    def comprobar():
+        if cancelado():
+            raise _Cancelado
+
     def escribir(texto, destino):
+        comprobar()
         if opciones.dry_run:
             detalle(f'  [dry-run] guardaría {destino.name}')
         else:
             guardar(texto, destino)
 
     if not region.is_configured:
-        region.configure('dogpile.cache.memory')
+        try:
+            region.configure('dogpile.cache.memory')
+        except RegionAlreadyConfigured:     # otra búsqueda la ha configurado a la vez
+            pass
     configs = leer_credenciales() if credenciales is None else credenciales
     providers = [p for p in PROVIDERS if p != 'opensubtitles' or 'opensubtitles' in configs]
 
@@ -211,6 +230,16 @@ def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=Non
         resultados.append(r)
         eventos.resultado(r)
 
+    try:
+        _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar, detalle,
+                  max_descargas, providers, configs)
+    except _Cancelado:
+        pass
+    return resultados
+
+
+def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar, detalle, max_descargas,
+              providers, configs):
     buscados = 0  # vídeos que ya han buscado en internet en esta ejecución
     with ProviderPool(providers=providers, provider_configs=configs) as pool:
         for indice, path in enumerate(videos, 1):
@@ -247,6 +276,7 @@ def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=Non
                     anotar(path, f'{ETIQUETA[actual]} (ya tenía .srt)', nota, SIN_CAMBIOS)
 
             emb = incrustado(path, opciones.ingles, detalle)
+            comprobar()
             destino_en = path.with_suffix('.en.srt')
             if emb['ingles'] and (opciones.force or not destino_en.exists()):
                 escribir(emb['ingles'][0], destino_en)
@@ -273,14 +303,17 @@ def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=Non
                     video.series = g['title']
                     video.title = g.get('episode_title')
             refine(video, refiners=['hash', 'metadata', 'tvdb'])
+            comprobar()
 
             candidatos = pool.list_subtitles(video, {Language('spa')})
+            comprobar()
             if max_descargas and len(candidatos) > max_descargas:
                 detalle(f'  {len(candidatos)} candidatos en español: se descargan los {max_descargas} '
                         f'mejores, alternando proveedores')
             castellanos, latinos = [], []
             vistos = set()
             for sub in mejores_candidatos(candidatos, video, max_descargas):
+                comprobar()
                 if not pool.download_subtitle(sub) or not sub.content:
                     continue
                 texto = sub.text
@@ -325,9 +358,8 @@ def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=Non
                 if texto:
                     aplicar('ingles', texto, 'INGLÉS (incrustado)', pista[:30])
                     continue
-                texto, sub = ingles_proveedores(pool, video, max_descargas, detalle)
+                texto, sub = ingles_proveedores(pool, video, max_descargas, detalle, comprobar)
                 if texto:
                     aplicar('ingles', texto, 'INGLÉS', f'{sub.provider_name} {sub.id}')
                 else:
                     anotar(path, 'NO ENCONTRADO', 'ni español ni inglés', NO_ENCONTRADO)
-    return resultados

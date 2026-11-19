@@ -1,11 +1,17 @@
-"""Colores, tipografía y hoja de estilos (QSS) de la app, en claro y oscuro.
+"""Colores, tamaño del texto y hoja de estilos (QSS) de la app, en claro y oscuro.
 
 Los colores de estado son fijos y siempre van con icono y texto, nunca solos:
 castellano = bien (verde), latino = aviso (ámbar), inglés = serio (naranja),
 no encontrado = crítico (rojo); pendiente (violeta) y sin cambios (gris) son informativos.
+
+Tamaño del texto: por defecto sigue a Windows (Configuración › Accesibilidad › Tamaño del
+texto, que guarda TextScaleFactor en el registro), igual que el Explorador. Todo lo que tiene
+que ver con texto (letra, márgenes, alturas de filas y tarjetas) se multiplica por esa escala.
 """
+import sys
+
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor, QGuiApplication, QPalette
+from PySide6.QtGui import QColor, QFont, QGuiApplication, QPalette
 
 from subtitulos import eventos as ev
 
@@ -28,6 +34,11 @@ OSCURO = {
     'error_suave': '#331717', 'error_borde': '#6b2a2a',
 }
 
+# Estados de la tabla mientras se busca (solo de la interfaz, no del núcleo).
+EN_ESPERA = 'en_espera'        # aún no se ha revisado
+BUSCANDO = 'buscando'          # el vídeo que se está revisando ahora
+NO_REVISADO = 'no_revisado'    # se canceló antes de llegar a él
+
 # Categoría -> (color claro, color oscuro, icono, nombre corto, explicación)
 # "Ya lo tenían" usa un verde más suave que "Castellano": los dos son buenos, pero solo uno es nuevo.
 ESTADOS = {
@@ -40,10 +51,17 @@ ESTADOS = {
     ev.PENDIENTE: ('#6250d6', '#9085e9', 'reloj', 'Pendientes',
                    'Superan el límite de vídeos por tanda: se harán la próxima vez'),
     ev.NO_ENCONTRADO: ('#d03b3b', '#e05555', 'error', 'Sin subtítulos', 'No se ha encontrado ningún subtítulo'),
+    NO_REVISADO: ('#a3a29b', '#6f6e68', 'circulo', 'No revisados',
+                  'No se llegaron a revisar porque se canceló la búsqueda'),
 }
 ORDEN_ESTADOS = list(ESTADOS)
+ESTADOS_PROGRESO = {
+    EN_ESPERA: (None, None, 'circulo', 'En espera', 'Todavía no se ha revisado'),
+    BUSCANDO: (None, None, 'buscar', 'Buscando…', 'Se está revisando ahora'),
+}
 
 _actual = CLARO
+_escala = 1.0
 
 
 def actual():
@@ -55,38 +73,97 @@ def oscuro():
     return _actual is OSCURO
 
 
+def _estado(categoria):
+    return ESTADOS.get(categoria) or ESTADOS_PROGRESO[categoria]
+
+
 def color_estado(categoria):
+    if categoria == EN_ESPERA:
+        return _actual['texto3']
+    if categoria == BUSCANDO:
+        return _actual['acento']
     claro, osc = ESTADOS[categoria][:2]
     return osc if oscuro() else claro
 
 
 def icono_estado(categoria):
-    return ESTADOS[categoria][2]
+    return _estado(categoria)[2]
 
 
 def nombre_estado(categoria):
-    return ESTADOS[categoria][3]
+    return _estado(categoria)[3]
 
 
 def explicacion_estado(categoria):
-    return ESTADOS[categoria][4]
+    return _estado(categoria)[4]
 
+
+# ---------- Tamaño del texto ----------
+
+def escala_windows():
+    """Porcentaje de 'Tamaño del texto' de Windows (100-225). 100 si no se puede leer."""
+    if sys.platform != 'win32':
+        return 100
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Accessibility') as k:
+            valor, _ = winreg.QueryValueEx(k, 'TextScaleFactor')
+        return min(225, max(100, int(valor)))
+    except (OSError, ValueError, TypeError):
+        return 100
+
+
+def porcentaje(tamano_texto):
+    """tamano_texto: 0 = como Windows; si no, el porcentaje elegido."""
+    return escala_windows() if not tamano_texto else tamano_texto
+
+
+def escala():
+    return _escala
+
+
+def px(n):
+    """Medida en píxeles que crece con el texto."""
+    return max(1, round(n * _escala))
+
+
+def pt(n):
+    """Tamaño de letra en puntos, con la escala aplicada."""
+    return n * _escala
+
+
+def fuente(base, puntos, peso=None, titulo=False):
+    f = QFont(base)
+    if titulo:
+        f.setFamilies(['Segoe UI Variable Display', 'Segoe UI'])
+    f.setPointSizeF(pt(puntos))
+    if peso is not None:
+        f.setWeight(peso)
+    return f
+
+
+# ---------- Aplicar ----------
 
 def sistema_oscuro():
     return QGuiApplication.styleHints().colorScheme() == Qt.ColorScheme.Dark
 
 
-def aplicar(app, preferencia='sistema'):
-    """Aplica el tema ('sistema', 'claro' u 'oscuro'). Devuelve los colores elegidos."""
-    global _actual
+def aplicar(app, preferencia='sistema', tamano_texto=0):
+    """Aplica el tema ('sistema', 'claro' u 'oscuro') y el tamaño del texto. Devuelve los colores."""
+    global _actual, _escala
     es_oscuro = sistema_oscuro() if preferencia == 'sistema' else preferencia == 'oscuro'
     _actual = OSCURO if es_oscuro else CLARO
+    _escala = porcentaje(tamano_texto) / 100
     hints = QGuiApplication.styleHints()
     if hasattr(hints, 'setColorScheme'):          # Qt >= 6.8: también la barra de título de Windows
         hints.setColorScheme(Qt.ColorScheme.Unknown if preferencia == 'sistema'
                              else Qt.ColorScheme.Dark if es_oscuro else Qt.ColorScheme.Light)
     app.setStyle('Fusion')
     app.setPalette(_paleta(_actual))
+    f = QFont(app.font())
+    f.setFamilies(['Segoe UI Variable Text', 'Segoe UI'])
+    f.setPointSizeF(pt(10))
+    app.setFont(f)
     app.setStyleSheet(qss(_actual))
     return _actual
 
@@ -113,41 +190,48 @@ FUENTE_MONO = '"Cascadia Mono", Consolas, monospace'
 
 
 def qss(t):
+    def f(n):
+        return f'{pt(n):.2f}pt'
+
+    def p(n):
+        return f'{px(n)}px'
+
     return f'''
-* {{ font-family: {FUENTE}; font-size: 10pt; }}
+* {{ font-family: {FUENTE}; font-size: {f(10)}; }}
 QWidget {{ color: {t['texto']}; }}
 QMainWindow, #raiz, #pagina {{ background: {t['fondo']}; }}
 QToolTip {{ background: {t['superficie']}; color: {t['texto']}; border: 1px solid {t['borde']}; padding: 4px 6px; }}
 
 #lateral {{ background: {t['lateral']}; border-right: 1px solid {t['borde']}; }}
-#marca {{ font-family: {FUENTE_TITULO}; font-size: 11.5pt; font-weight: 600; }}
-#marcaSub {{ color: {t['texto3']}; font-size: 8.5pt; }}
-#version {{ color: {t['texto3']}; font-size: 8.5pt; }}
-QPushButton#nav {{ text-align: left; padding: 9px 12px; border: 1px solid transparent; border-radius: 8px;
-                   background: transparent; color: {t['texto2']}; }}
+#marca {{ font-family: {FUENTE_TITULO}; font-size: {f(11.5)}; font-weight: 600; }}
+#marcaSub {{ color: {t['texto3']}; font-size: {f(8.5)}; }}
+#version {{ color: {t['texto3']}; font-size: {f(8.5)}; }}
+QPushButton#nav {{ text-align: left; padding: {p(9)} {p(12)}; border: 1px solid transparent; border-radius: 8px;
+                   background: transparent; color: {t['texto2']}; qproperty-iconSize: {p(18)} {p(18)}; }}
 QPushButton#nav:hover {{ background: {t['superficie_hover']}; color: {t['texto']}; }}
-QPushButton#nav:checked {{ background: {t['superficie']}; color: {t['texto']}; font-weight: 600;
-                           border: 1px solid {t['borde']}; }}
+QPushButton#nav:checked, QPushButton#nav:checked:disabled {{
+    background: {t['superficie']}; color: {t['texto']}; font-weight: 600; border: 1px solid {t['borde']}; }}
+QPushButton#nav:disabled {{ color: {t['texto3']}; background: transparent; }}
 
-#titulo {{ font-family: {FUENTE_TITULO}; font-size: 19pt; font-weight: 600; }}
-#subtitulo {{ color: {t['texto2']}; font-size: 10.5pt; }}
-#seccion {{ font-family: {FUENTE_TITULO}; font-size: 12pt; font-weight: 600; }}
-#ayuda {{ color: {t['texto3']}; font-size: 9pt; }}
+#titulo {{ font-family: {FUENTE_TITULO}; font-size: {f(19)}; font-weight: 600; }}
+#subtitulo {{ color: {t['texto2']}; font-size: {f(10.5)}; }}
+#seccion {{ font-family: {FUENTE_TITULO}; font-size: {f(12)}; font-weight: 600; }}
+#ayuda {{ color: {t['texto3']}; font-size: {f(9)}; }}
 #secundario {{ color: {t['texto2']}; }}
 #tarjeta {{ background: {t['superficie']}; border: 1px solid {t['borde']}; border-radius: 12px; }}
 #separador {{ background: {t['borde']}; max-height: 1px; min-height: 1px; border: none; }}
 
 #zona {{ background: {t['superficie']}; border: 2px dashed {t['borde_fuerte']}; border-radius: 18px; }}
 #zona[activa="true"] {{ background: {t['acento_suave']}; border: 2px solid {t['acento']}; }}
-#zonaTitulo {{ font-family: {FUENTE_TITULO}; font-size: 15pt; font-weight: 600; }}
+#zonaTitulo {{ font-family: {FUENTE_TITULO}; font-size: {f(15)}; font-weight: 600; }}
 #zonaTexto {{ color: {t['texto2']}; }}
-#resumenOpciones {{ color: {t['texto3']}; font-size: 9pt; }}
+#resumenOpciones {{ color: {t['texto3']}; font-size: {f(9)}; }}
 
 #banner {{ background: {t['aviso_suave']}; border: 1px solid {t['aviso_borde']}; border-radius: 8px; }}
 #bannerError {{ background: {t['error_suave']}; border: 1px solid {t['error_borde']}; border-radius: 8px; }}
 
-QPushButton {{ padding: 7px 14px; border-radius: 6px; border: 1px solid {t['borde_fuerte']};
-               background: {t['superficie']}; color: {t['texto']}; }}
+QPushButton {{ padding: {p(7)} {p(14)}; border-radius: 6px; border: 1px solid {t['borde_fuerte']};
+               background: {t['superficie']}; color: {t['texto']}; qproperty-iconSize: {p(16)} {p(16)}; }}
 QPushButton:hover {{ background: {t['superficie_hover']}; }}
 QPushButton:pressed {{ background: {t['borde']}; }}
 QPushButton:disabled {{ color: {t['texto3']}; border-color: {t['borde']}; }}
@@ -156,27 +240,30 @@ QPushButton#primario {{ background: {t['acento']}; color: {t['acento_texto']}; b
 QPushButton#primario:hover {{ background: {t['acento_hover']}; border-color: {t['acento_hover']}; }}
 QPushButton#primario:disabled {{ background: {t['superficie']}; color: {t['texto3']}; border-color: {t['borde']};
                                  font-weight: normal; }}
-QPushButton#plano {{ background: transparent; border: none; color: {t['texto2']}; padding: 6px 8px; }}
+QPushButton#plano {{ background: transparent; border: none; color: {t['texto2']}; padding: {p(6)} {p(8)}; }}
 QPushButton#plano:hover {{ color: {t['texto']}; background: {t['superficie_hover']}; }}
-
-QProgressBar {{ background: {t['pista']}; border: none; border-radius: 3px; min-height: 6px; max-height: 6px; }}
-QProgressBar::chunk {{ background: {t['acento']}; border-radius: 3px; }}
+QPushButton#segmento {{ border-radius: 0; padding: {p(6)} {p(16)}; margin: 0; }}
+QPushButton#segmento[pos="ini"] {{ border-top-left-radius: 6px; border-bottom-left-radius: 6px; }}
+QPushButton#segmento[pos="medio"] {{ border-left: none; border-right: none; }}
+QPushButton#segmento[pos="fin"] {{ border-top-right-radius: 6px; border-bottom-right-radius: 6px; }}
+QPushButton#segmento:checked {{ background: {t['acento']}; color: {t['acento_texto']};
+                                border-color: {t['acento']}; font-weight: 600; }}
 
 QTableView {{ background: {t['superficie']}; border: 1px solid {t['borde']}; border-radius: 12px;
               gridline-color: transparent; selection-background-color: {t['acento_suave']};
               selection-color: {t['texto']}; outline: none; }}
-QTableView::item {{ border-bottom: 1px solid {t['borde']}; padding: 0 8px; }}
+QTableView::item {{ border-bottom: 1px solid {t['borde']}; padding: 0 {p(8)}; }}
 QHeaderView {{ background: transparent; }}
 QHeaderView::section {{ background: {t['superficie']}; color: {t['texto3']}; border: none;
-                        border-bottom: 1px solid {t['borde']}; padding: 8px 10px; font-size: 8.5pt;
+                        border-bottom: 1px solid {t['borde']}; padding: {p(8)} {p(10)}; font-size: {f(8.5)};
                         font-weight: 600; }}
 QHeaderView::section:first {{ border-top-left-radius: 12px; }}
 QHeaderView::section:last {{ border-top-right-radius: 12px; }}
 
-QPlainTextEdit#log {{ font-family: {FUENTE_MONO}; font-size: 9pt; background: {t['superficie']};
-                      border: 1px solid {t['borde']}; border-radius: 8px; padding: 6px; color: {t['texto2']}; }}
+QPlainTextEdit#log {{ font-family: {FUENTE_MONO}; font-size: {f(10)}; background: {t['superficie']};
+                      border: 1px solid {t['borde']}; border-radius: 8px; padding: {p(8)}; color: {t['texto2']}; }}
 
-QLineEdit, QSpinBox {{ padding: 6px 8px; border: 1px solid {t['borde_fuerte']}; border-radius: 6px;
+QLineEdit, QSpinBox {{ padding: {p(6)} {p(8)}; border: 1px solid {t['borde_fuerte']}; border-radius: 6px;
                        background: {t['superficie']}; selection-background-color: {t['acento']}; }}
 QLineEdit:focus, QSpinBox:focus {{ border: 1px solid {t['acento']}; }}
 /* Sin flechas: se escribe el número o se usa la rueda. (setButtonSymbols(NoButtons) junto con una
@@ -184,8 +271,8 @@ QLineEdit:focus, QSpinBox:focus {{ border: 1px solid {t['acento']}; }}
 QSpinBox::up-button, QSpinBox::down-button {{ width: 0px; border: none; }}
 QLineEdit:disabled, QSpinBox:disabled {{ color: {t['texto3']}; background: {t['fondo']}; border-color: {t['borde']}; }}
 
-QCheckBox {{ spacing: 8px; }}
-QCheckBox::indicator {{ width: 16px; height: 16px; border: 1px solid {t['borde_fuerte']}; border-radius: 4px;
+QCheckBox {{ spacing: {p(8)}; }}
+QCheckBox::indicator {{ width: {p(16)}; height: {p(16)}; border: 1px solid {t['borde_fuerte']}; border-radius: 4px;
                         background: {t['superficie']}; }}
 QCheckBox::indicator:checked {{ background: {t['acento']}; border-color: {t['acento']}; }}
 

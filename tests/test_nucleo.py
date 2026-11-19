@@ -279,6 +279,30 @@ class CancelarDuranteLaPausa(ConSimulacion):
         self.assertEqual(len(resumen), 4)
 
 
+class PoolLento(PoolFalso):
+    """Un proveedor que tarda en responder; el usuario cancela mientras tanto."""
+    cancelar = None
+
+    def list_subtitles(self, video, languages):
+        PoolLento.cancelar()            # pulsa Cancelar mientras se espera la respuesta
+        time.sleep(0.3)
+        return super().list_subtitles(video, languages)
+
+
+class CancelarDuranteUnaConsulta(ConSimulacion):
+    def test_no_escribe_nada_despues_de_cancelar(self):
+        """Al volver la respuesta del proveedor, se ve la cancelación y no se guarda ese subtítulo."""
+        estado = {'cancelado': False}
+        PoolLento.cancelar = lambda: estado.__setitem__('cancelado', True)
+        g = Grabadora()
+        with mock.patch.object(nucleo, 'ProviderPool', PoolLento):
+            resumen = nucleo.procesar(self.videos, eventos=g, cancelado=lambda: estado['cancelado'],
+                                      credenciales={})
+        self.assertEqual([r.nombre for r in resumen], ['a_ya.mkv', 'b_renombra.mp4', 'c_incrustado.mkv'])
+        self.assertEqual(g.progreso[-1][2], 'd_red_cast.avi')     # llegó a consultar por d_red_cast
+        self.assertFalse((self.videos / 'd_red_cast.srt').exists())
+
+
 class OpcionesValidas(unittest.TestCase):
     def test_por_defecto_iguales_que_la_cli(self):
         o = Opciones()

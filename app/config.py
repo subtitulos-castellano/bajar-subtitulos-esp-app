@@ -12,6 +12,7 @@ from pathlib import Path
 from subtitulos.opciones import Opciones
 
 TEMAS = ('sistema', 'claro', 'oscuro')
+TAMANO_MIN, TAMANO_MAX = 80, 225    # % del tamaño del texto si no se usa el de Windows (0)
 
 
 def carpeta():
@@ -25,7 +26,8 @@ class Config:
         self.opciones = Opciones()
         self.tema = 'sistema'
         self.usuario_opensubtitles = ''
-        self.geometria = ''          # tamaño y posición de la ventana (base64 de Qt)
+        self.tamano_texto = 0         # 0 = como Windows; si no, porcentaje (80-225)
+        self.ventana = {}             # {'x', 'y', 'ancho', 'alto', 'maximizada'}
         self.cargar()
 
     def cargar(self):
@@ -46,12 +48,20 @@ class Config:
             self.tema = datos['tema']
         if isinstance(datos.get('usuario_opensubtitles'), str):
             self.usuario_opensubtitles = datos['usuario_opensubtitles']
-        if isinstance(datos.get('geometria'), str):
-            self.geometria = datos['geometria']
+        t = datos.get('tamano_texto')
+        if isinstance(t, int) and not isinstance(t, bool) and (t == 0 or TAMANO_MIN <= t <= TAMANO_MAX):
+            self.tamano_texto = t
+        v = datos.get('ventana')
+        if (isinstance(v, dict) and all(isinstance(v.get(k), int) and not isinstance(v.get(k), bool)
+                                        for k in ('x', 'y', 'ancho', 'alto'))
+                and v['ancho'] > 0 and v['alto'] > 0):
+            self.ventana = {k: v[k] for k in ('x', 'y', 'ancho', 'alto')}
+            self.ventana['maximizada'] = v.get('maximizada') is True
 
     def guardar(self):
         datos = {'opciones': asdict(self.opciones), 'tema': self.tema,
-                 'usuario_opensubtitles': self.usuario_opensubtitles, 'geometria': self.geometria}
+                 'usuario_opensubtitles': self.usuario_opensubtitles, 'tamano_texto': self.tamano_texto,
+                 'ventana': self.ventana}
         try:
             self.ruta.parent.mkdir(parents=True, exist_ok=True)
             temporal = self.ruta.with_suffix('.tmp')

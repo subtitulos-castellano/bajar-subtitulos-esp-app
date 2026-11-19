@@ -31,6 +31,8 @@ TRAZOS = {
     'error': '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
     'reloj': '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
     'igual': '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>',
+    'circulo': '<circle cx="12" cy="12" r="9" stroke-dasharray="3.5 3"/>',
+    'buscar': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
 }
 
 

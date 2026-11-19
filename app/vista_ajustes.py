@@ -1,8 +1,8 @@
 """Pantalla Configuración: las opciones de la CLI convertidas en preferencias que se guardan solas."""
 import threading
 
-from PySide6.QtCore import QObject, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QFont, QFontMetrics
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLineEdit, QPushButton,
                                QScrollArea, QSpinBox, QVBoxLayout, QWidget)
 
@@ -10,6 +10,7 @@ from subtitulos.archivos import HOME
 from subtitulos.opciones import MAX_DESCARGAS, MAX_VIDEOS, Opciones
 
 from . import credenciales, iconos, tema
+from .config import TAMANO_MAX, TAMANO_MIN
 from .componentes import FilaOpcion, IconoLabel
 from .vista_inicio import MARGEN, boton, etiqueta
 
@@ -80,6 +81,7 @@ class _Prueba(QObject):
 class VistaAjustes(QWidget):
     cambiado = Signal()            # cambiaron las opciones (ya guardadas)
     tema_elegido = Signal(str)     # 'sistema' | 'claro' | 'oscuro'
+    tamano_elegido = Signal()      # cambió el tamaño del texto (ya guardado)
 
     def __init__(self, config, parent=None):
         super().__init__(parent)
@@ -165,6 +167,7 @@ class VistaAjustes(QWidget):
             tl.addWidget(b)
         self.grupo_tema.buttonClicked.connect(self._tema)
         t.fila(FilaOpcion('Tema', 'Claro, oscuro o el mismo que Windows.', temas))
+        t.fila(self._fila_tamano())
         b_copias = boton('Abrir carpeta')
         b_copias.clicked.connect(self._abrir_copias)
         t.fila(FilaOpcion('Copias de seguridad',
@@ -222,6 +225,77 @@ class VistaAjustes(QWidget):
         self.config.tema = b.clave
         self.config.guardar()
         self.tema_elegido.emit(b.clave)
+
+    # ---------- Tamaño del texto ----------
+
+    def _fila_tamano(self):
+        control = QWidget()
+        cl = QHBoxLayout(control)
+        cl.setContentsMargins(0, 0, 0, 0)
+        cl.setSpacing(12)
+        segmentos = QWidget()
+        sl = QHBoxLayout(segmentos)
+        sl.setContentsMargins(0, 0, 0, 0)
+        sl.setSpacing(0)
+        self.grupo_tamano = QButtonGroup(self)
+        self.b_tamano_windows = QPushButton('Como Windows')
+        self.b_tamano_propio = QPushButton('Personalizado')
+        for i, b in enumerate((self.b_tamano_windows, self.b_tamano_propio)):
+            b.setCheckable(True)
+            b.setObjectName('segmento')
+            b.setProperty('pos', ('ini', 'fin')[i])
+            b.setCursor(Qt.PointingHandCursor)
+            self.grupo_tamano.addButton(b, i)
+            sl.addWidget(b)
+        cl.addWidget(segmentos)
+        self.tamano = QSpinBox()
+        self.tamano.setRange(TAMANO_MIN, TAMANO_MAX)
+        self.tamano.setSingleStep(5)
+        self.tamano.setSuffix(' %')
+        self.tamano.setAlignment(Qt.AlignRight)
+        self.tamano.setFixedWidth(tema.px(84))
+        cl.addWidget(self.tamano)
+        propio = self.config.tamano_texto
+        (self.b_tamano_propio if propio else self.b_tamano_windows).setChecked(True)
+        self.tamano.setValue(propio or tema.escala_windows())
+        self.tamano.setEnabled(bool(propio))
+        # Se aplica un instante después de dejar de teclear o girar la rueda (rehacer estilos cuesta algo).
+        self._espera_tamano = QTimer(self)
+        self._espera_tamano.setSingleShot(True)
+        self._espera_tamano.setInterval(400)
+        self._espera_tamano.timeout.connect(self._aplicar_tamano)
+        self.grupo_tamano.idClicked.connect(self._modo_tamano)
+        self.tamano.valueChanged.connect(lambda _: self._espera_tamano.start())
+        self.fila_tamano = FilaOpcion('Tamaño del texto',
+                                      'Como Windows: el de Configuración de Windows › Accesibilidad › Tamaño '
+                                      'del texto. Si lo cambias allí, la app se ajusta al volver a ella.',
+                                      control)
+        return self.fila_tamano
+
+    def _modo_tamano(self, i):
+        propio = i == 1
+        self.tamano.setEnabled(propio)
+        if not propio:
+            self.tamano.blockSignals(True)
+            self.tamano.setValue(tema.escala_windows())
+            self.tamano.blockSignals(False)
+        self._aplicar_tamano()
+
+    def _aplicar_tamano(self):
+        nuevo = self.tamano.value() if self.b_tamano_propio.isChecked() else 0
+        if nuevo != self.config.tamano_texto:
+            self.config.tamano_texto = nuevo
+            self.config.guardar()
+            self.tamano_elegido.emit()
+
+    def _texto_tamano(self):
+        windows = tema.escala_windows()
+        self.b_tamano_windows.setText(f'Como Windows ({windows} %)')
+        if not self.b_tamano_propio.isChecked():
+            self.tamano.blockSignals(True)
+            self.tamano.setValue(windows)
+            self.tamano.blockSignals(False)
+        self.tamano.setFixedWidth(tema.px(84))
 
     def _abrir_copias(self):
         carpeta = HOME / 'backup'
@@ -327,15 +401,15 @@ class VistaAjustes(QWidget):
         t = tema.actual()
         for ic in self.findChildren(IconoLabel):
             ic.refrescar()
-        self.b_restaurar.setIcon(iconos.icono('restaurar', t['texto2'], 16))
-        self.setStyleSheet(f'''
-            QPushButton#segmento {{ border-radius: 0; padding: 6px 16px; margin: 0; }}
-            QPushButton#segmento[pos="ini"] {{ border-top-left-radius: 6px; border-bottom-left-radius: 6px; }}
-            QPushButton#segmento[pos="medio"] {{ border-left: none; border-right: none; }}
-            QPushButton#segmento[pos="fin"] {{ border-top-right-radius: 6px; border-bottom-right-radius: 6px; }}
-            QPushButton#segmento:checked {{ background: {t['acento']}; color: {t['acento_texto']};
-                                            border-color: {t['acento']}; font-weight: 600; }}
-        ''')
+        self.b_restaurar.setIcon(iconos.icono('restaurar', t['texto2'], tema.px(16)))
+        self._texto_tamano()
+        for lim in (self.max_videos, self.max_descargas):
+            lim.numero.setFixedWidth(tema.px(84))
+        # El segmento marcado va en negrita y Qt no lo tiene en cuenta al calcular el ancho: se reserva.
+        negrita = tema.fuente(self.font(), 10, QFont.DemiBold)
+        fm = QFontMetrics(negrita)
+        for b in self.findChildren(QPushButton, 'segmento'):
+            b.setMinimumWidth(fm.horizontalAdvance(b.text()) + tema.px(36))
 
 
 def resumen_preferencias(o):

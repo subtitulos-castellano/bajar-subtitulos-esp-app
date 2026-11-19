@@ -5,14 +5,14 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal, QUrl
 from PySide6.QtGui import QDesktopServices, QFontMetrics, QGuiApplication
 from PySide6.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QHeaderView, QLabel, QPlainTextEdit,
-                               QProgressBar, QPushButton, QStackedLayout, QTableView, QVBoxLayout, QWidget)
+                               QPushButton, QStackedLayout, QTableView, QVBoxLayout, QWidget)
 
 from subtitulos import eventos as ev
 from subtitulos.texto import visible
 
 from . import iconos, tema
-from .componentes import (BarraSegmentada, DelegadoEstado, FiltroCategorias, IconoLabel, ModeloResultados,
-                          TarjetaContador)
+from .componentes import (BarraProgreso, BarraSegmentada, DelegadoEstado, FiltroCategorias, IconoLabel,
+                          ModeloResultados, TarjetaContador)
 
 MARGEN = 32
 
@@ -64,7 +64,6 @@ def tabla_resultados(modelo):
     t.setSelectionBehavior(QTableView.SelectRows)
     t.setSelectionMode(QTableView.SingleSelection)
     t.verticalHeader().hide()
-    t.verticalHeader().setDefaultSectionSize(40)
     t.setFocusPolicy(Qt.NoFocus)
     t.setWordWrap(False)
     t.setTextElideMode(Qt.ElideMiddle)
@@ -73,16 +72,23 @@ def tabla_resultados(modelo):
     h.setSectionResizeMode(0, QHeaderView.Fixed)
     h.setSectionResizeMode(1, QHeaderView.Stretch)
     h.setSectionResizeMode(2, QHeaderView.Interactive)
-    t.setColumnWidth(0, 230)
-    t.setColumnWidth(2, 230)
     h.setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+    ajustar_tabla(t)
     return t
+
+
+def ajustar_tabla(t):
+    """Alto de fila y anchos de columna según el tamaño del texto."""
+    t.verticalHeader().setDefaultSectionSize(tema.px(40))
+    t.verticalHeader().setMinimumSectionSize(tema.px(30))
+    t.setColumnWidth(0, tema.px(230))
+    t.setColumnWidth(2, tema.px(230))
 
 
 class Detalles(QWidget):
     """Botón 'Detalles' plegable con el registro técnico (lo mismo que imprime la CLI)."""
 
-    def __init__(self, documento=None, parent=None):
+    def __init__(self, documento=None, extra=None, parent=None):
         super().__init__(parent)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -93,13 +99,14 @@ class Detalles(QWidget):
         fila = QHBoxLayout()
         fila.addWidget(self.boton)
         fila.addStretch()
+        if extra is not None:
+            fila.addWidget(extra, 0, Qt.AlignVCenter)
         lay.addLayout(fila)
         self.log = QPlainTextEdit()
         self.log.setObjectName('log')
         self.log.setReadOnly(True)
         self.log.setAcceptDrops(False)
         self.log.setMaximumBlockCount(5000)
-        self.log.setFixedHeight(170)
         if documento is not None:
             self.log.setDocument(documento)
         self.log.hide()
@@ -110,7 +117,11 @@ class Detalles(QWidget):
         self.log.setVisible(abierto)
         self.refrescar()
 
+    def abrir(self, abierto=True):
+        self.boton.setChecked(abierto)
+
     def refrescar(self):
+        self.log.setFixedHeight(tema.px(150))
         self.boton.setIcon(iconos.icono('abajo' if self.boton.isChecked() else 'derecha', tema.actual()['texto2'], 16))
 
 
@@ -193,9 +204,9 @@ class VistaInicio(QWidget):
         fila.setSpacing(6)
         self.resumen_opciones = etiqueta('', 'resumenOpciones')
         fila.addWidget(self.resumen_opciones, 1)
-        b = boton('Cambiar preferencias', nombre='plano')
-        b.clicked.connect(self.ir_ajustes)
-        fila.addWidget(b)
+        self.b_cambiar_preferencias = boton('Cambiar preferencias', nombre='plano')
+        self.b_cambiar_preferencias.clicked.connect(self.ir_ajustes)
+        fila.addWidget(self.b_cambiar_preferencias)
         lay.addLayout(fila)
         return w
 
@@ -240,8 +251,7 @@ class VistaInicio(QWidget):
                                                   'Todavía no se busca ni se descarga nada.')
         lay.addWidget(self.banner_demo_p)
         lay.addSpacing(4)
-        self.barra = QProgressBar()
-        self.barra.setTextVisible(False)
+        self.barra = BarraProgreso()
         lay.addWidget(self.barra)
         fila = QHBoxLayout()
         self.p_estado = etiqueta('', 'secundario')
@@ -270,9 +280,12 @@ class VistaInicio(QWidget):
         self.demo = demo
         self.simulacion = simulacion
         self.errores = []
+        self.total = 0
         self.modelo.vaciar()
         self.detalles_p.log.clear()
-        self.barra.setRange(0, 0)
+        self.detalles_p.abrir()               # se ve lo que hace el programa por detrás
+        self.barra.poner(0, 1)
+        self.barra.poner_trabajando(True)
         self.b_cancelar.setEnabled(True)
         self.b_cancelar.setText('  Cancelar')
         self.banner_demo_p.setVisible(demo)
@@ -285,13 +298,24 @@ class VistaInicio(QWidget):
         return fm.elidedText(str(ruta), Qt.ElideMiddle, max(300, self.width() - 2 * MARGEN))
 
     def al_iniciar(self, videos):
-        self.barra.setRange(0, max(1, len(videos)))
-        self.barra.setValue(0)
+        """Lista completa de vídeos, todos 'En espera'. Con uno solo, la barra se anima mientras trabaja."""
+        self.total = len(videos)
+        self.modelo.preparar(videos)
         if not videos:
+            self.barra.poner_trabajando(False)
             self.p_estado.setText('No se ha encontrado ningún vídeo.')
+        elif len(videos) == 1:
+            self.barra.poner_trabajando(True)
+        else:
+            self.barra.poner_trabajando(False)
+            self.barra.poner(0, len(videos))
+            self.p_estado.setText(f'{len(videos)} vídeos encontrados')
 
     def al_video(self, indice, total, path):
-        self.barra.setValue(indice - 1)
+        fila = self.modelo.buscando(path)
+        self.tabla_p.scrollTo(self.modelo.index(fila, 0))
+        if total > 1:
+            self.barra.poner(indice - 1, total)
         self.p_estado.setText(f'Vídeo {indice} de {total}  ·  {visible(path.name)}')
 
     def al_detalle(self, linea):
@@ -302,8 +326,9 @@ class VistaInicio(QWidget):
         self.al_detalle(f'  ERROR: {mensaje}')
 
     def al_resultado(self, r):
-        self.modelo.anadir(r)
-        self.tabla_p.scrollToBottom()
+        self.modelo.poner_resultado(r)
+        if self.total > 1:
+            self.barra.poner(len(self.modelo.resultados), self.total)
 
     def poner_cola(self, n):
         self.p_cola.setText(f'En cola: {n}')
@@ -319,7 +344,7 @@ class VistaInicio(QWidget):
         lay.setSpacing(6)
         cab = QHBoxLayout()
         cab.setSpacing(10)
-        self.r_icono = IconoLabel('ok', tema.color_estado('castellano'), 30)
+        self.r_icono = IconoLabel('ok', tema.color_estado(ev.CASTELLANO), 30)
         cab.addWidget(self.r_icono, 0, Qt.AlignVCenter)
         self.r_titulo = etiqueta('Listo', 'titulo')
         cab.addWidget(self.r_titulo, 1)
@@ -364,17 +389,17 @@ class VistaInicio(QWidget):
         self.tabla_r = tabla_resultados(self.filtro)
         lay.addWidget(self.tabla_r, 1)
         lay.addSpacing(6)
-        pie = QHBoxLayout()
-        self.detalles_r = Detalles(self.detalles_p.log.document())
-        pie.addWidget(self.detalles_r, 1)
-        self.r_pista = etiqueta('Arrastra otro vídeo o carpeta para seguir.', 'ayuda')
-        pie.addWidget(self.r_pista, 0, Qt.AlignTop | Qt.AlignRight)
-        lay.addLayout(pie)
+        self.r_pista = etiqueta('Pulsa Inicio o arrastra otro vídeo o carpeta para seguir.', 'ayuda')
+        self.detalles_r = Detalles(self.detalles_p.log.document(), self.r_pista)
+        lay.addWidget(self.detalles_r)
         return w
 
     def terminar(self, resultados, cancelado, segundos):
+        self.barra.poner_trabajando(False)
+        self.modelo.cerrar()                  # lo que no llegó a revisarse: 'No revisado'
         n = len(resultados)
-        conteo = Counter(r.categoria for r in resultados)
+        total = len(self.modelo.filas)
+        conteo = Counter(f.categoria for f in self.modelo.filas)
         for cat, t in self.tarjetas.items():
             t.blockSignals(True)
             t.setChecked(False)
@@ -383,7 +408,7 @@ class VistaInicio(QWidget):
             t.setVisible(conteo.get(cat, 0) > 0)
         self.filtro.poner([])
         self.segmentos.poner([(c, conteo.get(c, 0)) for c in tema.ORDEN_ESTADOS])
-        self.segmentos.setVisible(n > 0)
+        self.segmentos.setVisible(total > 0)
         if self.errores:
             self.r_titulo.setText('Se ha detenido por un error')
             self.r_icono.poner('error', tema.color_estado(ev.NO_ENCONTRADO))
@@ -398,7 +423,10 @@ class VistaInicio(QWidget):
             self.r_titulo.setText('Listo' if buenos == n else 'Listo, con avisos')
             self.r_icono.poner('ok' if buenos == n else 'aviso',
                                tema.color_estado(ev.CASTELLANO if buenos == n else ev.LATINO))
-        videos = f'{n} vídeo{"s" if n != 1 else ""} revisado{"s" if n != 1 else ""}'
+        if n < total:
+            videos = f'{n} de {total} vídeos revisados'
+        else:
+            videos = f'{n} vídeo{"s" if n != 1 else ""} revisado{"s" if n != 1 else ""}'
         self.r_sub.setText(f'{videos} en {_duracion(segundos)}  ·  {self._ruta_corta(self.ruta_actual)}')
         self.banner_demo_r.setVisible(self.demo)
         self.banner_sim_resumen.setVisible(self.simulacion)
@@ -408,15 +436,17 @@ class VistaInicio(QWidget):
         self.banner_error.setVisible(bool(self.errores))
         self.b_pendientes.setVisible(conteo.get(ev.PENDIENTE, 0) > 0 and not cancelado)
         self.b_copiar.setText('  Copiar resumen')
-        self.b_abrir.setEnabled(n > 0)
+        self.b_abrir.setEnabled(total > 0)
         self.b_copiar.setEnabled(n > 0)
+        self.detalles_r.abrir(False)          # en el resumen manda la tabla; se puede abrir
         self.pila.setCurrentIndex(2)
 
     def _filtrar(self):
         self.filtro.poner([c for c, t in self.tarjetas.items() if t.isChecked()])
 
     def _texto_resumen(self):
-        filas = [f'{visible(r.estado):28} {visible(r.fuente):30} {visible(r.nombre)}' for r in self.modelo.filas]
+        filas = [f'{visible(r.estado):28} {visible(r.fuente):30} {visible(r.nombre)}'
+                 for r in self.modelo.resultados]
         return '==== RESUMEN ====\n' + '\n'.join(filas)
 
     def _copiar(self):
@@ -431,20 +461,34 @@ class VistaInicio(QWidget):
     def mostrar_reposo(self):
         self.pila.setCurrentIndex(0)
 
+    def mostrar_busqueda(self):
+        """La pantalla de la última búsqueda: progreso si sigue en marcha, si no el resumen."""
+        if self.pila.currentIndex() == 0:
+            self.pila.setCurrentIndex(2)
+
+    def en_reposo(self):
+        return self.pila.currentIndex() == 0
+
     # ---------- Tema ----------
 
     def refrescar(self):
         for b in self.findChildren(QPushButton):
             if getattr(b, '_icono', None):
                 clave = 'acento_texto' if b.objectName() == 'primario' else 'texto2'
-                b.setIcon(iconos.icono(b._icono, tema.actual()[clave], 16))
+                b.setIcon(iconos.icono(b._icono, tema.actual()[clave], tema.px(16)))
+        for t in self.tarjetas.values():
+            t.ajustar()
+        ajustar_tabla(self.tabla_p)
+        ajustar_tabla(self.tabla_r)
         for d in (self.detalles_p, self.detalles_r):
             d.refrescar()
         for b in self.findChildren(Banner):
             b.refrescar()
         self.b_copiar.setText('  Copiar resumen')
         circulo = self.zona.findChild(QFrame, 'circulo')
-        circulo.setStyleSheet(f'#circulo {{ background: {tema.actual()["acento_suave"]}; border-radius: 42px; }}')
+        circulo.setFixedSize(tema.px(84), tema.px(84))
+        circulo.setStyleSheet(f'#circulo {{ background: {tema.actual()["acento_suave"]}; '
+                              f'border-radius: {tema.px(84) // 2}px; }}')
 
 
 def _duracion(segundos):
