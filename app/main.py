@@ -36,6 +36,17 @@ def _id_windows():
         ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX)
 
 
+def _mkv_castellano():
+    """MKV mínimo con una pista de subtítulos en castellano (para la autoprueba)."""
+    def el(eid, datos):
+        return eid.to_bytes((eid.bit_length() + 7) // 8, 'big') + b'\x01' + len(datos).to_bytes(7, 'big') + datos
+    texto = 'Vale, tío, ¿qué hacéis vosotros aquí? Os lo dije.'.encode()
+    pista = el(0xAE, el(0xD7, b'\x01') + el(0x86, b'S_TEXT/UTF8') + el(0x22B59C, b'spa'))
+    bloque = el(0xA0, el(0xA1, b'\x81\x00\x00\x00' + texto) + el(0x9B, (2000).to_bytes(2, 'big')))
+    return el(0x1A45DFA3, el(0x4282, b'matroska')) + el(0x18538067, el(0x1654AE6B, pista)
+                                                     + el(0x1F43B675, el(0xE7, b'\x00') + bloque))
+
+
 def autoprueba(salida, con_red=False):
     """Comprueba que el ejecutable empaquetado lleva todo lo necesario (sin ventana) y escribe el
     informe en `salida`. Con `con_red`, además hace una búsqueda real (simulada, sin escribir) contra
@@ -83,13 +94,7 @@ def autoprueba(salida, con_red=False):
     def busqueda_sin_red():
         from subtitulos import nucleo
         from subtitulos.opciones import Opciones
-        def el(eid, datos):
-            return eid.to_bytes((eid.bit_length() + 7) // 8, 'big') + b'\x01' + len(datos).to_bytes(7, 'big') + datos
-        texto = 'Vale, tío, ¿qué hacéis vosotros aquí? Os lo dije.'.encode()
-        pista = el(0xAE, el(0xD7, b'\x01') + el(0x86, b'S_TEXT/UTF8') + el(0x22B59C, b'spa'))
-        bloque = el(0xA0, el(0xA1, b'\x81\x00\x00\x00' + texto) + el(0x9B, (2000).to_bytes(2, 'big')))
-        mkv = el(0x1A45DFA3, el(0x4282, b'matroska')) + el(0x18538067, el(0x1654AE6B, pista)
-                                                          + el(0x1F43B675, el(0xE7, b'\x00') + bloque))
+        mkv = _mkv_castellano()
         with tempfile.TemporaryDirectory() as d:
             ruta = Path(d) / 'Prueba.S01E01.mkv'
             ruta.write_bytes(mkv)
@@ -100,6 +105,25 @@ def autoprueba(salida, con_red=False):
                 raise RuntimeError('el .srt guardado no contiene el texto de la pista')
         return 'MKV con castellano incrustado -> .srt guardado'
     paso('búsqueda (sin red)', busqueda_sin_red)
+
+    def ruta_larga():
+        """Una carpeta con acentos y más de 260 caracteres (el antiguo límite MAX_PATH de Windows)."""
+        from subtitulos import nucleo
+        with tempfile.TemporaryDirectory() as d:
+            carpeta = Path(d) / 'Señor de los Anillos – Edición Extendida ñÁÜ'
+            while len(str(carpeta)) < 300:
+                carpeta = carpeta / f'Temporada con un nombre larguísimo {len(str(carpeta))}'
+            try:
+                carpeta.mkdir(parents=True)
+            except OSError:
+                return 'AVISO: Windows no admite rutas largas aquí (LongPathsEnabled desactivado)'
+            mkv = _mkv_castellano()
+            (carpeta / 'Prueba.S01E01.mkv').write_bytes(mkv)
+            r = nucleo.procesar(carpeta, credenciales={})
+            if [x.estado for x in r] != ['CASTELLANO (incrustado)'] or not (carpeta / 'Prueba.S01E01.srt').exists():
+                raise RuntimeError(f'resultado inesperado con ruta de {len(str(carpeta))} caracteres: {r}')
+            return f'{len(str(carpeta))} caracteres -> .srt guardado'
+    paso('ruta larga con acentos', ruta_larga)
 
     def busqueda_con_red():
         from subtitulos import nucleo

@@ -322,6 +322,56 @@ class CancelarDuranteUnaConsulta(ConSimulacion):
         self.assertFalse((self.videos / 'd_red_cast.srt').exists())
 
 
+class RutasDificiles(ConSimulacion):
+    def test_acentos_enes_y_espacios(self):
+        carpeta = self.videos / 'Señor de los Anillos (2001) – Edición Extendida ñÁÜ'
+        carpeta.mkdir()
+        (carpeta / 'c_incrustado.mkv').write_bytes((self.videos / 'c_incrustado.mkv').read_bytes())
+        resumen = nucleo.procesar(carpeta, credenciales={})
+        self.assertEqual([r.estado for r in resumen], ['CASTELLANO (incrustado)'])
+        self.assertTrue((carpeta / 'c_incrustado.srt').exists())
+
+    def test_ruta_muy_larga(self):
+        """Más de 260 caracteres (el antiguo límite MAX_PATH de Windows)."""
+        carpeta = self.videos
+        while len(str(carpeta)) < 300:
+            carpeta = carpeta / ('Temporada muy larga con un nombre interminable ' + str(len(str(carpeta))))
+        try:
+            carpeta.mkdir(parents=True)
+            (carpeta / 'c_incrustado.mkv').write_bytes((self.videos / 'c_incrustado.mkv').read_bytes())
+        except OSError:
+            self.skipTest('este sistema no admite rutas largas (LongPathsEnabled desactivado)')
+        resumen = nucleo.procesar(carpeta, credenciales={})
+        self.assertEqual([r.estado for r in resumen], ['CASTELLANO (incrustado)'])
+        self.assertTrue((carpeta / 'c_incrustado.srt').exists())
+
+
+class SinConexion(ConSimulacion):
+    def test_sin_internet_no_falla(self):
+        """Proveedores reales sin red: cada uno falla, se avisa y el vídeo queda como NO ENCONTRADO."""
+        import requests
+        from subliminal.core import ProviderPool
+
+        def sin_red(*a, **k):
+            raise requests.exceptions.ConnectionError('sin conexión (simulado)')
+        g = Grabadora()
+        with mock.patch.object(nucleo, 'ProviderPool', ProviderPool), \
+                mock.patch.object(requests.Session, 'request', sin_red):
+            inicio = time.monotonic()
+            resumen = nucleo.procesar(self.videos / 'g_nada.avi', eventos=g, credenciales={})
+        self.assertLess(time.monotonic() - inicio, 30)
+        self.assertEqual([(r.estado, r.fuente) for r in resumen], [('NO ENCONTRADO', 'ni español ni inglés')])
+
+    def test_un_proveedor_que_falla_no_impide_los_demas(self):
+        class PoolMedioRoto(PoolFalso):
+            def list_subtitles(self, video, languages):
+                subs = super().list_subtitles(video, languages)
+                return [s for s in subs if s.provider_name != 'opensubtitles']   # opensubtitles "caído"
+        with mock.patch.object(nucleo, 'ProviderPool', PoolMedioRoto):
+            resumen = nucleo.procesar(self.videos / 'd_red_cast.avi', credenciales={})
+        self.assertEqual((resumen[0].estado, resumen[0].fuente), ('CASTELLANO', 'gestdown cast2'))
+
+
 class OpcionesValidas(unittest.TestCase):
     def test_por_defecto_iguales_que_la_cli(self):
         o = Opciones()

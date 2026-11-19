@@ -1,6 +1,8 @@
-# Compila Bajar Subtítulos ESP en Windows: pruebas, .exe, autoprueba, zip portable e instalador.
-# - Al subir una etiqueta vX.Y.Z: además crea una Release (privada, como el repositorio) con ambos.
-# - A mano (Actions › Compilar › Run workflow): solo deja los archivos como artefacto descargable.
+# Bajar Subtítulos ESP: compila en Windows, prueba lo compilado en Windows 10 y 11 y, con una
+# etiqueta vX.Y.Z, publica la Release (privada, como el repositorio).
+# - A mano (Actions › Compilar › Run workflow): compila y prueba; los archivos quedan como artefacto.
+#
+# Windows Server 2022 comparte base con Windows 10 (21H2) y Windows Server 2025 con Windows 11 (24H2).
 name: Compilar
 
 on:
@@ -12,8 +14,8 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  compilar:
+    runs-on: windows-2025
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
@@ -44,7 +46,7 @@ jobs:
         run: |
           if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
 
-      - name: Compilar
+      - name: Compilar (incluye la autoprueba del .exe)
         run: python -I packaging/compilar.py
 
       - uses: actions/upload-artifact@v7
@@ -55,11 +57,88 @@ jobs:
             dist/*-instalador.exe
           if-no-files-found: error
 
-      - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
+  probar:
+    needs: compilar
+    strategy:
+      fail-fast: false
+      matrix:
+        sistema: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.sistema }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: requirements-app.txt
+
+      - name: Sistema
         shell: pwsh
         run: |
-          gh release create "${{ github.ref_name }}" (Get-Item dist/*-instalador.exe) (Get-Item dist/*-portable.zip) `
-            --title "Bajar Subtítulos ESP ${{ github.ref_name }}" --generate-notes
+          $os = Get-CimInstance Win32_OperatingSystem
+          "$($os.Caption) $($os.Version) (compilación $($os.BuildNumber))"
+
+      - name: Pruebas
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          python -m pip install -r requirements-app.txt
+          python -I -m unittest discover -s tests
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: BajarSubtitulosESP-${{ github.ref_name }}
+          path: dist
+
+      - name: Instalar, autoprueba y desinstalar
+        shell: pwsh
+        run: |
+          function Autoprueba($exe, $informe) {
+            $p = Start-Process $exe -ArgumentList '--autoprueba', $informe -Wait -PassThru
+            Get-Content $informe
+            if ($p.ExitCode -ne 0) { throw "Autoprueba fallida ($exe): código $($p.ExitCode)" }
+          }
+          $dir = Join-Path $env:RUNNER_TEMP 'instalado'
+          $instalador = (Get-Item dist/*-instalador.exe).FullName
+          $p = Start-Process $instalador -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=$dir", '/NOICONS' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "El instalador ha fallado: código $($p.ExitCode)" }
+          Autoprueba "$dir\BajarSubtitulosESP.exe" (Join-Path $env:RUNNER_TEMP 'instalado.txt')
+
+          $p = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
+          Start-Sleep -Seconds 8
+          if (Test-Path "$dir\BajarSubtitulosESP.exe") { throw 'La desinstalación ha dejado el programa' }
+          $clave = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F0C2D8E-3B7A-4E51-9C2F-8A1D5E7B4C93}_is1'
+          if (Test-Path $clave) { throw 'La desinstalación ha dejado la entrada en el registro' }
+          'Instalación y desinstalación correctas'
+
+      - name: Versión portable
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'portable'
+          Expand-Archive (Get-Item dist/*-portable.zip).FullName -DestinationPath $dir
+          $informe = Join-Path $env:RUNNER_TEMP 'portable.txt'
+          $p = Start-Process "$dir\BajarSubtitulosESP\BajarSubtitulosESP.exe" -ArgumentList '--autoprueba', $informe -Wait -PassThru
+          Get-Content $informe
+          if ($p.ExitCode -ne 0) { throw "Autoprueba de la versión portable fallida: código $($p.ExitCode)" }
+
+  publicar:
+    needs: probar
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: BajarSubtitulosESP-${{ github.ref_name }}
+          path: dist
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notas=$(awk -v v="${GITHUB_REF_NAME#v}" '$0 ~ "^## " v {s=1; next} /^## / {s=0} s' CHANGELOG.md)
+          gh release create "$GITHUB_REF_NAME" dist/*-instalador.exe dist/*-portable.zip \
+            --title "Bajar Subtítulos ESP $GITHUB_REF_NAME" --notes "${notas:-Ver CHANGELOG.md}"
