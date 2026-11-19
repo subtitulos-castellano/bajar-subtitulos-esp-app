@@ -29,14 +29,13 @@ from subliminal.core import ProviderPool
 from subliminal.score import compute_score, episode_scores, movie_scores
 from subliminal.video import Episode
 
-from .archivos import VIDEO_EXT, buscar_videos  # noqa: F401
+from .archivos import HOME, VIDEO_EXT, buscar_videos  # noqa: F401
 from .eventos import (CASTELLANO, INGLES, LATINO, NO_ENCONTRADO, PENDIENTE, SIN_CAMBIOS,  # noqa: F401
                       YA_CASTELLANO, Eventos, Resultado)
 from .opciones import MAX_DESCARGAS, Opciones
 from .pistas import incrustado, ingles_incrustado
 from .texto import MAX_SRT, dialecto, idioma_srt, limpiar_texto, ultimo_tiempo, visible
 
-HOME = Path.home() / '.subtitulos-esp'
 # opensubtitlescom queda fuera: se usa la cuenta de opensubtitles.org (son cuentas distintas).
 # subtis (Argentina) y napiprojekt (polaco) no aportan castellano.
 # podnapisi: el dominio dejó de resolver en 2026 (podnapisi.net sin registro A, www sin DNS).

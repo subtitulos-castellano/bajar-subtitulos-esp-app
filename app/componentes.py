@@ -42,20 +42,22 @@ class Interruptor(QAbstractButton):
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedSize(44, 22)
-        self._pos = 0.0
-        self._anim = QPropertyAnimation(self, b'pos', self)
+        self._avance = 0.0   # 0 = apagado, 1 = encendido (posición de la bolita)
+        # Ojo: no llamar 'pos' a esta propiedad: en Qt 'pos' es la posición del widget y la
+        # animación movía el interruptor entero.
+        self._anim = QPropertyAnimation(self, b'avance', self)
         self._anim.setDuration(140)
         self._anim.setEasingCurve(QEasingCurve.OutCubic)
         self.toggled.connect(self._animar)
 
-    def _get_pos(self):
-        return self._pos
+    def _get_avance(self):
+        return self._avance
 
-    def _set_pos(self, v):
-        self._pos = v
+    def _set_avance(self, v):
+        self._avance = v
         self.update()
 
-    pos = Property(float, _get_pos, _set_pos)
+    avance = Property(float, _get_avance, _set_avance)
 
     def _animar(self, activo):
         self._anim.stop()
@@ -65,7 +67,7 @@ class Interruptor(QAbstractButton):
     def setChecked(self, activo):
         super().setChecked(activo)
         self._anim.stop()
-        self._set_pos(1.0 if activo else 0.0)
+        self._set_avance(1.0 if activo else 0.0)
 
     def sizeHint(self):
         return QSize(44, 22)
@@ -83,7 +85,7 @@ class Interruptor(QAbstractButton):
             p.setBrush(Qt.NoBrush)
         p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
         d = 12 if (self.underMouse() and self.isEnabled()) else 10
-        x = r.left() + 5 + self._pos * (r.width() - 10 - d) + (10 - d) / 2 + (d - 10) / 2
+        x = r.left() + 5 + self._avance * (r.width() - 10 - d)
         cx = x + d / 2
         p.setPen(Qt.NoPen)
         p.setBrush(QColor('#ffffff') if activo else color('texto2'))
@@ -273,8 +275,13 @@ class FiltroCategorias(QSortFilterProxyModel):
         self.categorias = set()
 
     def poner(self, categorias):
-        self.categorias = set(categorias)
-        self.invalidateFilter()
+        if hasattr(self, 'beginFilterChange'):     # Qt >= 6.10 (invalidateFilter está obsoleto)
+            self.beginFilterChange()
+            self.categorias = set(categorias)
+            self.endFilterChange()
+        else:
+            self.categorias = set(categorias)
+            self.invalidateFilter()
 
     def filterAcceptsRow(self, fila, padre):
         if not self.categorias:

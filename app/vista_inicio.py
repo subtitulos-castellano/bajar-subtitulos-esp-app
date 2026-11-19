@@ -37,9 +37,10 @@ def boton(texto, icono=None, nombre=None):
 class Banner(QFrame):
     """Aviso discreto (simulación, prototipo)."""
 
-    def __init__(self, icono, texto, parent=None):
+    def __init__(self, icono, texto, tipo='aviso', parent=None):
         super().__init__(parent)
-        self.setObjectName('banner')
+        self.tipo = tipo
+        self.setObjectName('banner' if tipo == 'aviso' else 'bannerError')
         lay = QHBoxLayout(self)
         lay.setContentsMargins(12, 8, 12, 8)
         lay.setSpacing(10)
@@ -49,7 +50,10 @@ class Banner(QFrame):
         lay.addWidget(self.texto, 1)
 
     def refrescar(self):
-        self.icono.poner(clave_color='#fab219' if tema.oscuro() else '#a86f00')
+        if self.tipo == 'error':
+            self.icono.poner(clave_color=tema.color_estado(ev.NO_ENCONTRADO))
+        else:
+            self.icono.poner(clave_color='#fab219' if tema.oscuro() else '#a86f00')
 
 
 def tabla_resultados(modelo):
@@ -114,6 +118,7 @@ class VistaInicio(QWidget):
     elegido = Signal(list)       # rutas elegidas con los botones
     cancelar = Signal()
     ir_ajustes = Signal()
+    repetir = Signal(list)       # 'Procesar pendientes': vuelve a pasar la misma ruta
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -127,6 +132,8 @@ class VistaInicio(QWidget):
         self.pila.addWidget(self._resumen())
         self.ruta_actual = None
         self.demo = False
+        self.simulacion = False
+        self.errores = []
 
     # ---------- Reposo ----------
 
@@ -201,7 +208,6 @@ class VistaInicio(QWidget):
     def poner_preferencias(self, texto, simulacion):
         self.resumen_opciones.setText(texto)
         self.banner_sim.setVisible(simulacion)
-        self.banner_sim_resumen.setVisible(simulacion)
 
     def _elegir_carpeta(self):
         ruta = QFileDialog.getExistingDirectory(self, 'Elegir carpeta con vídeos')
@@ -259,9 +265,11 @@ class VistaInicio(QWidget):
         self.b_cancelar.setText('  Cancelando…')
         self.cancelar.emit()
 
-    def empezar(self, ruta, demo=False):
+    def empezar(self, ruta, demo=False, simulacion=False):
         self.ruta_actual = Path(ruta)
         self.demo = demo
+        self.simulacion = simulacion
+        self.errores = []
         self.modelo.vaciar()
         self.detalles_p.log.clear()
         self.barra.setRange(0, 0)
@@ -289,6 +297,10 @@ class VistaInicio(QWidget):
     def al_detalle(self, linea):
         self.detalles_p.log.appendPlainText(linea[1:] if linea.startswith('\n') else linea)
 
+    def al_error(self, mensaje):
+        self.errores.append(mensaje)
+        self.al_detalle(f'  ERROR: {mensaje}')
+
     def al_resultado(self, r):
         self.modelo.anadir(r)
         self.tabla_p.scrollToBottom()
@@ -315,6 +327,11 @@ class VistaInicio(QWidget):
         self.b_copiar.clicked.connect(self._copiar)
         self.b_abrir = boton('  Abrir carpeta', 'carpeta', 'primario')
         self.b_abrir.clicked.connect(self._abrir_carpeta)
+        self.b_pendientes = boton('  Procesar pendientes', 'reloj')
+        self.b_pendientes.setToolTip('Vuelve a revisar la misma carpeta: los vídeos ya resueltos se saltan '
+                                     'enseguida y se buscan los pendientes.')
+        self.b_pendientes.clicked.connect(lambda: self.repetir.emit([self.ruta_actual]))
+        cab.addWidget(self.b_pendientes, 0, Qt.AlignVCenter)
         cab.addWidget(self.b_copiar, 0, Qt.AlignVCenter)
         cab.addWidget(self.b_abrir, 0, Qt.AlignVCenter)
         lay.addLayout(cab)
@@ -324,6 +341,9 @@ class VistaInicio(QWidget):
         self.banner_sim_resumen = Banner('simulacion', 'Simulación: no se ha escrito ningún archivo.')
         self.banner_sim_resumen.hide()
         lay.addWidget(self.banner_sim_resumen)
+        self.banner_error = Banner('error', '', 'error')
+        self.banner_error.hide()
+        lay.addWidget(self.banner_error)
         self.banner_demo_r = Banner('simulacion', 'Prototipo: resultados de demostración. '
                                                   'Todavía no se busca ni se descarga nada.')
         lay.addWidget(self.banner_demo_r)
@@ -364,7 +384,10 @@ class VistaInicio(QWidget):
         self.filtro.poner([])
         self.segmentos.poner([(c, conteo.get(c, 0)) for c in tema.ORDEN_ESTADOS])
         self.segmentos.setVisible(n > 0)
-        if cancelado:
+        if self.errores:
+            self.r_titulo.setText('Se ha detenido por un error')
+            self.r_icono.poner('error', tema.color_estado(ev.NO_ENCONTRADO))
+        elif cancelado:
             self.r_titulo.setText('Cancelado')
             self.r_icono.poner('igual', 'texto3')
         elif n == 0:
@@ -378,6 +401,13 @@ class VistaInicio(QWidget):
         videos = f'{n} vídeo{"s" if n != 1 else ""} revisado{"s" if n != 1 else ""}'
         self.r_sub.setText(f'{videos} en {_duracion(segundos)}  ·  {self._ruta_corta(self.ruta_actual)}')
         self.banner_demo_r.setVisible(self.demo)
+        self.banner_sim_resumen.setVisible(self.simulacion)
+        self.banner_error.texto.setText(
+            f'{visible(self.errores[0])}. Lo que ya estaba hecho se ha guardado; puedes volver a '
+            f'intentarlo arrastrando la carpeta otra vez.' if self.errores else '')
+        self.banner_error.setVisible(bool(self.errores))
+        self.b_pendientes.setVisible(conteo.get(ev.PENDIENTE, 0) > 0 and not cancelado)
+        self.b_copiar.setText('  Copiar resumen')
         self.b_abrir.setEnabled(n > 0)
         self.b_copiar.setEnabled(n > 0)
         self.pila.setCurrentIndex(2)

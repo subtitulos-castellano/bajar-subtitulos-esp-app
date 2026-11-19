@@ -16,6 +16,7 @@ CLARO = {
     'texto': '#0b0b0b', 'texto2': '#52514e', 'texto3': '#7a7974',
     'acento': '#2a78d6', 'acento_hover': '#2368bd', 'acento_texto': '#ffffff', 'acento_suave': '#e8f0fb',
     'aviso_suave': '#fff6e0', 'aviso_borde': '#f3d58a',
+    'error_suave': '#fdecec', 'error_borde': '#f1b5b5',
 }
 OSCURO = {
     'nombre': 'oscuro',
@@ -24,6 +25,7 @@ OSCURO = {
     'texto': '#f0efec', 'texto2': '#c3c2b7', 'texto3': '#8f8e86',
     'acento': '#3987e5', 'acento_hover': '#5598ea', 'acento_texto': '#ffffff', 'acento_suave': '#1a2a3f',
     'aviso_suave': '#2e2510', 'aviso_borde': '#5c4716',
+    'error_suave': '#331717', 'error_borde': '#6b2a2a',
 }
 
 # Categoría -> (color claro, color oscuro, icono, nombre corto, explicación)
@@ -142,6 +144,7 @@ QPushButton#nav:checked {{ background: {t['superficie']}; color: {t['texto']}; f
 #resumenOpciones {{ color: {t['texto3']}; font-size: 9pt; }}
 
 #banner {{ background: {t['aviso_suave']}; border: 1px solid {t['aviso_borde']}; border-radius: 8px; }}
+#bannerError {{ background: {t['error_suave']}; border: 1px solid {t['error_borde']}; border-radius: 8px; }}
 
 QPushButton {{ padding: 7px 14px; border-radius: 6px; border: 1px solid {t['borde_fuerte']};
                background: {t['superficie']}; color: {t['texto']}; }}
@@ -151,6 +154,8 @@ QPushButton:disabled {{ color: {t['texto3']}; border-color: {t['borde']}; }}
 QPushButton#primario {{ background: {t['acento']}; color: {t['acento_texto']}; border: 1px solid {t['acento']};
                         font-weight: 600; }}
 QPushButton#primario:hover {{ background: {t['acento_hover']}; border-color: {t['acento_hover']}; }}
+QPushButton#primario:disabled {{ background: {t['superficie']}; color: {t['texto3']}; border-color: {t['borde']};
+                                 font-weight: normal; }}
 QPushButton#plano {{ background: transparent; border: none; color: {t['texto2']}; padding: 6px 8px; }}
 QPushButton#plano:hover {{ color: {t['texto']}; background: {t['superficie_hover']}; }}
 
@@ -174,6 +179,9 @@ QPlainTextEdit#log {{ font-family: {FUENTE_MONO}; font-size: 9pt; background: {t
 QLineEdit, QSpinBox {{ padding: 6px 8px; border: 1px solid {t['borde_fuerte']}; border-radius: 6px;
                        background: {t['superficie']}; selection-background-color: {t['acento']}; }}
 QLineEdit:focus, QSpinBox:focus {{ border: 1px solid {t['acento']}; }}
+/* Sin flechas: se escribe el número o se usa la rueda. (setButtonSymbols(NoButtons) junto con una
+   hoja de estilos deja el campo con 1 px de ancho en Qt 6.12.) */
+QSpinBox::up-button, QSpinBox::down-button {{ width: 0px; border: none; }}
 QLineEdit:disabled, QSpinBox:disabled {{ color: {t['texto3']}; background: {t['fondo']}; border-color: {t['borde']}; }}
 
 QCheckBox {{ spacing: 8px; }}

@@ -1,14 +1,15 @@
-"""Pantalla Configuración: las opciones de la CLI convertidas en preferencias.
+"""Pantalla Configuración: las opciones de la CLI convertidas en preferencias que se guardan solas."""
+import threading
 
-Prototipo (Fase 2): los cambios se aplican en la sesión, pero todavía no se guardan en disco.
-"""
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
+from PySide6.QtCore import QObject, Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLineEdit, QPushButton,
                                QScrollArea, QSpinBox, QVBoxLayout, QWidget)
 
+from subtitulos.archivos import HOME
 from subtitulos.opciones import MAX_DESCARGAS, MAX_VIDEOS, Opciones
 
-from . import iconos, tema
+from . import credenciales, iconos, tema
 from .componentes import FilaOpcion, IconoLabel
 from .vista_inicio import MARGEN, boton, etiqueta
 
@@ -32,7 +33,6 @@ class Tarjeta(QFrame):
             e = etiqueta(explicacion, 'ayuda', envolver=True)
             e.setContentsMargins(44, 0, 16, 6)
             self.lay.addWidget(e)
-        self._filas = 0
 
     def fila(self, widget):
         sep = QFrame()
@@ -56,7 +56,6 @@ class Limite(QWidget):
         self.numero.setValue(valor)
         self.numero.setFixedWidth(84)
         self.numero.setAlignment(Qt.AlignRight)
-        self.numero.setButtonSymbols(QSpinBox.NoButtons)
         self.sin = QCheckBox('Sin límite')
         lay.addWidget(self.numero)
         lay.addWidget(self.sin)
@@ -73,12 +72,18 @@ class Limite(QWidget):
             self.numero.setValue(valor)
 
 
+class _Prueba(QObject):
+    """Recibe en el hilo de la ventana el resultado de 'Probar conexión' (que usa la red)."""
+    hecha = Signal(bool, str)
+
+
 class VistaAjustes(QWidget):
-    cambiado = Signal()            # opciones o tema
+    cambiado = Signal()            # cambiaron las opciones (ya guardadas)
     tema_elegido = Signal(str)     # 'sistema' | 'claro' | 'oscuro'
 
-    def __init__(self, parent=None):
+    def __init__(self, config, parent=None):
         super().__init__(parent)
+        self.config = config
         self.setObjectName('pagina')
         exterior = QVBoxLayout(self)
         exterior.setContentsMargins(0, 0, 0, 0)
@@ -93,7 +98,8 @@ class VistaAjustes(QWidget):
         lay.setContentsMargins(MARGEN, MARGEN - 4, MARGEN, MARGEN)
         lay.setSpacing(6)
         lay.addWidget(etiqueta('Configuración', 'titulo'))
-        lay.addWidget(etiqueta('Los cambios se aplican al momento.', 'subtitulo'))
+        lay.addWidget(etiqueta('Los cambios se guardan al momento y se usan en la siguiente búsqueda.',
+                               'subtitulo'))
         lay.addSpacing(16)
 
         # Qué guardar
@@ -136,27 +142,7 @@ class VistaAjustes(QWidget):
         lay.addSpacing(12)
 
         # OpenSubtitles
-        t = Tarjeta('usuario', 'Cuenta de OpenSubtitles',
-                    'Opcional, pero da más resultados. Es una cuenta de opensubtitles.org (no de .com). '
-                    'La contraseña se guardará en el Administrador de credenciales de Windows.')
-        cuenta = QWidget()
-        cl = QHBoxLayout(cuenta)
-        cl.setContentsMargins(16, 12, 16, 12)
-        cl.setSpacing(10)
-        self.usuario = QLineEdit()
-        self.usuario.setPlaceholderText('Usuario')
-        self.clave = QLineEdit()
-        self.clave.setPlaceholderText('Contraseña')
-        self.clave.setEchoMode(QLineEdit.Password)
-        for e in (self.usuario, self.clave):
-            e.setAcceptDrops(False)
-            cl.addWidget(e, 1)
-        self.b_probar = boton('Probar conexión')
-        self.b_probar.setEnabled(False)
-        self.b_probar.setToolTip('Disponible en la siguiente fase')
-        cl.addWidget(self.b_probar)
-        t.fila(cuenta)
-        lay.addWidget(t)
+        lay.addWidget(self._cuenta())
         lay.addSpacing(12)
 
         # Apariencia y copias
@@ -166,6 +152,7 @@ class VistaAjustes(QWidget):
         tl.setContentsMargins(0, 0, 0, 0)
         tl.setSpacing(0)
         self.grupo_tema = QButtonGroup(self)
+        self.botones_tema = {}
         for i, (clave, texto) in enumerate((('sistema', 'Sistema'), ('claro', 'Claro'), ('oscuro', 'Oscuro'))):
             b = QPushButton(texto)
             b.setCheckable(True)
@@ -174,19 +161,15 @@ class VistaAjustes(QWidget):
             b.setCursor(Qt.PointingHandCursor)
             b.clave = clave
             self.grupo_tema.addButton(b)
+            self.botones_tema[clave] = b
             tl.addWidget(b)
-            if clave == 'sistema':
-                b.setChecked(True)
-        self.grupo_tema.buttonClicked.connect(lambda b: self.tema_elegido.emit(b.clave))
+        self.grupo_tema.buttonClicked.connect(self._tema)
         t.fila(FilaOpcion('Tema', 'Claro, oscuro o el mismo que Windows.', temas))
-        copias = QWidget()
         b_copias = boton('Abrir carpeta')
-        b_copias.setEnabled(False)
-        b_copias.setToolTip('Disponible en la siguiente fase')
+        b_copias.clicked.connect(self._abrir_copias)
         t.fila(FilaOpcion('Copias de seguridad',
-                          'Copia de cada subtítulo sustituido, en %USERPROFILE%\\.subtitulos-esp\\backup '
+                          f'Copia de cada subtítulo sustituido, en {HOME / "backup"} '
                           '(la misma carpeta que usa la skill).', b_copias))
-        del copias
         lay.addWidget(t)
         lay.addSpacing(16)
 
@@ -198,14 +181,17 @@ class VistaAjustes(QWidget):
         lay.addLayout(pie)
         lay.addStretch()
 
-        self.restaurar()
+        self._poner_opciones(config.opciones)
+        self.botones_tema.get(config.tema, self.botones_tema['sistema']).setChecked(True)
         for c in (self.latino, self.ingles, self.ingles_extra, self.force, self.simulacion):
-            c.toggled.connect(self.cambiado)
-        self.max_videos.cambiado.connect(self.cambiado)
-        self.max_descargas.cambiado.connect(self.cambiado)
+            c.toggled.connect(self._opciones_cambiadas)
+        self.max_videos.cambiado.connect(self._opciones_cambiadas)
+        self.max_descargas.cambiado.connect(self._opciones_cambiadas)
 
-    def restaurar(self):
-        o = Opciones()
+    # ---------- Opciones ----------
+
+    def _poner_opciones(self, o):
+        self._cargando = True
         self.latino.setChecked(not o.solo_castellano)
         self.ingles.setChecked(not o.sin_ingles)
         self.ingles_extra.setChecked(o.ingles)
@@ -213,13 +199,129 @@ class VistaAjustes(QWidget):
         self.simulacion.setChecked(o.dry_run)
         self.max_videos.poner(o.max_videos)
         self.max_descargas.poner(o.max_descargas)
-        self.cambiado.emit()
+        self._cargando = False
 
     def opciones(self):
         return Opciones(force=self.force.isChecked(), solo_castellano=not self.latino.isChecked(),
                         sin_ingles=not self.ingles.isChecked(), ingles=self.ingles_extra.isChecked(),
                         dry_run=self.simulacion.isChecked(), max_videos=self.max_videos.valor(),
                         max_descargas=self.max_descargas.valor())
+
+    def _opciones_cambiadas(self):
+        if self._cargando:
+            return
+        self.config.opciones = self.opciones()
+        self.config.guardar()
+        self.cambiado.emit()
+
+    def restaurar(self):
+        self._poner_opciones(Opciones())
+        self._opciones_cambiadas()
+
+    def _tema(self, b):
+        self.config.tema = b.clave
+        self.config.guardar()
+        self.tema_elegido.emit(b.clave)
+
+    def _abrir_copias(self):
+        carpeta = HOME / 'backup'
+        carpeta.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(carpeta)))
+
+    # ---------- Cuenta de OpenSubtitles ----------
+
+    def _cuenta(self):
+        t = Tarjeta('usuario', 'Cuenta de OpenSubtitles',
+                    'Opcional, pero da más resultados. Es una cuenta de opensubtitles.org (no de .com). '
+                    'La contraseña se guarda en el Administrador de credenciales de Windows, nunca en un archivo.')
+        cuenta = QWidget()
+        v = QVBoxLayout(cuenta)
+        v.setContentsMargins(16, 12, 16, 12)
+        v.setSpacing(10)
+        fila = QHBoxLayout()
+        fila.setSpacing(10)
+        self.usuario = QLineEdit(self.config.usuario_opensubtitles)
+        self.usuario.setPlaceholderText('Usuario')
+        self.clave = QLineEdit(credenciales.leer_clave(self.config.usuario_opensubtitles))
+        self.clave.setPlaceholderText('Contraseña')
+        self.clave.setEchoMode(QLineEdit.Password)
+        for e in (self.usuario, self.clave):
+            e.setAcceptDrops(False)
+            e.textEdited.connect(self._cuenta_editada)
+            fila.addWidget(e, 1)
+        self.b_guardar = boton('Guardar', nombre='primario')
+        self.b_guardar.clicked.connect(self._guardar_cuenta)
+        self.b_probar = boton('Probar conexión')
+        self.b_probar.clicked.connect(self._probar)
+        fila.addWidget(self.b_guardar)
+        fila.addWidget(self.b_probar)
+        v.addLayout(fila)
+        abajo = QHBoxLayout()
+        self.estado_cuenta = etiqueta('', 'ayuda', envolver=True)
+        abajo.addWidget(self.estado_cuenta, 1)
+        self.b_importar = boton('Usar la cuenta de la skill', nombre='plano')
+        self.b_importar.setToolTip(f'Importa {HOME / "credenciales.json"}')
+        self.b_importar.clicked.connect(self._importar)
+        abajo.addWidget(self.b_importar)
+        v.addLayout(abajo)
+        t.fila(cuenta)
+        self._prueba = _Prueba(self)
+        self._prueba.hecha.connect(self._prueba_hecha)
+        self._actualizar_cuenta()
+        return t
+
+    def _actualizar_cuenta(self, mensaje=None):
+        guardado = self.config.usuario_opensubtitles
+        cambios = (self.usuario.text().strip() != guardado
+                   or self.clave.text() != credenciales.leer_clave(guardado))
+        self.b_guardar.setEnabled(cambios)
+        self.b_probar.setEnabled(bool(self.usuario.text().strip() and self.clave.text()))
+        skill = credenciales.credenciales_skill()
+        self.b_importar.setVisible(bool(skill) and skill[0] != guardado)
+        if mensaje is None:
+            if cambios:
+                mensaje = 'Hay cambios sin guardar.'
+            elif guardado and credenciales.leer_clave(guardado):
+                mensaje = f'Se usará la cuenta «{guardado}» en las búsquedas.'
+            else:
+                mensaje = 'Sin cuenta: se busca en Addic7ed, Gestdown y Subtitulamos.'
+        self.estado_cuenta.setText(mensaje)
+
+    def _cuenta_editada(self):
+        self._actualizar_cuenta()
+
+    def _guardar_cuenta(self):
+        usuario, clave = self.usuario.text().strip(), self.clave.text()
+        if not credenciales.guardar_clave(usuario, clave, self.config.usuario_opensubtitles):
+            self._actualizar_cuenta('No se pudo guardar la contraseña en el Administrador de credenciales.')
+            return
+        self.config.usuario_opensubtitles = usuario if clave else ''
+        self.config.guardar()
+        self._actualizar_cuenta()
+
+    def _importar(self):
+        skill = credenciales.credenciales_skill()
+        if skill:
+            self.usuario.setText(skill[0])
+            self.clave.setText(skill[1])
+            self._guardar_cuenta()
+
+    def _probar(self):
+        usuario, clave = self.usuario.text().strip(), self.clave.text()
+        self.b_probar.setEnabled(False)
+        self.estado_cuenta.setText('Comprobando la conexión con opensubtitles.org…')
+
+        def comprobar():
+            ok, mensaje = credenciales.probar(usuario, clave)
+            self._prueba.hecha.emit(ok, mensaje)
+
+        threading.Thread(target=comprobar, name='probar-opensubtitles', daemon=True).start()
+
+    def _prueba_hecha(self, ok, mensaje):
+        self.b_probar.setEnabled(True)
+        self.estado_cuenta.setText(('✓ ' if ok else '✗ ') + mensaje)
+
+    # ---------- Tema ----------
 
     def refrescar(self):
         t = tema.actual()

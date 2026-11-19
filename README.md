@@ -42,7 +42,7 @@ Después se aplican en el módulo correspondiente:
 0. Repositorios ✅
 1. Separar el núcleo (`procesar()`) de la salida por pantalla, sin cambiar el comportamiento de la CLI ✅
 2. Prototipo de la ventana: arrastrar y soltar, y estilo claro/oscuro ✅ (con resultados de demostración)
-3. Interfaz completa: Inicio, progreso, resumen con colores y Configuración
+3. Interfaz completa: búsqueda real, configuración guardada, cuenta de OpenSubtitles ✅
 4. Empaquetado: `.exe`, instalador y versión portable
 5. Pruebas en Windows 10 y 11
 6. Documentación y versión 1.0
@@ -69,7 +69,10 @@ app/            interfaz gráfica (Qt / PySide6)
   componentes.py   interruptor, tarjetas, barra segmentada, tabla
   tema.py       colores claro/oscuro y hoja de estilos
   iconos.py     iconos SVG (Lucide, ISC)
-  demo.py       trabajador de demostración (prototipo)
+  trabajador.py ejecuta procesar() en un hilo (QThread) y lo convierte en señales
+  config.py     preferencias en %APPDATA%\BajarSubtitulosEsp\config.json
+  credenciales.py  cuenta de OpenSubtitles (contraseña en el Administrador de credenciales)
+  demo.py       resultados de demostración (--demo, --captura)
 subtitulos/
   archivos.py   qué archivos son vídeos
   eventos.py    Resultado, Eventos y categorías del resumen
@@ -92,14 +95,24 @@ La app se ejecuta con el Python de Windows. `scripts/windows.sh` copia el códig
 ```bash
 scripts/windows.sh entorno     # una vez: crea el venv de Windows (requirements-app.txt)
 scripts/windows.sh app         # abre la app
+scripts/windows.sh app --demo  # con resultados de demostración (no busca ni descarga)
 scripts/windows.sh python -I app/main.py --captura 'C:\ruta\capturas'   # imágenes de cada pantalla
 ```
+
+Preferencias: `%APPDATA%\BajarSubtitulosEsp\config.json`. La contraseña de OpenSubtitles va al
+Administrador de credenciales de Windows (servicio `BajarSubtitulosESP/opensubtitles`). Las copias
+de seguridad y el `credenciales.json` de la skill (que se puede importar) siguen en
+`%USERPROFILE%\.subtitulos-esp`.
 
 ## Pruebas
 
 ```bash
-python -m unittest discover -s tests
+python -m unittest discover -s tests                        # núcleo (la prueba de la app se salta sin PySide6)
+scripts/windows.sh python -I -m unittest discover -s tests  # todo, con el Python de Windows
 ```
+
+`tests/test_app.py` prueba la app sin mostrar ventanas: configuración, credenciales, rutas soltadas,
+el trabajador en su hilo (búsqueda, cancelar, errores) y la ventana completa.
 
 `tests/test_nucleo.py` simula los proveedores, así que no necesita internet. Comprueba que la CLI
 produce exactamente la misma salida y los mismos archivos que el script original de la skill

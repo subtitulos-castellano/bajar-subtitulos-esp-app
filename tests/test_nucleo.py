@@ -172,7 +172,7 @@ class ConSimulacion(unittest.TestCase):
         self._tmp.cleanup()
 
     def arbol(self):
-        return {str(p.relative_to(self.videos)): hashlib.sha256(p.read_bytes()).hexdigest()[:16]
+        return {p.relative_to(self.videos).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()[:16]
                 for p in sorted(self.videos.rglob('*')) if p.is_file()}
 
     def backups(self):
@@ -191,7 +191,7 @@ class CliIgualQueLaSkill(ConSimulacion):
                     self.setUp()
                 esperado = json.loads((ESPERADO / f'cli_{esc}.json').read_text(encoding='utf-8'))
                 buf = io.BytesIO()
-                salida = io.TextIOWrapper(buf, encoding='utf-8')
+                salida = io.TextIOWrapper(buf, encoding='utf-8', newline='\n')   # igual en Windows
                 with contextlib.redirect_stdout(salida):
                     bajar_subs.main([str(self.videos)] + args)
                 salida.flush()

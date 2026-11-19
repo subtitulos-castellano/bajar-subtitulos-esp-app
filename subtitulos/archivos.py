@@ -1,6 +1,8 @@
 """Qué archivos son vídeos. Solo usa la biblioteca estándar."""
 from pathlib import Path
 
+# Datos compartidos con la skill: credenciales.json y copias de seguridad (backup/).
+HOME = Path.home() / '.subtitulos-esp'
 VIDEO_EXT = {'.mkv', '.mp4', '.avi', '.m4v', '.mov', '.wmv', '.ts'}
 
 

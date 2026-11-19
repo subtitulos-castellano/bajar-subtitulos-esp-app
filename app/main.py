@@ -1,9 +1,11 @@
 """Arranque de Bajar Subtítulos ESP.
 
-    python -I app/main.py [--tema sistema|claro|oscuro] [--captura CARPETA]
+    python -I app/main.py [--tema sistema|claro|oscuro] [--demo] [--captura CARPETA] [--config ARCHIVO]
 
+--demo usa resultados de demostración (no busca ni descarga nada).
 --captura guarda imágenes de cada pantalla en claro y oscuro sin mostrar la ventana (sirve para
-revisar el diseño).
+revisar el diseño; implica --demo).
+--config usa otro archivo de configuración (para pruebas).
 """
 import time
 
@@ -16,8 +18,8 @@ from pathlib import Path
 # Con -I, Python no añade la carpeta del script a sys.path: se añade la raíz del proyecto.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from PySide6.QtCore import Qt  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
+from PySide6.QtCore import Qt, QTimer  # noqa: E402
+from PySide6.QtWidgets import QApplication, QScrollArea  # noqa: E402
 
 from app import tema  # noqa: E402
 
@@ -74,27 +76,39 @@ def capturar(app, ventana, carpeta):
         ventana.inicio.tarjetas['latino'].setChecked(False)
         ventana.ir(1)
         guardar(f'{nombre_tema}_6_configuracion')
+        barra = ventana.ajustes.findChild(QScrollArea).verticalScrollBar()
+        barra.setValue(barra.maximum())
+        guardar(f'{nombre_tema}_7_configuracion_final')
+        barra.setValue(0)
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument('--tema', choices=('sistema', 'claro', 'oscuro'), default='sistema')
+    ap.add_argument('--tema', choices=('sistema', 'claro', 'oscuro'))
+    ap.add_argument('--demo', action='store_true')
     ap.add_argument('--captura', metavar='CARPETA')
+    ap.add_argument('--config', metavar='ARCHIVO')
     ap.add_argument('--medir-arranque', action='store_true', help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     _id_windows()
     app = QApplication(sys.argv[:1])
     app.setApplicationName('Bajar Subtítulos ESP')
     app.setOrganizationName('subtitulos-castellano')
-    tema.aplicar(app, args.tema)
+    from app.config import Config
+    config = Config(args.config)
+    if args.tema:
+        config.tema = args.tema
+    tema.aplicar(app, config.tema)
     from app.ventana import Ventana
-    ventana = Ventana(args.tema)
+    ventana = Ventana(config, demo=args.demo or bool(args.captura))
     if args.captura:
         capturar(app, ventana, args.captura)
         return 0
     ventana.show()
+    if not args.demo:
+        from app.trabajador import precargar
+        QTimer.singleShot(300, precargar)     # subliminal se carga cuando la ventana ya se ve
     if args.medir_arranque:
-        from PySide6.QtCore import QTimer
         app.processEvents()
         print(f'ventana visible en {time.perf_counter() - _T0:.2f} s '
               f'(subliminal cargado: {"subliminal" in sys.modules})')

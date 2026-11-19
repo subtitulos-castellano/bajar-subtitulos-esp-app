@@ -1,7 +1,7 @@
 """Ventana principal: barra lateral, Inicio y Configuración, arrastre en toda la ventana y cola."""
 from pathlib import Path
 
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QByteArray, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow,
                                QPushButton, QStackedWidget, QVBoxLayout, QWidget)
@@ -10,12 +10,14 @@ from subtitulos.archivos import es_video
 
 from . import iconos, tema
 from .componentes import IconoLabel, color
+from .credenciales import credenciales_proveedores
 from .demo import TrabajadorDemo
+from .trabajador import Trabajador
 from .vista_ajustes import VistaAjustes, resumen_preferencias
 from .vista_inicio import VistaInicio
 
 NOMBRE_APP = 'Bajar Subtítulos ESP'
-VERSION = '0.2 · prototipo'
+VERSION = '0.3'
 
 
 def icono_app():
@@ -88,14 +90,18 @@ class CapaArrastre(QWidget):
 
 
 class Ventana(QMainWindow):
-    def __init__(self, preferencia_tema='sistema'):
+    def __init__(self, config, demo=False):
         super().__init__()
+        self.config = config
+        self.demo = demo
         self.setWindowTitle(NOMBRE_APP)
         self.setWindowIcon(icono_app())
         self.setMinimumSize(880, 600)
         self.resize(1080, 720)
         self.setAcceptDrops(True)
-        self.preferencia_tema = preferencia_tema
+        self.preferencia_tema = config.tema
+        if config.geometria:
+            self.restoreGeometry(QByteArray.fromBase64(config.geometria.encode()))
         self.cola = []
         self.trabajador = None
 
@@ -108,7 +114,7 @@ class Ventana(QMainWindow):
         h.addWidget(self._lateral())
         self.paginas = QStackedWidget()
         self.inicio = VistaInicio()
-        self.ajustes = VistaAjustes()
+        self.ajustes = VistaAjustes(config)
         self.paginas.addWidget(self.inicio)
         self.paginas.addWidget(self.ajustes)
         h.addWidget(self.paginas, 1)
@@ -117,6 +123,7 @@ class Ventana(QMainWindow):
         self.inicio.elegido.connect(self.procesar)
         self.inicio.cancelar.connect(self._cancelar)
         self.inicio.ir_ajustes.connect(lambda: self.ir(1))
+        self.inicio.repetir.connect(self.procesar)
         self.ajustes.cambiado.connect(self._preferencias_cambiadas)
         self.ajustes.tema_elegido.connect(self.cambiar_tema)
         QGuiApplication.styleHints().colorSchemeChanged.connect(self._tema_sistema_cambiado)
@@ -196,7 +203,7 @@ class Ventana(QMainWindow):
             w.update()
 
     def _preferencias_cambiadas(self):
-        o = self.ajustes.opciones()
+        o = self.config.opciones
         self.inicio.poner_preferencias(resumen_preferencias(o), o.dry_run)
 
     # ---------- Arrastrar y soltar ----------
@@ -251,18 +258,27 @@ class Ventana(QMainWindow):
             return
         ruta = self.cola.pop(0)
         self.inicio.poner_cola(len(self.cola))
-        self.trabajador = TrabajadorDemo(ruta, self)
+        opciones = self.config.opciones       # las preferencias de este momento valen para toda la tanda
+        if self.demo:
+            self.trabajador = TrabajadorDemo(ruta, self)
+        else:
+            self.trabajador = Trabajador(ruta, opciones,
+                                         credenciales_proveedores(self.config.usuario_opensubtitles))
+            self.trabajador.error.connect(self.inicio.al_error)
         self.trabajador.inicio.connect(self.inicio.al_iniciar)
         self.trabajador.video.connect(self.inicio.al_video)
         self.trabajador.detalle.connect(self.inicio.al_detalle)
         self.trabajador.resultado.connect(self.inicio.al_resultado)
         self.trabajador.terminado.connect(self._terminado)
-        self.inicio.empezar(ruta, demo=True)
+        self.inicio.empezar(ruta, demo=self.demo, simulacion=opciones.dry_run)
         self.trabajador.empezar()
 
     def _terminado(self, resultados, cancelado, segundos):
         self.inicio.terminar(resultados, cancelado, segundos)
-        self.trabajador.deleteLater()
+        if self.demo:
+            self.trabajador.deleteLater()
+        else:
+            self.trabajador.esperar()
         self.trabajador = None
         if cancelado:
             self.cola.clear()
@@ -272,3 +288,13 @@ class Ventana(QMainWindow):
     def _cancelar(self):
         if self.trabajador:
             self.trabajador.cancelar()
+
+    def closeEvent(self, e):
+        self.config.geometria = bytes(self.saveGeometry().toBase64()).decode()
+        self.config.guardar()
+        if self.trabajador:
+            self.cola.clear()
+            self.trabajador.cancelar()
+            if not self.demo:
+                self.trabajador.esperar(15000)   # termina el vídeo en curso; lo hecho queda guardado
+        super().closeEvent(e)
