@@ -303,6 +303,18 @@ class MenuLateralYTabla(test_nucleo.ConSimulacion):
         config.opciones = Opciones(max_videos=7)
         self.v = Ventana(config)
 
+    def espiar_video(self, funcion):
+        """Llama a `funcion` en cada vídeo, ANTES de empezar la búsqueda (con los proveedores simulados
+        va tan rápido que, si se conecta después, los primeros avisos ya han pasado)."""
+        original = self.v.inicio.al_video
+
+        def espia(*args):
+            original(*args)
+            funcion(*args)
+        parche = mock.patch.object(self.v.inicio, 'al_video', espia)
+        parche.start()
+        self.addCleanup(parche.stop)
+
     def tearDown(self):
         self.v.close()
         self._d.cleanup()
@@ -316,8 +328,8 @@ class MenuLateralYTabla(test_nucleo.ConSimulacion):
 
         def al_video(*a):
             estados.append((nav[INICIO].isEnabled(), nav[BUSCANDO].isChecked(), nav[AJUSTES].isEnabled()))
+        self.espiar_video(al_video)
         v.procesar([self.videos])
-        v.trabajador.video.connect(al_video)
         esperar(lambda: v.trabajador is None)
         self.assertTrue(estados)
         self.assertTrue(all(e == (False, True, False) for e in estados))   # buscando: solo 'Buscando…'
@@ -336,8 +348,8 @@ class MenuLateralYTabla(test_nucleo.ConSimulacion):
 
         def al_video(i, total, path):
             capturas.append([f.categoria for f in v.inicio.modelo.filas])
+        self.espiar_video(al_video)
         v.procesar([self.videos])
-        v.trabajador.video.connect(al_video)
         self.assertTrue(v.inicio.detalles_p.boton.isChecked())   # Detalles abierto al empezar
         esperar(lambda: v.trabajador is None)
         primera = capturas[0]
@@ -372,8 +384,8 @@ class MenuLateralYTabla(test_nucleo.ConSimulacion):
     def test_un_solo_video_anima_la_barra(self):
         v = self.v
         animada = []
+        self.espiar_video(lambda *a: animada.append(v.inicio.barra.trabajando))
         v.procesar([self.videos / 'd_red_cast.avi'])
-        v.trabajador.video.connect(lambda *a: animada.append(v.inicio.barra.trabajando))
         esperar(lambda: v.trabajador is None)
         self.assertEqual(animada, [True])
         self.assertFalse(v.inicio.barra.trabajando)
@@ -383,9 +395,9 @@ class MenuLateralYTabla(test_nucleo.ConSimulacion):
         v = self.v
         sueltos = [self.videos / 'z_pend.avi', self.videos / 'c_incrustado.mkv', self.videos / 'a_ya.mkv']
         filas = []
+        self.espiar_video(lambda *a: filas.append(len(v.inicio.modelo.filas)))
         v.procesar(sueltos)                                   # se sueltan los tres a la vez
         self.assertEqual(v.cola, [])                          # nada en cola: una sola búsqueda
-        v.trabajador.video.connect(lambda *a: filas.append(len(v.inicio.modelo.filas)))
         esperar(lambda: v.trabajador is None)
         self.assertEqual(filas, [3, 3, 3])                   # los tres en la tabla desde el principio
         self.assertEqual([f.nombre for f in v.inicio.modelo.filas], ['z_pend.avi', 'c_incrustado.mkv', 'a_ya.mkv'])
