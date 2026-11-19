@@ -1,0 +1,31 @@
+{
+ "stdout": "\n== a_ya.mkv\n  ya tiene a_ya.srt en castellano\n\n== b_renombra.mp4\n  ya tiene b_renombra.srt en castellano\n\n== c_incrustado.mkv\n  2 pistas de subtítulos incrustadas\n  pista incrustada 1 [spa] Español (España): españa=5 latino=0\n\n== d_red_cast.avi\n  4 candidatos en español: se descargan los 2 mejores, alternando proveedores\n  opensubtitles id=cast1 score=18 sincronía=18 españa=6 latino=0 episodio_ok=True duración_ok=True\n  addic7ed      id=lat1 score=0 sincronía=0 españa=0 latino=4 episodio_ok=True duración_ok=True\n\n== e_red_lat.avi\n  opensubtitles id=grande descartado: tamaño anormal\n  addic7ed      id=lat2 score=0 sincronía=0 españa=0 latino=4 episodio_ok=True duración_ok=True\n\n== f_red_eng.avi\n  [inglés] gestdown      id=en1 score=0 episodio_ok=True duración_ok=True\n\n== g_nada.avi\n\n== h_latino_previo.avi\n  ya tiene h_latino_previo.srt en latino\n\n== i_mejora.avi\n  ya tiene i_mejora.srt en ingles\n  opensubtitles id=cast5 score=0 sincronía=0 españa=10 latino=0 episodio_ok=True duración_ok=True\n\n== k_lat_incrustado.mkv\n  1 pistas de subtítulos incrustadas\n  pista incrustada 1 [spa] Español (Latinoamérica): españa=0 latino=3\n\n== z_pend.avi\n  opensubtitles id=cast9 score=0 sincronía=0 españa=6 latino=0 episodio_ok=True duración_ok=True\n\n==== RESUMEN ====\nCASTELLANO (ya tenía .srt)   -                              a_ya.mkv\nCASTELLANO (ya tenía .srt)   renombrado desde .es.srt       b_renombra.mp4\nCASTELLANO (incrustado)      pista 1 Español (España)       c_incrustado.mkv\nCASTELLANO                   opensubtitles cast1            d_red_cast.avi\nLATINO                       addic7ed lat2                  e_red_lat.avi\nINGLÉS                       gestdown en1                   f_red_eng.avi\nNO ENCONTRADO                ni español ni inglés           g_nada.avi\nLATINO (ya tenía .srt)       -                              h_latino_previo.avi\nCASTELLANO                   opensubtitles cast5            i_mejora.avi\nLATINO (incrustado)          pista 1 Español (Latinoamérica k_lat_incrustado.mkv\nCASTELLANO                   opensubtitles cast9            z_pend.avi\n",
+ "arbol": {
+  "a_ya.mkv": "e5a00aa9991ac8a5",
+  "a_ya.srt": "8f883e92f757a806",
+  "b_renombra.mp4": "e5a00aa9991ac8a5",
+  "b_renombra.srt": "8f883e92f757a806",
+  "c_incrustado.en.srt": "1d3be3913ee10d71",
+  "c_incrustado.mkv": "564c5ece593d904d",
+  "c_incrustado.srt": "c68f18fcb3b5772b",
+  "d_red_cast.avi": "e5a00aa9991ac8a5",
+  "d_red_cast.srt": "5f4ebd9537a03161",
+  "e_red_lat.avi": "e5a00aa9991ac8a5",
+  "e_red_lat.srt": "804df581b48a6cd4",
+  "f_red_eng.avi": "e5a00aa9991ac8a5",
+  "f_red_eng.srt": "203127d3b4128db3",
+  "g_nada.avi": "e5a00aa9991ac8a5",
+  "h_latino_previo.avi": "e5a00aa9991ac8a5",
+  "h_latino_previo.srt": "7de2c74534811611",
+  "i_mejora.avi": "e5a00aa9991ac8a5",
+  "i_mejora.srt": "db147e0034f3cda6",
+  "sample-x.avi": "e5a00aa9991ac8a5",
+  "sub/k_lat_incrustado.mkv": "67f4aa7b97b7c4d8",
+  "sub/k_lat_incrustado.srt": "3c6866aee2ac7c95",
+  "z_pend.avi": "e5a00aa9991ac8a5",
+  "z_pend.srt": "5f4ebd9537a03161"
+ },
+ "backups": [
+  "i_mejora.srt"
+ ]
+}

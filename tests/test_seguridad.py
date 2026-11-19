@@ -1,4 +1,4 @@
-"""Pruebas de seguridad de bajar_subs.py con vídeos y textos construidos a mano.
+"""Pruebas de seguridad del núcleo (paquete subtitulos) con vídeos y textos construidos a mano.
 
 Comprueban que los vídeos válidos se siguen leyendo igual y que los corruptos o manipulados
 terminan enseguida con ArchivoInvalido, sin colgarse ni agotar la memoria.
@@ -14,7 +14,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-import bajar_subs as b  # noqa: E402
+from subtitulos import nucleo, texto  # noqa: E402
+from subtitulos import pistas as pt  # noqa: E402
 
 LIMITE_SEGUNDOS = 10
 TEXTO = 'Vale, tío, ¿qué hacéis vosotros aquí?'
@@ -124,20 +125,20 @@ class ConArchivos(unittest.TestCase):
 class VideosValidos(ConArchivos):
     def test_mkv_valido_sigue_funcionando(self):
         ruta = self.archivo('valido.mkv', mkv_valido())
-        pistas = b.pistas_texto(ruta)
+        pistas = pt.pistas_texto(ruta)
         self.assertEqual([(p['num'], p['lang'], p['name']) for p in pistas], [(1, 'spa', 'Español (España)')])
-        srt = b.extraer_srt(ruta, [1])[1]
+        srt = pt.extraer_srt(ruta, [1])[1]
         self.assertIn('00:00:00,000 --> 00:00:02,000', srt)
         self.assertIn(TEXTO, srt)
-        res, error = sin_colgarse(self, b.incrustado, ruta)
+        res, error = sin_colgarse(self, pt.incrustado, ruta)
         self.assertIsNone(error)
         self.assertIsNotNone(res['castellano'])
 
     def test_mp4_valido_sigue_funcionando(self):
         ruta = self.archivo('valido.mp4', mp4())
-        pistas = b.pistas_texto(ruta)
+        pistas = pt.pistas_texto(ruta)
         self.assertEqual([(p['num'], p['lang'], p['codec']) for p in pistas], [(1, 'spa', 'tx3g')])
-        srt = b.extraer_srt(ruta, [1])[1]
+        srt = pt.extraer_srt(ruta, [1])[1]
         self.assertIn('00:00:00,000 --> 00:00:02,000', srt)
         self.assertIn(TEXTO, srt)
 
@@ -145,33 +146,33 @@ class VideosValidos(ConArchivos):
 class VideosManipulados(ConArchivos):
     def test_mkv_cortado_no_se_cuelga(self):
         ruta = self.archivo('cortado.mkv', mkv_cortado())
-        _, error = sin_colgarse(self, b.pistas_mkv, ruta)
-        self.assertIsInstance(error, b.ArchivoInvalido)
+        _, error = sin_colgarse(self, pt.pistas_mkv, ruta)
+        self.assertIsInstance(error, pt.ArchivoInvalido)
 
     def test_mkv_bloque_cero_no_se_cuelga(self):
         ruta = self.archivo('cero.mkv', mkv_bloque_cero())
-        _, error = sin_colgarse(self, b.extraer_srt_mkv, ruta, [1])
-        self.assertIsInstance(error, b.ArchivoInvalido)
+        _, error = sin_colgarse(self, pt.extraer_srt_mkv, ruta, [1])
+        self.assertIsInstance(error, pt.ArchivoInvalido)
 
     def test_vint_b_byte_cero(self):
-        _, error = sin_colgarse(self, b._vint_b, b'\x00' * 9, 0)
-        self.assertIsInstance(error, b.ArchivoInvalido)
+        _, error = sin_colgarse(self, pt._vint_b, b'\x00' * 9, 0)
+        self.assertIsInstance(error, pt.ArchivoInvalido)
 
     def test_mp4_con_miles_de_millones_de_muestras(self):
         ruta = self.archivo('muestras.mp4', mp4(tam_fijo=4, n_muestras=0xFFFFFFFF))
-        _, error = sin_colgarse(self, b.pistas_mp4, ruta)
-        self.assertIsInstance(error, b.ArchivoInvalido)
+        _, error = sin_colgarse(self, pt.pistas_mp4, ruta)
+        self.assertIsInstance(error, pt.ArchivoInvalido)
 
     def test_mp4_moov_enorme(self):
         ruta = self.archivo('moov.mp4', mp4_moov_enorme())
-        _, error = sin_colgarse(self, b.pistas_mp4, ruta)
-        self.assertIsInstance(error, b.ArchivoInvalido)
+        _, error = sin_colgarse(self, pt.pistas_mp4, ruta)
+        self.assertIsInstance(error, pt.ArchivoInvalido)
 
     def test_incrustado_devuelve_vacio_sin_error(self):
-        for nombre, datos in (('a.mkv', mkv_cortado()), ('b.mkv', mkv_bloque_cero()),
+        for nombre, datos in (('a.mkv', mkv_cortado()), ('pistas.mkv', mkv_bloque_cero()),
                               ('c.mp4', mp4(tam_fijo=4, n_muestras=0xFFFFFFFF)), ('d.mp4', mp4_moov_enorme())):
             with self.subTest(nombre):
-                res, error = sin_colgarse(self, b.incrustado, self.archivo(nombre, datos))
+                res, error = sin_colgarse(self, pt.incrustado, self.archivo(nombre, datos))
                 self.assertIsNone(error)
                 self.assertEqual(res, {'castellano': None, 'latino': None, 'ingles': None})
 
@@ -179,14 +180,14 @@ class VideosManipulados(ConArchivos):
 class TextosDeTerceros(ConArchivos):
     def test_limpiar_texto_quita_controles_y_conserva_saltos(self):
         sucio = 'Hola\x1b[31m‮mundo\x00\x9b​.\r\nAdiós\t!'
-        self.assertEqual(b.limpiar_texto(sucio), 'Hola[31mmundo.\r\nAdiós\t!')
+        self.assertEqual(texto.limpiar_texto(sucio), 'Hola[31mmundo.\r\nAdiós\t!')
 
     def test_visible_es_una_sola_linea(self):
-        self.assertEqual(b.visible('pista\nCASTELLANO falso\x1b'), 'pista CASTELLANO falso ')
+        self.assertEqual(texto.visible('pista\nCASTELLANO falso\x1b'), 'pista CASTELLANO falso ')
 
     def test_guardar_limpia_el_texto(self):
         destino = self.dir / 'video.srt'
-        b.guardar('1\r\n00:00:01,000 --> 00:00:02,000\r\nHola\x1b]0;titulo\x07\r\n', destino)
+        nucleo.guardar('1\r\n00:00:01,000 --> 00:00:02,000\r\nHola\x1b]0;titulo\x07\r\n', destino)
         self.assertEqual(destino.read_bytes().decode('utf-8'),
                          '1\r\n00:00:01,000 --> 00:00:02,000\r\nHola]0;titulo\r\n')
 
