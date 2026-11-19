@@ -167,7 +167,7 @@ def capturar(app, ventana, carpeta):
         ventana.capa.mostrar('Suelta para buscar subtítulos', 'Serie de Ejemplo - Temporada 1')
         guardar(f'{nombre_tema}_2_arrastrando')
         ventana.capa.hide()
-        ventana.inicio.empezar(ejemplo, demo=True)
+        ventana.inicio.empezar(ejemplo, demo=False)   # sin el aviso de demostración: capturas limpias
         ventana.hay_busqueda = True
         ventana.trabajador = object()          # para ver el menú lateral como durante una búsqueda
         ventana.nav_botones[1].setChecked(True)
