@@ -299,7 +299,7 @@ class Arranque(unittest.TestCase):
     def test_modulos_ligeros_no_cargan_subliminal(self):
         """La app muestra la ventana antes de cargar subliminal: estos módulos no deben importarlo."""
         r = self.ejecutar('-c', f'import sys; sys.path.insert(0, {str(RAIZ)!r}); '
-                                'import subtitulos.opciones, subtitulos.texto, subtitulos.pistas; '
+                                'import subtitulos.opciones, subtitulos.texto, subtitulos.pistas, subtitulos.eventos, subtitulos.archivos; '
                                 'print(sorted(m for m in ("subliminal", "guessit", "babelfish") if m in sys.modules))')
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), '[]')

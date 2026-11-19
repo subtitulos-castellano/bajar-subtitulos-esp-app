@@ -41,7 +41,7 @@ Después se aplican en el módulo correspondiente:
 
 0. Repositorios ✅
 1. Separar el núcleo (`procesar()`) de la salida por pantalla, sin cambiar el comportamiento de la CLI ✅
-2. Prototipo de la ventana: arrastrar y soltar, y estilo claro/oscuro
+2. Prototipo de la ventana: arrastrar y soltar, y estilo claro/oscuro ✅ (con resultados de demostración)
 3. Interfaz completa: Inicio, progreso, resumen con colores y Configuración
 4. Empaquetado: `.exe`, instalador y versión portable
 5. Pruebas en Windows 10 y 11
@@ -61,7 +61,18 @@ Requiere `pip install -r requirements.txt`.
 ## Estructura
 
 ```
+app/            interfaz gráfica (Qt / PySide6)
+  main.py       arranque (--tema, --captura)
+  ventana.py    ventana principal, arrastrar y soltar, cola
+  vista_inicio.py  zona de arrastre, progreso y resumen con colores
+  vista_ajustes.py Configuración
+  componentes.py   interruptor, tarjetas, barra segmentada, tabla
+  tema.py       colores claro/oscuro y hoja de estilos
+  iconos.py     iconos SVG (Lucide, ISC)
+  demo.py       trabajador de demostración (prototipo)
 subtitulos/
+  archivos.py   qué archivos son vídeos
+  eventos.py    Resultado, Eventos y categorías del resumen
   opciones.py   Opciones de una ejecución (equivalen a los parámetros de la CLI)
   texto.py      limpieza de textos de terceros, idioma y dialecto
   pistas.py     subtítulos incrustados en MKV y MP4 (sin ffmpeg)
@@ -70,8 +81,19 @@ bajar_subs.py   CLI
 tests/
 ```
 
-`opciones.py`, `texto.py` y `pistas.py` solo usan la biblioteca estándar. `nucleo.py` importa
+Todos los módulos de `subtitulos/` menos `nucleo.py` solo usan la biblioteca estándar. `nucleo.py` importa
 subliminal, que tarda en cargar.
+
+## App (desarrollo desde WSL)
+
+La app se ejecuta con el Python de Windows. `scripts/windows.sh` copia el código a
+`C:\Users\<usuario>\dev\bajar-subtitulos-esp-app` y lo ejecuta allí:
+
+```bash
+scripts/windows.sh entorno     # una vez: crea el venv de Windows (requirements-app.txt)
+scripts/windows.sh app         # abre la app
+scripts/windows.sh python -I app/main.py --captura 'C:\ruta\capturas'   # imágenes de cada pantalla
+```
 
 ## Pruebas
 

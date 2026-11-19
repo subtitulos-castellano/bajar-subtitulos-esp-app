@@ -19,7 +19,6 @@ import json
 import logging
 import shutil
 import time
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -30,12 +29,14 @@ from subliminal.core import ProviderPool
 from subliminal.score import compute_score, episode_scores, movie_scores
 from subliminal.video import Episode
 
+from .archivos import VIDEO_EXT, buscar_videos  # noqa: F401
+from .eventos import (CASTELLANO, INGLES, LATINO, NO_ENCONTRADO, PENDIENTE, SIN_CAMBIOS,  # noqa: F401
+                      YA_CASTELLANO, Eventos, Resultado)
 from .opciones import MAX_DESCARGAS, Opciones
 from .pistas import incrustado, ingles_incrustado
 from .texto import MAX_SRT, dialecto, idioma_srt, limpiar_texto, ultimo_tiempo, visible
 
 HOME = Path.home() / '.subtitulos-esp'
-VIDEO_EXT = {'.mkv', '.mp4', '.avi', '.m4v', '.mov', '.wmv', '.ts'}
 # opensubtitlescom queda fuera: se usa la cuenta de opensubtitles.org (son cuentas distintas).
 # subtis (Argentina) y napiprojekt (polaco) no aportan castellano.
 # podnapisi: el dominio dejó de resolver en 2026 (podnapisi.net sin registro A, www sin DNS).
@@ -45,46 +46,6 @@ PAUSA = 3           # segundos de espera entre un vídeo que busca en internet y
 
 RANGO = {None: 0, 'otro': 0, 'ingles': 1, 'latino': 2, 'castellano': 3}
 ETIQUETA = {'castellano': 'CASTELLANO', 'latino': 'LATINO', 'ingles': 'INGLÉS'}
-
-# Categoría de cada resultado (para dar color al resumen en la app).
-CASTELLANO = 'castellano'        # CASTELLANO, CASTELLANO (incrustado)
-YA_CASTELLANO = 'ya_castellano'  # ya tenía castellano
-LATINO = 'latino'                # LATINO, LATINO (incrustado)
-INGLES = 'ingles'                # INGLÉS, INGLÉS (incrustado)
-SIN_CAMBIOS = 'sin_cambios'      # <TIPO> (ya tenía .srt): no se encontró nada mejor
-PENDIENTE = 'pendiente'          # PENDIENTE (límite)
-NO_ENCONTRADO = 'no_encontrado'  # NO ENCONTRADO
-
-
-@dataclass(frozen=True)
-class Resultado:
-    """Una línea del resumen."""
-    video: Path
-    estado: str       # texto exacto del resumen de la CLI ('CASTELLANO (incrustado)', ...)
-    fuente: str       # proveedor e id, pista incrustada o nota
-    categoria: str    # una de las constantes de categoría de arriba
-
-    @property
-    def nombre(self):
-        return self.video.name
-
-
-class Eventos:
-    """Recibe lo que pasa durante `procesar()`. Por defecto no hace nada: la CLI y la app
-    sobrescriben los métodos que necesitan. Se llaman desde el hilo que ejecuta `procesar()`."""
-
-    def inicio(self, videos):
-        """Lista (de Path) de los vídeos que se van a revisar."""
-
-    def video(self, indice, total, path):
-        """Empieza un vídeo (`indice` va de 1 a `total`)."""
-
-    def detalle(self, linea):
-        """Línea informativa, con el mismo formato que imprime la CLI."""
-
-    def resultado(self, resultado):
-        """Un vídeo terminado (`Resultado`)."""
-
 
 def leer_credenciales():
     """Configuración de proveedores de ~/.subtitulos-esp/credenciales.json ({} si no existe)."""
@@ -146,12 +107,6 @@ def duracion_ok(texto, video):
     if not dur or not fin:
         return True
     return 0.6 * dur <= fin <= dur + 120
-
-
-def buscar_videos(ruta):
-    if ruta.is_file():
-        return [ruta]
-    return sorted(p for p in ruta.rglob('*') if p.suffix.lower() in VIDEO_EXT and 'sample' not in p.name.lower())
 
 
 def ingles_proveedores(pool, video, max_descargas=MAX_DESCARGAS, detalle=lambda linea: None):
