@@ -13,6 +13,10 @@
 #endif
 #define Nombre "Bajar Subtítulos ESP"
 #define Exe "BajarSubtitulosESP.exe"
+; Los crea la app al arrancar (app/actualizar.py): el primero indica que está abierta y el segundo dura
+; hasta que su proceso termina.
+#define MutexApp "BajarSubtitulosESP"
+#define MutexProceso "BajarSubtitulosESP-proceso"
 
 [Setup]
 ; No cambiar nunca AppId: identifica la app para actualizar y desinstalar.
@@ -40,7 +44,7 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 ; Si la app está abierta, el instalador pide cerrarla (la app crea este mutex al arrancar).
-AppMutex=BajarSubtitulosESP
+AppMutex={#MutexApp}
 CloseApplications=yes
 LicenseFile=..\LICENSE
 
@@ -63,7 +67,34 @@ Name: "{autodesktop}\{#Nombre}"; Filename: "{app}\{#Exe}"; Tasks: escritorio
 
 [Run]
 Filename: "{app}\{#Exe}"; Description: "Abrir {#Nombre}"; Flags: nowait postinstall skipifsilent
+; Actualización desde la propia app (/REABRIR=1): se vuelve a abrir sola al terminar.
+Filename: "{app}\{#Exe}"; Flags: nowait runasoriginaluser; Check: Reabrir
 
 ; La configuración (%APPDATA%\BajarSubtitulosEsp), la contraseña guardada en el Administrador de
 ; credenciales y las copias de seguridad (%USERPROFILE%\.subtitulos-esp) se conservan al
 ; desinstalar: son del usuario y las comparte con la skill.
+
+[Code]
+// La app lanza el instalador con /VERYSILENT /REABRIR=1 y se cierra al momento.
+function Reabrir(): Boolean;
+begin
+  Result := ExpandConstant('{param:REABRIR|0}') = '1';
+end;
+
+// Al actualizar desde la app, esperar (como mucho 30 s) a que termine de cerrarse antes de tocar
+// sus archivos.
+function InitializeSetup(): Boolean;
+var
+  Espera: Integer;
+begin
+  if Reabrir() then
+  begin
+    Espera := 0;
+    while CheckForMutexes('{#MutexProceso}') and (Espera < 300) do
+    begin
+      Sleep(100);
+      Espera := Espera + 1;
+    end;
+  end;
+  Result := True;
+end;

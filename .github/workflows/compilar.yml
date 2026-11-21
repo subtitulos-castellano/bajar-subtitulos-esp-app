@@ -106,6 +106,30 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "El instalador ha fallado: código $($p.ExitCode)" }
           Autoprueba "$dir\BajarSubtitulosESP.exe" (Join-Path $env:RUNNER_TEMP 'instalado.txt')
 
+          # Actualización como la hace la app al pulsar Actualizar: lanza el instalador en silencio y se
+          # cierra; el instalador espera a que termine, instala encima y la vuelve a abrir.
+          # (WaitForExit y no -Wait: -Wait esperaría también al instalador y a la app que este reabre.)
+          $registro = Join-Path (Split-Path $instalador) 'instalacion.log'
+          $p = Start-Process "$dir\BajarSubtitulosESP.exe" -ArgumentList '--probar-actualizacion', "`"$instalador`"" -PassThru
+          $p.WaitForExit()
+          if ($p.ExitCode -ne 0) { throw "La app no ha lanzado la actualización: código $($p.ExitCode)" }
+          $fin = (Get-Date).AddMinutes(3)
+          while (-not ((Test-Path $registro) -and (Select-String -Path $registro -Pattern 'Log closed' -Quiet))) {
+            if ((Get-Date) -gt $fin) { if (Test-Path $registro) { Get-Content $registro }; throw 'El instalador no ha terminado' }
+            Start-Sleep -Seconds 2
+          }
+          Get-Content $registro | Select-String -Pattern 'Setup version|Installation process succeeded|Need to restart|Exception|error'
+          if (-not (Select-String -Path $registro -Pattern 'Installation process succeeded' -Quiet)) { Get-Content $registro; throw 'La actualización no se ha instalado' }
+          $fin = (Get-Date).AddSeconds(60)
+          while (-not ($reabierta = Get-Process BajarSubtitulosESP -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$dir\BajarSubtitulosESP.exe" })) {
+            if ((Get-Date) -gt $fin) { throw 'La app no se ha vuelto a abrir tras actualizarse' }
+            Start-Sleep -Seconds 1
+          }
+          'Actualización correcta: la app se ha vuelto a abrir sola'
+          $reabierta | Stop-Process -Force
+          Start-Sleep -Seconds 3
+          Autoprueba "$dir\BajarSubtitulosESP.exe" (Join-Path $env:RUNNER_TEMP 'actualizado.txt')
+
           $p = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
           Start-Sleep -Seconds 8
           if (Test-Path "$dir\BajarSubtitulosESP.exe") { throw 'La desinstalación ha dejado el programa' }

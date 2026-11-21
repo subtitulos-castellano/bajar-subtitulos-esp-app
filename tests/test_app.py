@@ -29,7 +29,7 @@ from subtitulos.opciones import Opciones  # noqa: E402
 
 APP = QApplication.instance() or QApplication([])
 
-from app import credenciales, tema  # noqa: E402
+from app import __version__, actualizar, credenciales, tema  # noqa: E402
 from app.componentes import FilaOpcion  # noqa: E402
 from app.config import Config  # noqa: E402
 from app.trabajador import Trabajador  # noqa: E402
@@ -120,6 +120,20 @@ class Configuracion(unittest.TestCase):
         self.ruta.parent.mkdir(parents=True)
         self.ruta.write_text(json.dumps({'opciones': {'force': True, 'futura': 1}}), encoding='utf-8')
         self.assertTrue(Config(self.ruta).opciones.force)
+
+    def test_actualizaciones(self):
+        c = Config(self.ruta)
+        self.assertEqual((c.actualizaciones, c.ultima_comprobacion, c.version), (True, 0.0, ''))
+        c.actualizaciones, c.ultima_comprobacion, c.version = False, 1795000000.5, '1.0.1'
+        c.guardar()
+        d = Config(self.ruta)
+        self.assertEqual((d.actualizaciones, d.ultima_comprobacion, d.version), (False, 1795000000.5, '1.0.1'))
+        for malo in ({'actualizaciones': 'no'}, {'ultima_comprobacion': -1}, {'ultima_comprobacion': True},
+                     {'version': 7}, {'version': 'x' * 50}):
+            with self.subTest(malo):
+                self.ruta.write_text(json.dumps(malo), encoding='utf-8')
+                c = Config(self.ruta)
+                self.assertEqual((c.actualizaciones, c.ultima_comprobacion, c.version), (True, 0.0, ''))
 
 
 class Credenciales(unittest.TestCase):
@@ -462,6 +476,141 @@ class TamanoDelTexto(unittest.TestCase):
                 ruta = Path(d) / 'config.json'
                 ruta.write_text(json.dumps({'tamano_texto': valor}), encoding='utf-8')
                 self.assertEqual(Config(ruta).tamano_texto, esperado)
+
+
+NOVEDAD = actualizar.Novedad(
+    '99.0.0', 'https://github.com/subtitulos-castellano/bajar-subtitulos-esp-app/releases/tag/v99.0.0',
+    '• Actualizaciones automáticas\n• <b>no es HTML</b>',
+    actualizar.Archivo('BajarSubtitulosESP-99.0.0-instalador.exe', 'https://github.com/x', 'ab' * 32, 10))
+
+
+class Actualizaciones(unittest.TestCase):
+    def setUp(self):
+        self._d = tempfile.TemporaryDirectory()
+        self.addCleanup(self._d.cleanup)
+        self.ruta = Path(self._d.name) / 'config.json'
+        c = Config(self.ruta)
+        c.version = __version__
+        c.guardar()
+        self.v = Ventana(Config(self.ruta))
+        self.v.setAttribute(Qt.WA_DontShowOnScreen)
+        self.v.show()
+        self.addCleanup(self.v.close)
+        APP.processEvents()
+
+    def test_opcion_en_configuracion(self):
+        a = self.v.ajustes
+        self.assertTrue(a.auto_actualizar.isChecked())
+        a.auto_actualizar.click()
+        self.assertFalse(Config(self.ruta).actualizaciones)
+        self.assertFalse(self.v.actualizador.toca())           # desactivada: no se comprueba al abrir
+        a.auto_actualizar.click()
+        self.assertTrue(Config(self.ruta).actualizaciones)
+
+    def test_como_mucho_una_vez_al_dia(self):
+        act = self.v.actualizador
+        self.assertTrue(act.toca())
+        self.v.config.ultima_comprobacion = time.time() - 3600
+        self.assertFalse(act.toca())
+        self.v.config.ultima_comprobacion = time.time() - 25 * 3600
+        self.assertTrue(act.toca())
+
+    def test_buscar_ahora(self):
+        a = self.v.ajustes
+        with mock.patch.object(actualizar, 'consultar', return_value=None):
+            a.b_buscar_version.click()
+            esperar(lambda: 'última versión' in a.estado_version.text())
+        self.assertTrue(a.b_buscar_version.isEnabled())
+        self.assertGreater(Config(self.ruta).ultima_comprobacion, 0)
+        with mock.patch.object(actualizar, 'consultar', side_effect=actualizar.ErrorActualizacion('Sin red.')):
+            a.b_buscar_version.click()
+            esperar(lambda: 'No se ha podido comprobar: Sin red.' in a.estado_version.text())
+        self.assertFalse(self.v.marco_aviso.isVisible())       # un fallo no molesta con avisos
+
+    def test_aviso_de_version_nueva(self):
+        v = self.v
+        with mock.patch.object(actualizar, 'consultar', return_value=NOVEDAD), \
+                mock.patch.object(actualizar, 'instalada', return_value=True):
+            v.actualizador.comprobar()
+            esperar(lambda: v.marco_aviso.isVisible())
+        aviso = v.aviso
+        self.assertEqual(aviso.estado, 'disponible')
+        self.assertEqual(aviso.titulo.text(), 'Hay una versión nueva: 99.0')
+        self.assertEqual(aviso.b_accion.text(), 'Actualizar')
+        self.assertIn('Hay una versión nueva: 99.0', v.ajustes.estado_version.text())
+        self.assertFalse(aviso.notas.isVisible())
+        aviso.b_notas.click()
+        self.assertTrue(aviso.notas.isVisible())
+        self.assertEqual(aviso.notas.textFormat(), Qt.PlainText)      # las notas nunca se pintan como HTML
+        aviso.b_tarde.click()
+        self.assertFalse(v.marco_aviso.isVisible())
+
+    def test_version_portable_solo_ofrece_la_descarga(self):
+        v = self.v
+        with mock.patch.object(actualizar, 'instalada', return_value=False):
+            v._novedad(NOVEDAD, False)
+        self.assertEqual(v.aviso.estado, 'portable')
+        self.assertEqual(v.aviso.b_accion.text(), 'Descargar')
+        with mock.patch.object(actualizar, 'descargar') as descargar, \
+                mock.patch('app.ventana.QDesktopServices.openUrl') as abrir:
+            v.aviso.b_accion.click()
+        descargar.assert_not_called()
+        self.assertEqual(abrir.call_args.args[0].toString(), NOVEDAD.pagina)
+
+    def test_no_se_actualiza_durante_una_busqueda(self):
+        v = self.v
+        with mock.patch.object(actualizar, 'instalada', return_value=True):
+            v._novedad(NOVEDAD, False)
+        v.trabajador = object()
+        v._actualizar_nav()
+        self.assertFalse(v.aviso.b_accion.isEnabled())
+        v.trabajador = None
+        v._actualizar_nav()
+        self.assertTrue(v.aviso.b_accion.isEnabled())
+
+    def test_actualizar_descarga_instala_y_cierra(self):
+        v = self.v
+        with mock.patch.object(actualizar, 'instalada', return_value=True):
+            v._novedad(NOVEDAD, False)
+        ruta = Path(self._d.name) / NOVEDAD.instalador.nombre
+
+        def descargar(archivo, progreso=None, cancelada=None):
+            self.assertEqual(archivo, NOVEDAD.instalador)
+            progreso(5, 10)
+            return ruta
+        with mock.patch.object(actualizar, 'descargar', side_effect=descargar), \
+                mock.patch.object(actualizar, 'lanzar_instalador') as lanzar:
+            v.aviso.b_accion.click()
+            esperar(lambda: lanzar.called)
+            APP.processEvents()
+        lanzar.assert_called_once_with(ruta)
+        self.assertEqual(v.aviso.estado, 'instalando')
+        self.assertFalse(v.isVisible())                       # la app se cierra para que se instale
+
+    def test_fallo_al_descargar(self):
+        v = self.v
+        with mock.patch.object(actualizar, 'instalada', return_value=True):
+            v._novedad(NOVEDAD, False)
+        with mock.patch.object(actualizar, 'descargar',
+                               side_effect=actualizar.ErrorActualizacion('No coincide la huella.')), \
+                mock.patch.object(actualizar, 'lanzar_instalador') as lanzar:
+            v.aviso.b_accion.click()
+            esperar(lambda: v.aviso.estado == 'error')
+        lanzar.assert_not_called()
+        self.assertEqual(v.aviso.detalle.text(), 'No coincide la huella.')
+        self.assertEqual(v.aviso.b_accion.text(), 'Reintentar')
+        self.assertTrue(v.isVisible())
+
+    def test_aviso_tras_actualizarse(self):
+        for anterior, aviso in (('0.9.0', True), (__version__, False), ('', False), ('basura', False)):
+            with self.subTest(anterior):
+                c = Config(self.ruta)
+                c.version = anterior
+                c.guardar()
+                v = Ventana(Config(self.ruta))
+                self.assertEqual(v.aviso.estado == 'actualizada', aviso)
+                self.assertEqual(Config(self.ruta).version, __version__)    # solo se avisa una vez
+                v.close()
 
 
 if __name__ == '__main__':

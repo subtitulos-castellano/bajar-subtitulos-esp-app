@@ -24,16 +24,16 @@ from PySide6.QtWidgets import QApplication, QScrollArea  # noqa: E402
 from app import tema  # noqa: E402
 
 ID_APP = 'subtitulos-castellano.BajarSubtitulosESP'
-MUTEX = 'BajarSubtitulosESP'     # el instalador (AppMutex) lo usa para pedir que se cierre la app
 
 
 def _id_windows():
     """Para que Windows agrupe la app en la barra de tareas con su propio icono, y para que el
-    instalador sepa si la app está abierta."""
+    instalador sepa si la app está abierta (y, al actualizar, cuándo se ha cerrado)."""
     if sys.platform == 'win32':
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(ID_APP)
-        ctypes.windll.kernel32.CreateMutexW(None, False, MUTEX)
+    from app import actualizar
+    actualizar.crear_mutex()
 
 
 def _mkv_castellano():
@@ -91,6 +91,15 @@ def autoprueba(salida, con_red=False):
     paso('keyring', lambda: type(__import__('keyring').get_keyring()).__name__)
     paso('certificados', lambda: __import__('certifi').where())
 
+    def actualizaciones():
+        from app import actualizar
+        if actualizar.version(__version__) is None:
+            raise RuntimeError(f'versión no válida: {__version__}')
+        actualizar._contexto_ssl()
+        return (f'instalada con el instalador: {actualizar.instalada()} · '
+                f'modo: {actualizar.modo_instalacion()} · descargas en {actualizar.carpeta_descargas()}')
+    paso('actualizaciones', actualizaciones)
+
     def busqueda_sin_red():
         from subtitulos import nucleo
         from subtitulos.opciones import Opciones
@@ -139,8 +148,15 @@ def autoprueba(salida, con_red=False):
             if not r:
                 raise RuntimeError('sin resultado')
             return f'{r[0].estado} · {r[0].fuente}' + ''.join(f'\n        {a}' for a in avisos)
+    def consulta_github():
+        from app import actualizar
+        n = actualizar.consultar('0.0.1')       # como si fuera una versión antigua: siempre hay novedad
+        if n is None or n.instalador is None:
+            raise RuntimeError(f'sin instalador con huella en la última Release: {n}')
+        return f'última versión publicada: {n.version} · {n.instalador.nombre} · sha256 {n.instalador.sha256[:12]}…'
     if con_red:
         paso('búsqueda real (proveedores, simulación)', busqueda_con_red)
+        paso('actualizaciones (consulta a GitHub)', consulta_github)
     Path(salida).write_text('\n'.join(lineas) + '\n', encoding='utf-8')
     return 0 if ok else 1
 
@@ -208,10 +224,17 @@ def main(argv=None):
     ap.add_argument('--medir-arranque', action='store_true', help=argparse.SUPPRESS)
     ap.add_argument('--autoprueba', metavar='INFORME', help=argparse.SUPPRESS)
     ap.add_argument('--con-red', action='store_true', help=argparse.SUPPRESS)
+    # Pruebas de GitHub Actions: lo mismo que pulsar Actualizar con un instalador ya descargado.
+    ap.add_argument('--probar-actualizacion', metavar='INSTALADOR', help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if args.autoprueba:
         return autoprueba(args.autoprueba, args.con_red)
     _id_windows()
+    if args.probar_actualizacion:
+        from app import actualizar
+        actualizar.lanzar_instalador(args.probar_actualizacion)
+        time.sleep(3)          # como la app al cerrarse: el instalador tiene que esperar a que termine
+        return 0
     app = QApplication(sys.argv[:1])
     app.setApplicationName('Bajar Subtítulos ESP')
     app.setOrganizationName('subtitulos-castellano')
@@ -229,6 +252,7 @@ def main(argv=None):
     if not args.demo:
         from app.trabajador import precargar
         QTimer.singleShot(300, precargar)     # subliminal se carga cuando la ventana ya se ve
+        QTimer.singleShot(2500, ventana.comprobar_actualizaciones)
     if args.medir_arranque:
         app.processEvents()
         print(f'ventana visible en {time.perf_counter() - _T0:.2f} s '

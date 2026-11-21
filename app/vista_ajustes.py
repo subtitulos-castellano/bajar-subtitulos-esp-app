@@ -3,13 +3,13 @@ import threading
 
 from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QFont, QFontMetrics
-from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLineEdit, QPushButton,
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QScrollArea, QSpinBox, QVBoxLayout, QWidget)
 
 from subtitulos.archivos import HOME
 from subtitulos.opciones import MAX_DESCARGAS, MAX_VIDEOS, Opciones
 
-from . import credenciales, iconos, tema
+from . import __version__, actualizar, credenciales, iconos, tema
 from .config import TAMANO_MAX, TAMANO_MIN
 from .componentes import FilaOpcion, IconoLabel
 from .vista_inicio import MARGEN, boton, etiqueta
@@ -82,6 +82,7 @@ class VistaAjustes(QWidget):
     cambiado = Signal()            # cambiaron las opciones (ya guardadas)
     tema_elegido = Signal(str)     # 'sistema' | 'claro' | 'oscuro'
     tamano_elegido = Signal()      # cambió el tamaño del texto (ya guardado)
+    buscar_actualizacion = Signal()  # 'Buscar ahora'
 
     def __init__(self, config, parent=None):
         super().__init__(parent)
@@ -174,6 +175,10 @@ class VistaAjustes(QWidget):
                           f'Copia de cada subtítulo sustituido, en {HOME / "backup"} '
                           '(la misma carpeta que usa la skill).', b_copias))
         lay.addWidget(t)
+        lay.addSpacing(12)
+
+        # Actualizaciones
+        lay.addWidget(self._actualizaciones())
         lay.addSpacing(16)
 
         pie = QHBoxLayout()
@@ -301,6 +306,37 @@ class VistaAjustes(QWidget):
         carpeta = HOME / 'backup'
         carpeta.mkdir(parents=True, exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(carpeta)))
+
+    # ---------- Actualizaciones ----------
+
+    def _actualizaciones(self):
+        t = Tarjeta('actualizar', 'Actualizaciones')
+        fila = t.fila(FilaOpcion('Buscar actualizaciones automáticamente',
+                                 'Al abrir la app, como mucho una vez al día, mira en GitHub si hay una versión '
+                                 'nueva. Antes de instalar nada siempre te pregunta.'))
+        self.auto_actualizar = fila.control
+        self.auto_actualizar.setChecked(self.config.actualizaciones)
+        self.auto_actualizar.toggled.connect(self._auto_actualizar)
+        self.b_buscar_version = boton('Buscar ahora')
+        self.b_buscar_version.clicked.connect(self._buscar_version)
+        fila = t.fila(FilaOpcion(f'Versión instalada: {actualizar.version_corta(__version__)}',
+                                 'Comprueba ahora si hay una versión nueva.', self.b_buscar_version))
+        self.estado_version = fila.findChild(QLabel, 'ayuda')
+        self.estado_version.setTextFormat(Qt.PlainText)
+        return t
+
+    def _auto_actualizar(self, activo):
+        self.config.actualizaciones = activo
+        self.config.guardar()
+
+    def _buscar_version(self):
+        self.b_buscar_version.setEnabled(False)
+        self.estado_version.setText('Buscando en GitHub…')
+        self.buscar_actualizacion.emit()
+
+    def poner_estado_version(self, texto):
+        self.b_buscar_version.setEnabled(True)
+        self.estado_version.setText(texto)
 
     # ---------- Cuenta de OpenSubtitles ----------
 

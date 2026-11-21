@@ -22,6 +22,7 @@ material con derechos de autor.
 - La app (`app/`) y el núcleo (`subtitulos/`): lectura de pistas incrustadas en MKV y MP4,
   descarga, validación y guardado de subtítulos, configuración y credenciales.
 - El ejecutable, el instalador y la versión portable que se publican en *Releases*.
+- Las actualizaciones automáticas (`app/actualizar.py`).
 
 Fuera del alcance: fallos de los proveedores de subtítulos, de subliminal y demás dependencias
 (avisa a sus autores) y de los reproductores de vídeo.
@@ -40,3 +41,12 @@ Fuera del alcance: fallos de los proveedores de subtítulos, de subliminal y dem
   en un archivo.
 - Antes de sustituir un subtítulo, se guarda una copia en `%USERPROFILE%\.subtitulos-esp\backup`.
 - Los límites de búsqueda por tanda evitan saturar a los proveedores.
+- Actualizaciones:
+  - Solo se descargan archivos de las Releases de este repositorio, con el nombre exacto que
+    genera el workflow.
+  - El instalador solo se ejecuta si su SHA-256 coincide con la huella que publica GitHub; si no,
+    se borra.
+  - Nunca se instala nada sin que el usuario pulse *Actualizar*.
+  - Las notas de la versión se muestran como texto plano.
+  - Cada Release incluye `SHA256SUMS.txt` y una atestación de procedencia de GitHub de cada
+    archivo (ver *Comprobar la descarga* en el README).

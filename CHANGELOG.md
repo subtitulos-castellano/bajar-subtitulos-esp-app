@@ -1,5 +1,19 @@
 # Cambios
 
+## 1.0.1
+
+- **Actualizaciones automáticas**:
+  - al abrir la app, como mucho una vez al día, mira en GitHub si hay una versión nueva;
+  - si la hay, avisa arriba de la ventana con sus novedades, y *Actualizar* la descarga, comprueba
+    que su SHA-256 coincide con el publicado en GitHub, la instala en silencio y vuelve a abrir la app;
+  - nunca se instala nada sin que lo pidas, ni durante una búsqueda;
+  - la versión portable solo avisa y abre la página de descarga.
+- *Configuración › Actualizaciones*: activar o desactivar la comprobación automática y *Buscar ahora*.
+- Las Releases incluyen `SHA256SUMS.txt` y una atestación de procedencia de GitHub de cada archivo.
+- El repositorio es público.
+
+Quien tenga la 1.0.0 tiene que instalar esta versión a mano una vez: la 1.0.0 aún no sabía actualizarse.
+
 ## 1.0.0
 
 Primera versión de **Bajar Subtítulos ESP** como aplicación de Windows 10 y 11.

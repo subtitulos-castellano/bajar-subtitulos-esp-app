@@ -1,20 +1,21 @@
 """Ventana principal: barra lateral (Inicio, Buscando…, Configuración), arrastre en toda la ventana y cola."""
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QPoint, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QGuiApplication, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QUrl
+from PySide6.QtGui import QColor, QDesktopServices, QFont, QGuiApplication, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow,
                                QPushButton, QStackedWidget, QVBoxLayout, QWidget)
 
 from subtitulos.archivos import es_video
 
-from . import iconos, tema
+from . import actualizar, iconos, tema
 from .componentes import IconoLabel, color
 from .credenciales import credenciales_proveedores
 from .demo import TrabajadorDemo
 from .trabajador import Trabajador
+from .vista_actualizacion import Actualizador, AvisoActualizacion
 from .vista_ajustes import VistaAjustes, resumen_preferencias
-from .vista_inicio import VistaInicio
+from .vista_inicio import MARGEN, VistaInicio
 
 from . import __version__
 
@@ -111,13 +112,27 @@ class Ventana(QMainWindow):
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(0)
         h.addWidget(self._lateral())
+        derecha = QVBoxLayout()
+        derecha.setContentsMargins(0, 0, 0, 0)
+        derecha.setSpacing(0)
+        self.aviso = AvisoActualizacion()
+        self.marco_aviso = QWidget()
+        self.marco_aviso.setObjectName('pagina')
+        ma = QVBoxLayout(self.marco_aviso)
+        ma.setContentsMargins(MARGEN, 16, MARGEN, 0)
+        ma.addWidget(self.aviso)
+        self.marco_aviso.hide()
+        derecha.addWidget(self.marco_aviso)
         self.paginas = QStackedWidget()
         self.inicio = VistaInicio()
         self.ajustes = VistaAjustes(config)
         self.paginas.addWidget(self.inicio)
         self.paginas.addWidget(self.ajustes)
-        h.addWidget(self.paginas, 1)
+        derecha.addWidget(self.paginas, 1)
+        h.addLayout(derecha, 1)
         self.capa = CapaArrastre(raiz)
+        self.actualizador = Actualizador(config, self)
+        self.novedad = None             # versión nueva encontrada en GitHub
 
         self.inicio.elegido.connect(self.procesar)
         self.inicio.cancelar.connect(self._cancelar)
@@ -126,11 +141,24 @@ class Ventana(QMainWindow):
         self.ajustes.cambiado.connect(self._preferencias_cambiadas)
         self.ajustes.tema_elegido.connect(self.cambiar_tema)
         self.ajustes.tamano_elegido.connect(lambda: self.cambiar_tema(self.preferencia_tema))
+        self.ajustes.buscar_actualizacion.connect(lambda: self.actualizador.comprobar(manual=True))
+        self.actualizador.novedad.connect(self._novedad)
+        self.actualizador.al_dia.connect(self._al_dia)
+        self.actualizador.fallo.connect(self._fallo_consulta)
+        self.actualizador.progreso.connect(self.aviso.poner_progreso)
+        self.actualizador.descargado.connect(self._instalar)
+        self.actualizador.fallo_descarga.connect(self._fallo_descarga)
+        self.aviso.actualizar.connect(self._actualizar)
+        self.aviso.descargar_pagina.connect(self._abrir_pagina_novedad)
+        self.aviso.novedades.connect(self._abrir_pagina_version)
+        self.aviso.mas_tarde.connect(self._ocultar_aviso)
+        self.aviso.cancelar.connect(self._cancelar_descarga)
         QGuiApplication.styleHints().colorSchemeChanged.connect(self._tema_sistema_cambiado)
         self._preferencias_cambiadas()
         self.refrescar()
         self._restaurar_ventana()
         self._actualizar_nav()
+        self._aviso_actualizada()
 
     # ---------- Posición y tamaño ----------
 
@@ -238,6 +266,7 @@ class Ventana(QMainWindow):
         self.nav_botones[AJUSTES].setEnabled(not buscando)
         self.nav_botones[BUSCANDO].setEnabled(self.hay_busqueda and not buscando)
         self.inicio.b_cambiar_preferencias.setEnabled(not buscando)
+        self.aviso.poner_ocupada(buscando)
 
     # ---------- Tema y tamaño del texto ----------
 
@@ -269,6 +298,7 @@ class Ventana(QMainWindow):
             ic.refrescar()
         self.inicio.refrescar()
         self.ajustes.refrescar()
+        self.aviso.refrescar()
         self.update()
         for w in self.findChildren(QWidget):
             w.update()
@@ -373,7 +403,92 @@ class Ventana(QMainWindow):
         if self.trabajador:
             self.trabajador.cancelar()
 
+    # ---------- Actualizaciones ----------
+
+    def comprobar_actualizaciones(self):
+        """Al arrancar: limpia descargas antiguas y, si toca, mira si hay una versión nueva."""
+        actualizar.limpiar_descargas()
+        if self.actualizador.toca():
+            self.actualizador.comprobar()
+
+    def _aviso_actualizada(self):
+        """Si la app se acaba de actualizar, lo dice (una sola vez)."""
+        previa, actual = actualizar.version(self.config.version), actualizar.version(__version__)
+        if previa and actual and previa < actual:
+            self._mostrar_aviso('actualizada', actualizar.Novedad(__version__, self._pagina_version(), ''))
+        if self.config.version != __version__:
+            self.config.version = __version__
+            self.config.guardar()
+
+    @staticmethod
+    def _pagina_version():
+        return f'{actualizar.PREFIJO_PAGINA}tag/v{__version__}'
+
+    def _mostrar_aviso(self, estado, novedad=None, mensaje=''):
+        self.aviso.poner(estado, novedad, mensaje)
+        self.marco_aviso.show()
+
+    def _ocultar_aviso(self):
+        self.marco_aviso.hide()
+        self.aviso.hide()
+
+    def _novedad(self, novedad, manual):
+        self.novedad = novedad
+        v = actualizar.version_corta(novedad.version)
+        self.ajustes.poner_estado_version(f'Hay una versión nueva: {v}.')
+        if self.actualizador.descargando or self.aviso.estado == 'instalando':
+            return
+        if novedad.instalador and actualizar.instalada():
+            self._mostrar_aviso('disponible', novedad)
+        elif novedad.instalador:
+            self._mostrar_aviso('portable', novedad, 'Estás usando la versión portable: descarga la nueva '
+                                                     'desde su página en GitHub.')
+        else:
+            self._mostrar_aviso('portable', novedad)
+
+    def _al_dia(self, manual):
+        self.ajustes.poner_estado_version(f'Tienes la última versión ({VERSION}).')
+
+    def _fallo_consulta(self, mensaje, manual):
+        # La comprobación automática falla en silencio (sin internet, por ejemplo): ya se intentará otro día.
+        self.ajustes.poner_estado_version(f'No se ha podido comprobar: {mensaje}' if manual
+                                          else 'Comprueba ahora si hay una versión nueva.')
+
+    def _actualizar(self):
+        if self.novedad is None or self.trabajador is not None:
+            return
+        self._mostrar_aviso('descargando', self.novedad)
+        self.actualizador.descargar(self.novedad)
+
+    def _cancelar_descarga(self):
+        self.actualizador.cancelar()
+        if self.novedad:
+            self._mostrar_aviso('disponible', self.novedad)
+
+    def _fallo_descarga(self, mensaje):
+        self._mostrar_aviso('error', self.novedad, mensaje)
+
+    def _instalar(self, ruta):
+        if self.trabajador is not None:        # no debería pasar: durante una búsqueda no se puede pulsar
+            self._mostrar_aviso('disponible', self.novedad)
+            return
+        self._mostrar_aviso('instalando', self.novedad)
+        try:
+            actualizar.lanzar_instalador(ruta)
+        except OSError as e:
+            self._mostrar_aviso('error', self.novedad, f'No se ha podido abrir el instalador ({e.strerror or e}).')
+            return
+        self.close()                            # guarda la configuración; el instalador espera a que termine
+
+    def _abrir_pagina_novedad(self):
+        if self.novedad:
+            QDesktopServices.openUrl(QUrl(self.novedad.pagina))
+
+    def _abrir_pagina_version(self):
+        QDesktopServices.openUrl(QUrl(self._pagina_version()))
+
     def closeEvent(self, e):
+        self.actualizador.cancelar()
         self._guardar_ventana()
         self.config.guardar()
         if self.trabajador:

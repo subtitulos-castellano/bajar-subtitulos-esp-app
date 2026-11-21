@@ -107,6 +107,7 @@ Los cambios se guardan al momento y se usan en la siguiente búsqueda.
 | Cuenta de opensubtitles.org (opcional, da más resultados) | — |
 | Tema: Sistema, Claro u Oscuro | Sistema |
 | Tamaño del texto: como Windows o un porcentaje propio | Como Windows |
+| Buscar actualizaciones automáticamente | Sí |
 
 ![Configuración](docs/capturas/claro_6_configuracion.png)
 
@@ -117,6 +118,21 @@ usas la skill, *Usar la cuenta de la skill* la importa de su `credenciales.json`
 **Tamaño del texto:** por defecto sigue a *Configuración de Windows › Accesibilidad › Tamaño del
 texto*, como el Explorador. Si lo cambias allí, la app se ajusta al volver a ella.
 
+### Actualizaciones
+
+Al abrir la app, como mucho una vez al día, mira en GitHub si hay una versión nueva. Si la hay,
+lo avisa arriba de la ventana, con sus novedades:
+
+- **Actualizar** descarga el instalador y comprueba que su huella SHA-256 coincide con la que
+  publica GitHub. Si coincide, la app se cierra, la versión nueva se instala sola y la app se vuelve
+  a abrir. Si no coincide, no se instala nada.
+- **Más tarde** cierra el aviso hasta la próxima vez que abras la app.
+- Durante una búsqueda no se puede actualizar: espera a que termine.
+- **Versión portable:** solo avisa y abre la página de descarga.
+
+En *Configuración › Actualizaciones* puedes desactivar la comprobación automática o buscar ahora. La
+app solo pregunta a GitHub por la última versión publicada, sin enviar nada tuyo.
+
 ## Dónde guarda cada cosa
 
 | Qué | Dónde |
@@ -125,10 +141,15 @@ texto*, como el Explorador. Si lo cambias allí, la app se ajusta al volver a el
 | Copias de los subtítulos sustituidos | `%USERPROFILE%\.subtitulos-esp\backup` (la misma carpeta que la skill) |
 | Preferencias, tamaño y posición de la ventana | `%APPDATA%\BajarSubtitulosEsp\config.json` |
 | Contraseña de OpenSubtitles | Administrador de credenciales de Windows (`BajarSubtitulosESP/opensubtitles`) |
+| Instalador de la última actualización y su registro | `%TEMP%\BajarSubtitulosESP-actualizacion` (se borra solo) |
 
 Al desinstalar, todo esto se conserva: es tuyo y lo comparte la skill.
 
 ## Preguntas frecuentes
+
+**No me aparece el aviso de la versión nueva.** La comprobación se hace como mucho una vez al
+día. Usa *Configuración › Actualizaciones › Buscar ahora*. La versión 1.0.0 aún no sabía
+actualizarse: si la tienes, instala la última a mano una vez.
 
 **Un proveedor da error (por ejemplo, "HTTP error 503. Provider addic7ed" en Detalles).** Ese
 servicio no está disponible en ese momento. La app sigue con los demás. Si un vídeo se queda sin
@@ -161,6 +182,8 @@ app/            interfaz gráfica (Qt / PySide6)
   componentes.py   interruptor, tarjetas, barras, tabla de vídeos
   config.py     preferencias (%APPDATA%\BajarSubtitulosEsp\config.json)
   credenciales.py  cuenta de OpenSubtitles (keyring)
+  actualizar.py consultar la última Release, descargar y verificar el instalador y lanzarlo (sin Qt)
+  vista_actualizacion.py  aviso de versión nueva y comprobación/descarga en hilos aparte
   tema.py       colores claro/oscuro, tamaño del texto y hoja de estilos
   iconos.py     iconos SVG (Lucide, ISC)
   demo.py       resultados de demostración (--demo, --captura)

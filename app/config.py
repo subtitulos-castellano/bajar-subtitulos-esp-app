@@ -28,6 +28,9 @@ class Config:
         self.usuario_opensubtitles = ''
         self.tamano_texto = 0         # 0 = como Windows; si no, porcentaje (80-225)
         self.ventana = {}             # {'x', 'y', 'ancho', 'alto', 'maximizada'}
+        self.actualizaciones = True   # buscar versiones nuevas al abrir la app (como mucho una vez al día)
+        self.ultima_comprobacion = 0.0
+        self.version = ''             # versión de la app la última vez que se abrió (aviso "Actualizada a…")
         self.cargar()
 
     def cargar(self):
@@ -57,11 +60,19 @@ class Config:
                 and v['ancho'] > 0 and v['alto'] > 0):
             self.ventana = {k: v[k] for k in ('x', 'y', 'ancho', 'alto')}
             self.ventana['maximizada'] = v.get('maximizada') is True
+        if isinstance(datos.get('actualizaciones'), bool):
+            self.actualizaciones = datos['actualizaciones']
+        u = datos.get('ultima_comprobacion')
+        if isinstance(u, (int, float)) and not isinstance(u, bool) and u >= 0:
+            self.ultima_comprobacion = float(u)
+        if isinstance(datos.get('version'), str) and len(datos['version']) <= 20:
+            self.version = datos['version']
 
     def guardar(self):
         datos = {'opciones': asdict(self.opciones), 'tema': self.tema,
                  'usuario_opensubtitles': self.usuario_opensubtitles, 'tamano_texto': self.tamano_texto,
-                 'ventana': self.ventana}
+                 'ventana': self.ventana, 'actualizaciones': self.actualizaciones,
+                 'ultima_comprobacion': self.ultima_comprobacion, 'version': self.version}
         try:
             self.ruta.parent.mkdir(parents=True, exist_ok=True)
             temporal = self.ruta.with_suffix('.tmp')
