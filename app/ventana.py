@@ -2,7 +2,7 @@
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QUrl
-from PySide6.QtGui import QColor, QDesktopServices, QFont, QGuiApplication, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtGui import QDesktopServices, QFont, QGuiApplication, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow,
                                QPushButton, QStackedWidget, QVBoxLayout, QWidget)
 
@@ -26,20 +26,10 @@ INICIO, BUSCANDO, AJUSTES = range(3)
 
 
 def icono_app():
-    """Icono de la app: subtítulos blancos sobre un cuadrado redondeado azul."""
+    """Icono de la app (iconos.ICONO_APP) dibujado a cada tamaño que usa Windows, nítido en todos."""
     ico = QIcon()
-    for lado in (16, 24, 32, 48, 64, 128, 256):
-        pm = QPixmap(lado, lado)
-        pm.fill(Qt.transparent)
-        p = QPainter(pm)
-        p.setRenderHint(QPainter.Antialiasing)
-        p.setPen(Qt.NoPen)
-        p.setBrush(QColor('#2a78d6'))
-        p.drawRoundedRect(QRectF(0, 0, lado, lado), lado * 0.22, lado * 0.22)
-        m = lado * 0.18
-        iconos.dibujar(p, 'subtitulos', '#ffffff', QRectF(m, m, lado - 2 * m, lado - 2 * m), 2.2)
-        p.end()
-        ico.addPixmap(pm)
+    for lado in (16, 20, 24, 32, 40, 48, 64, 128, 256):
+        ico.addPixmap(iconos.pixmap_app(lado))
     return ico
 
 
@@ -291,7 +281,11 @@ class Ventana(QMainWindow):
         px = tema.px
         self.setMinimumSize(px(640) + px(232), px(560))
         self.lateral.setFixedWidth(px(232))
-        self.logo.setPixmap(icono_app().pixmap(px(34), px(34)))
+        # Dibujado a la resolución real de la pantalla (nítido con cualquier escalado de Windows).
+        escala = self.devicePixelRatioF() or 1.0
+        logo = iconos.pixmap_app(round(px(40) * escala))
+        logo.setDevicePixelRatio(escala)
+        self.logo.setPixmap(logo)
         for b in self.nav_botones:
             b.setIcon(iconos.icono(b._icono, t['texto2'], px(18)))
         for ic in self.findChildren(IconoLabel):

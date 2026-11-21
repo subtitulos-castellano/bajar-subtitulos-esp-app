@@ -37,6 +37,50 @@ TRAZOS = {
 }
 
 
+# Icono de la app: pantalla de vídeo (cristal oscuro con marco azul) con play y subtítulos, y una
+# flecha que entra en una bandeja (descargar). Sin fondo: el contorno es la propia pantalla.
+ICONO_APP = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+<defs>
+  <linearGradient id="pantalla" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#2c3038"/><stop offset="1" stop-color="#07090c"/>
+  </linearGradient>
+  <linearGradient id="vidrio" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#ffffff" stop-opacity="0.20"/>
+    <stop offset="0.45" stop-color="#ffffff" stop-opacity="0.05"/>
+    <stop offset="0.46" stop-color="#ffffff" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="azul" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#4f9cf5"/><stop offset="1" stop-color="#1c5fb3"/>
+  </linearGradient>
+</defs>
+<rect x="10" y="22" width="220" height="172" rx="30" fill="url(#pantalla)"/>
+<rect x="10" y="22" width="220" height="172" rx="30" fill="url(#vidrio)"/>
+<rect x="13" y="25" width="214" height="166" rx="27" fill="none" stroke="url(#azul)" stroke-width="6"/>
+<circle cx="120" cy="90" r="32" fill="#ffffff" fill-opacity="0.9"/>
+<path d="M109.8 74 L136.6 90 L109.8 106 Z" fill="#0b0d10" stroke="#0b0d10" stroke-width="3.8" stroke-linejoin="round"/>
+<rect x="58" y="140" width="124" height="13" rx="6.5" fill="#ffffff"/>
+<rect x="81.6" y="160.8" width="76.9" height="13" rx="6.5" fill="#ffffff" fill-opacity="0.7"/>
+<circle cx="200" cy="204" r="52" fill="#000000" fill-opacity="0.25"/>
+<circle cx="200" cy="200" r="50" fill="#ffffff"/>
+<circle cx="200" cy="200" r="47" fill="none" stroke="url(#azul)" stroke-width="6"/>
+<path d="M200 171 V204 M185 191 L200 206 L215 191" fill="none" stroke="#2a78d6" stroke-width="11"
+      stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M177 208 V216 A6 6 0 0 0 183 222 H217 A6 6 0 0 0 223 216 V208" fill="none" stroke="#2a78d6"
+      stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>'''
+
+
+def pixmap_app(lado):
+    """El icono de la app a `lado` x `lado` píxeles."""
+    pm = QPixmap(lado, lado)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    QSvgRenderer(QByteArray(ICONO_APP.encode())).render(p, QRectF(0, 0, lado, lado))
+    p.end()
+    return pm
+
+
 def _svg(nombre, color, grosor):
     return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{color}" '
             f'stroke-width="{grosor}" stroke-linecap="round" stroke-linejoin="round">{TRAZOS[nombre]}</svg>')

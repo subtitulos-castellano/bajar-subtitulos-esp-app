@@ -1,6 +1,6 @@
 """Genera los recursos del empaquetado (se ejecuta antes de PyInstaller, con el Python de Windows):
 
-- packaging/build/icono.ico: el icono de la app (16-256 px, PNG dentro del .ico).
+- packaging/build/icono.ico: el icono de la app (16-256 px, PNG dentro del .ico), desde iconos.ICONO_APP.
 - packaging/build/version.txt: datos de versión del .exe (Propiedades › Detalles en Windows).
 - packaging/build/AVISOS_TERCEROS.txt: licencias de las librerías incluidas.
 
@@ -27,7 +27,7 @@ def icono():
     from app.ventana import icono_app
     ico = icono_app()
     imagenes = []
-    for lado in (16, 24, 32, 48, 64, 128, 256):
+    for lado in (16, 20, 24, 32, 40, 48, 64, 128, 256):     # los que usa Windows según el escalado
         buf = QBuffer()
         buf.open(QIODevice.WriteOnly)
         ico.pixmap(lado, lado).toImage().save(buf, 'PNG')
