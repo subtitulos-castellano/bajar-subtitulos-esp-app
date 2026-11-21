@@ -1,5 +1,11 @@
 # Cambios
 
+## 1.0.2
+
+- **Icono nuevo**: una pantalla de vídeo con play y subtítulos, y una flecha que entra en una bandeja
+  (descargar). Se ve nítido a cualquier tamaño, también con el escalado de Windows al 125 % y 250 %.
+- El logo de la barra lateral se dibuja a la resolución de la pantalla.
+
 ## 1.0.1
 
 - **Actualizaciones automáticas**:
