@@ -1,5 +1,5 @@
 # Bajar Subtítulos ESP: compila en Windows, prueba lo compilado en Windows 10 y 11 y, con una
-# etiqueta vX.Y.Z, publica la Release (privada, como el repositorio).
+# etiqueta vX.Y.Z, publica la Release con SHA256SUMS.txt y la atestación de procedencia de cada archivo.
 # - A mano (Actions › Compilar › Run workflow): compila y prueba; los archivos quedan como artefacto.
 #
 # Windows Server 2022 comparte base con Windows 10 (21H2) y Windows Server 2025 con Windows 11 (24H2).
@@ -127,6 +127,10 @@ jobs:
     needs: probar
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write      # crear la Release
+      id-token: write      # atestación: identidad del workflow ante Sigstore
+      attestations: write  # atestación: guardarla en el repositorio
     steps:
       - uses: actions/checkout@v7
 
@@ -135,10 +139,23 @@ jobs:
           name: BajarSubtitulosESP-${{ github.ref_name }}
           path: dist
 
+      - name: Sumas SHA-256
+        working-directory: dist
+        run: |
+          sha256sum *-instalador.exe *-portable.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Atestación de procedencia
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            dist/*-instalador.exe
+            dist/*-portable.zip
+
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           notas=$(awk -v v="${GITHUB_REF_NAME#v}" '$0 ~ "^## " v {s=1; next} /^## / {s=0} s' CHANGELOG.md)
-          gh release create "$GITHUB_REF_NAME" dist/*-instalador.exe dist/*-portable.zip \
+          gh release create "$GITHUB_REF_NAME" dist/*-instalador.exe dist/*-portable.zip dist/SHA256SUMS.txt \
             --title "Bajar Subtítulos ESP $GITHUB_REF_NAME" --notes "${notas:-Ver CHANGELOG.md}"

@@ -41,6 +41,25 @@ Descarga la última versión desde **Releases**:
 El programa no está firmado digitalmente, así que la primera vez Windows puede mostrar
 **"Windows protegió su PC"**. Pulsa *Más información › Ejecutar de todas formas*.
 
+### Comprobar la descarga
+
+Cada Release incluye **`SHA256SUMS.txt`** con la huella SHA-256 de cada archivo. En PowerShell:
+
+```powershell
+Get-FileHash .\BajarSubtitulosESP-<versión>-instalador.exe
+```
+
+El resultado tiene que coincidir con la línea de ese archivo en `SHA256SUMS.txt`. Si no coincide, el
+archivo está dañado o no es el original: no lo abras.
+
+Desde la versión 1.0.1, cada archivo tiene además una **atestación de procedencia** de GitHub. Esta
+atestación demuestra que el archivo lo compiló GitHub Actions a partir del código de este
+repositorio, y no lo subió nadie a mano. Para comprobarla, con [GitHub CLI](https://cli.github.com/):
+
+```powershell
+gh attestation verify .\BajarSubtitulosESP-<versión>-instalador.exe -R subtitulos-castellano/bajar-subtitulos-esp-app
+```
+
 ## Usar
 
 1. **Arrastra** un vídeo, varios vídeos o una carpeta (con todas sus subcarpetas) a cualquier
@@ -223,7 +242,8 @@ proveedores.
 2. Prueba lo compilado en **Windows Server 2022** (base de Windows 10) y **2025** (base de
    Windows 11): pruebas, instalación silenciosa, autoprueba del programa instalado y del portable,
    y desinstalación sin restos.
-3. Con una etiqueta `vX.Y.Z`, publica la Release con las notas de `CHANGELOG.md`.
+3. Con una etiqueta `vX.Y.Z`, publica la Release con las notas de `CHANGELOG.md`, junto con
+   `SHA256SUMS.txt` y la atestación de procedencia de cada archivo.
 
 Para publicar una versión:
 
