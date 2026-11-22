@@ -83,6 +83,7 @@ class VistaAjustes(QWidget):
     tema_elegido = Signal(str)     # 'sistema' | 'claro' | 'oscuro'
     tamano_elegido = Signal()      # cambió el tamaño del texto (ya guardado)
     buscar_actualizacion = Signal()  # 'Buscar ahora'
+    bandeja_cambiada = Signal()    # cambió «Al cerrar la ventana, seguir junto al reloj» (ya guardado)
 
     def __init__(self, config, parent=None):
         super().__init__(parent)
@@ -149,7 +150,14 @@ class VistaAjustes(QWidget):
         lay.addSpacing(12)
 
         # Apariencia y copias
-        t = Tarjeta('restaurar', 'Apariencia y copias de seguridad')
+        t = Tarjeta('restaurar', 'Ventana, apariencia y copias de seguridad')
+        fila = t.fila(FilaOpcion('Al cerrar la ventana, seguir junto al reloj',
+                                 'La app no se cierra: queda un icono junto al reloj para volver a abrirla. '
+                                 'Si estaba buscando, sigue y avisa al terminar. Para cerrarla del todo: '
+                                 'clic derecho en el icono › Salir.'))
+        self.bandeja = fila.control
+        self.bandeja.setChecked(config.cerrar_a_bandeja)
+        self.bandeja.toggled.connect(self._bandeja)
         temas = QWidget()
         tl = QHBoxLayout(temas)
         tl.setContentsMargins(0, 0, 0, 0)
@@ -364,6 +372,11 @@ class VistaAjustes(QWidget):
         self.estado_menu.setText(self._texto_menu)
         self.config.menu_contextual = activo
         self.config.guardar()
+
+    def _bandeja(self, activo):
+        self.config.cerrar_a_bandeja = activo
+        self.config.guardar()
+        self.bandeja_cambiada.emit()
 
     def _modo_menu(self, i):
         self.config.menu_segundo_plano = i == 1

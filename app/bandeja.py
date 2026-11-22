@@ -1,8 +1,12 @@
-"""Búsquedas en segundo plano (menú contextual con «En segundo plano» en Configuración).
+"""Icono junto al reloj: búsquedas en segundo plano y app que sigue abierta al cerrar la ventana.
 
-La ventana no se abre: mientras busca hay un icono junto al reloj (desde él se ve el progreso o se
-cancela) y, al terminar, un aviso de Windows con el resumen. Pulsar el aviso abre el resumen. Si no se
-pulsa, la app se cierra sola un minuto después (el icono hace falta para que el aviso responda).
+- Segundo plano (menú contextual con «En segundo plano» en Configuración): la ventana no se abre;
+  mientras busca hay un icono junto al reloj (desde él se ve el progreso o se cancela) y, al terminar,
+  un aviso de Windows con el resumen. Pulsar el aviso abre el resumen. Si no se pulsa, la app se cierra
+  sola un minuto después (el icono hace falta para que el aviso responda).
+- «Al cerrar la ventana, seguir junto al reloj» (Configuración): el icono está siempre; cerrar la
+  ventana solo la oculta y la app sigue abierta hasta que se elige *Salir* en el icono. Si se cierra
+  durante una búsqueda, sigue buscando y avisa al terminar, como en segundo plano.
 """
 from collections import Counter
 
@@ -15,6 +19,7 @@ from subtitulos.texto import visible
 from . import tema
 
 ESPERA_FINAL = 60_000      # ms que sigue el icono tras el aviso final, por si se pulsa
+TITULO = 'Bajar Subtítulos ESP'
 
 
 def resumen(resultados, cancelado, errores):
@@ -42,19 +47,26 @@ def resumen(resultados, cancelado, errores):
 
 
 class Bandeja(QObject):
-    def __init__(self, ventana, icono, salir, parent=None):
-        """`salir`: función que cierra la app (cuando ya no queda nada que hacer)."""
+    def __init__(self, ventana, icono, salir, residente=None, parent=None):
+        """`salir`: función que cierra la app. `residente`: función que dice si la app sigue junto al
+        reloj al cerrar la ventana (la opción de Configuración)."""
         super().__init__(parent)
         self.ventana = ventana
         self.salir = salir
-        self.activa = False
+        self.residente = residente or (lambda: False)
+        self.activa = False           # búsqueda en segundo plano (en marcha o con su aviso pendiente)
         self._reiniciar()
         self.icono = QSystemTrayIcon(icono, self)
+        self.icono.setToolTip(TITULO)
         self.menu = QMenu()
-        self.a_ver = self.menu.addAction('Ver progreso')
+        self.a_ver = self.menu.addAction('Abrir Bajar Subtítulos ESP')
         self.a_ver.triggered.connect(self.ver)
         self.a_cancelar = self.menu.addAction('Cancelar la búsqueda')
         self.a_cancelar.triggered.connect(self._cancelar)
+        self.menu.addSeparator()
+        self.a_salir = self.menu.addAction('Salir')
+        self.a_salir.triggered.connect(self._salir)
+        self.menu.aboutToShow.connect(self._preparar_menu)
         self.icono.setContextMenu(self.menu)
         self.icono.activated.connect(self._activado)
         self.icono.messageClicked.connect(self.ver)
@@ -65,9 +77,14 @@ class Bandeja(QObject):
         ventana.progreso.connect(self._progreso)
         ventana.lote_terminado.connect(self._lote)
         ventana.en_reposo.connect(self._reposo)
+        ventana.oculta.connect(self.en_bandeja)
 
     def _reiniciar(self):
         self.resultados, self.errores, self.cancelado = [], [], False
+
+    def actualizar(self):
+        """Muestra u oculta el icono: está mientras hay algo en segundo plano o con la opción activada."""
+        self.icono.setVisible(self.activa or self.residente())
 
     def empezar(self):
         """Hay una búsqueda nueva en segundo plano (la ventana está oculta)."""
@@ -76,14 +93,26 @@ class Bandeja(QObject):
         self.activa = True
         self._fin.stop()
         self.ventana.ocultar_al_cerrar = True
-        self.a_ver.setText('Ver progreso')
-        self.a_cancelar.setEnabled(True)
-        self.icono.setToolTip('Bajar Subtítulos ESP\nBuscando subtítulos…')
+        self.icono.setToolTip(f'{TITULO}\nBuscando subtítulos…')
         self.icono.show()
 
+    def en_bandeja(self):
+        """Se ha cerrado la ventana y la app sigue: si estaba buscando, sigue en segundo plano."""
+        if self.ventana.trabajador is not None and not self.activa:
+            self.empezar()
+        self.actualizar()
+
+    def _preparar_menu(self):
+        if self.ventana.trabajador is not None:
+            self.a_ver.setText('Ver progreso')
+        elif self.activa:
+            self.a_ver.setText('Ver el resumen')
+        else:
+            self.a_ver.setText('Abrir Bajar Subtítulos ESP')
+        self.a_cancelar.setVisible(self.ventana.trabajador is not None)
+
     def _progreso(self, indice, total):
-        if self.activa:
-            self.icono.setToolTip(f'Bajar Subtítulos ESP\nBuscando subtítulos: vídeo {indice} de {total}')
+        self.icono.setToolTip(f'{TITULO}\nBuscando subtítulos: vídeo {indice} de {total}')
 
     def _lote(self, resultados, cancelado, errores):
         if self.activa:
@@ -93,6 +122,7 @@ class Bandeja(QObject):
 
     def _reposo(self):
         """Ya no queda nada: si la ventana está a la vista no hace falta avisar."""
+        self.icono.setToolTip(TITULO)
         if not self.activa:
             return
         if self.ventana.isVisible():
@@ -103,9 +133,7 @@ class Bandeja(QObject):
             return
         titulo, texto = resumen(self.resultados, self.cancelado, self.errores)
         aviso = QSystemTrayIcon.Warning if self.errores else QSystemTrayIcon.Information
-        self.icono.setToolTip(f'Bajar Subtítulos ESP\n{titulo}')
-        self.a_ver.setText('Ver el resumen')
-        self.a_cancelar.setEnabled(False)
+        self.icono.setToolTip(f'{TITULO}\n{titulo}')
         self.icono.showMessage(titulo, texto, aviso, 15000)
         self._fin.start()
 
@@ -114,9 +142,9 @@ class Bandeja(QObject):
             self.ver()
 
     def ver(self):
-        """Abre la ventana con la búsqueda (en marcha o su resumen)."""
+        """Abre la ventana con la búsqueda (en marcha o su resumen), o sin más si no hay ninguna."""
         from .ventana import BUSCANDO
-        if self.ventana.hay_busqueda:
+        if self.activa and self.ventana.hay_busqueda:
             self.ventana.ir(BUSCANDO)
         self.ventana.traer_al_frente()
         if self.ventana.trabajador is None:
@@ -125,15 +153,23 @@ class Bandeja(QObject):
     def _cancelar(self):
         self.ventana._cancelar()
 
+    def _salir(self):
+        self._fin.stop()
+        self.activa = False
+        self.icono.hide()
+        self.salir()
+
     def _apagar(self):
-        """Fin del segundo plano: la app sigue abierta con su ventana a la vista."""
+        """Fin del segundo plano (el icono sigue si la opción de seguir junto al reloj está activada)."""
         self._fin.stop()
         self.activa = False
         self.ventana.ocultar_al_cerrar = False
-        self.icono.hide()
+        self.icono.setToolTip(TITULO)
+        self.actualizar()
 
     def _terminar(self):
-        """Fin del segundo plano sin que se haya abierto la ventana: se cierra la app."""
+        """Fin del segundo plano sin que se haya abierto la ventana: se cierra la app (salvo que deba
+        seguir junto al reloj)."""
         self._apagar()
-        if not self.ventana.isVisible():
+        if not self.ventana.isVisible() and not self.residente():
             self.salir()

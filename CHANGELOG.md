@@ -18,6 +18,12 @@
   está abierta, a su cola.
 - Se pueden soltar vídeos o carpetas sobre el icono del programa para abrirlo y buscarlos.
 - Al desinstalar, el menú contextual se quita.
+- *Configuración › Al cerrar la ventana, seguir junto al reloj*: cerrar la ventana la oculta y la app
+  sigue con un icono junto al reloj (un clic la abre; *Salir* la cierra). Si estaba buscando, sigue y
+  avisa al terminar.
+- **Discos lentos**: si extraer la pista de subtítulos de un vídeo fuera a tardar más de 15 segundos
+  (vídeos grandes en un disco USB, un NAS o una carpeta de red), no se extrae y se busca en internet.
+  En *Detalles* se indica, con lo que habría tardado.
 
 ## 1.0.2
 

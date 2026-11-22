@@ -353,18 +353,26 @@ def main(argv=None):
 
 def _atender_pedidos(app, ventana, config):
     """Pedidos de esta apertura y de las siguientes (menú contextual, el icono del programa…)."""
+    from PySide6.QtWidgets import QSystemTrayIcon
+
     from app import instancia
     from app.bandeja import Bandeja
     from app.ventana import icono_app
 
     def salir():
+        ventana.salir()          # cancela lo que esté en marcha y guarda la configuración
         config.guardar()
         app.quit()
 
     app.servidor = instancia.Servidor(app)
     app.servidor.escuchar()
     app.agrupador = instancia.Agrupador(parent=app)
-    app.bandeja = None
+    app.bandeja = Bandeja(ventana, icono_app(), salir, lambda: config.cerrar_a_bandeja, app)
+    ventana.puede_ir_a_bandeja = QSystemTrayIcon.isSystemTrayAvailable()
+    ventana.ajustes.bandeja_cambiada.connect(app.bandeja.actualizar)
+    app.bandeja.actualizar()
+    # Al apagar Windows o cerrar sesión, la ventana se cierra de verdad (si no, lo impediría).
+    app.commitDataRequest.connect(lambda _gestor: setattr(ventana, '_saliendo', True))
 
     def recibido(pedido):
         if pedido.get('mostrar'):
@@ -379,8 +387,6 @@ def _atender_pedidos(app, ventana, config):
                 ventana.mostrar()          # nada válido que buscar: al menos se abre la app
             return
         if menu and config.menu_segundo_plano and not ventana.isVisible():
-            if app.bandeja is None:
-                app.bandeja = Bandeja(ventana, icono_app(), salir, app)
             app.bandeja.empezar()
         elif not (menu and config.menu_segundo_plano):
             ventana.traer_al_frente()

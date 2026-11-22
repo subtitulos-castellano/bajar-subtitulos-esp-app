@@ -11,7 +11,9 @@ Windows, sin abrir antes la app.
 
 - **Mira primero dentro del vídeo.** Si el `.mkv` o el `.mp4` trae una pista de subtítulos en
   castellano, la extrae. Es lo mejor, porque va sincronizada al milímetro. Lo hace sin ffmpeg y
-  en segundos, aunque el vídeo ocupe varios GB.
+  en segundos, aunque el vídeo ocupe varios GB. Si el disco es lento (una unidad USB, un NAS o una
+  carpeta de red) y extraerla fuese a tardar más de 15 segundos, no lo hace y busca en internet; en
+  *Detalles* se indica.
 - Si no la trae, **busca en internet**: OpenSubtitles (si tienes cuenta), Addic7ed, Gestdown y
   Subtitulamos. Descarga los mejores candidatos y se queda con el que es **castellano de verdad**.
   Para eso comprueba el vocabulario (vosotros, vale, móvil… frente a ustedes, celular, computadora…),
@@ -25,9 +27,10 @@ Windows, sin abrir antes la app.
   mucho 5 descargas por vídeo, con una pausa entre vídeos. Lo que pase del límite queda como
   *Pendiente* para la próxima vez.
 
-Hace exactamente lo mismo que la skill
+Hace lo mismo que la skill
 [`bajar-subtitulos-esp`](https://github.com/subtitulos-castellano/bajar-subtitulos-esp) (para Claude
-Code, Codex y OpenCode), de la que parte este proyecto.
+Code, Codex y OpenCode), de la que parte este proyecto. La única diferencia es ese límite de 15
+segundos para extraer la pista de un vídeo en un disco lento.
 
 ## Instalar
 
@@ -131,6 +134,7 @@ Los cambios se guardan al momento y se usan en la siguiente búsqueda.
 | Vídeos que buscan en internet en cada tanda | 40 |
 | Candidatos que se descargan por vídeo | 5 |
 | Cuenta de opensubtitles.org (opcional, da más resultados) | — |
+| Al cerrar la ventana, seguir junto al reloj | No |
 | Tema: Sistema, Claro u Oscuro | Sistema |
 | Tamaño del texto: como Windows o un porcentaje propio | Como Windows |
 | Mostrar «Bajar subtítulos» en el menú contextual del Explorador | Sí (instalador), No (portable) |
@@ -195,6 +199,16 @@ mejor no saturarlos.
 **No veo «Bajar subtítulos» al hacer clic derecho.** En Windows 11 está dentro de *Mostrar más
 opciones*. Comprueba también que está activado en *Configuración › Menú contextual del Explorador*.
 
+**Quiero que la app siga abierta al cerrar la ventana.** Activa *Configuración › Al cerrar la
+ventana, seguir junto al reloj*. Cerrar la ventana la oculta y queda un icono junto al reloj: un
+clic la vuelve a abrir. Si estaba buscando, sigue y avisa al terminar. Para cerrarla del todo, clic
+derecho en el icono › *Salir*.
+
+**En Detalles pone «no se han extraído los subtítulos incrustados del propio vídeo porque leerlo
+era muy lento».** El vídeo trae una pista en español, pero está en un disco lento y extraerla iba a
+tardar más de 15 segundos. La app lo deja y busca en internet. Si prefieres la pista del vídeo,
+copia el vídeo a un disco más rápido y vuelve a buscar.
+
 **¿Sube o comparte algo de mis vídeos?** No. Solo consulta a los proveedores el nombre del
 episodio o de la película, y lee los vídeos desde tu disco.
 
@@ -210,7 +224,7 @@ app/            interfaz gráfica (Qt / PySide6)
   ventana.py    ventana principal, menú lateral, arrastrar y soltar, cola
   menu_contextual.py  menú del Explorador en HKCU\Software\Classes (sin Qt)
   instancia.py  una sola app abierta: mutex, canal local y agrupar lo que llega seguido
-  bandeja.py    búsquedas en segundo plano: icono junto al reloj y aviso al terminar
+  bandeja.py    icono junto al reloj: segundo plano, aviso al terminar y seguir abierta al cerrar
   vista_inicio.py  zona de arrastre, búsqueda en curso y resumen con colores
   vista_ajustes.py Configuración
   trabajador.py procesar() en un hilo; señales, avisos y cancelación inmediata
@@ -273,7 +287,8 @@ scripts/windows.sh python -I -m unittest discover -s tests  # todas, con el Pyth
   - no tener conexión;
   - proveedores caídos;
   - varias rutas a la vez.
-- `tests/test_seguridad.py`: vídeos y textos manipulados.
+- `tests/test_seguridad.py`: vídeos y textos manipulados, y el límite de tiempo al extraer pistas
+  de un disco lento.
 - `tests/test_app.py`: la app sin mostrar ventanas. Cubre:
   - configuración y credenciales;
   - qué se acepta al soltar;
@@ -281,7 +296,8 @@ scripts/windows.sh python -I -m unittest discover -s tests  # todas, con el Pyth
   - el menú lateral y la tabla progresiva;
   - la posición de la ventana y el tamaño del texto.
 - `tests/test_menu.py`: el menú contextual en una clave de pruebas del registro, búsquedas sin
-  subcarpetas, una sola app abierta (varias aperturas a la vez) y el segundo plano.
+  subcarpetas, una sola app abierta (varias aperturas a la vez), el segundo plano y seguir junto
+  al reloj al cerrar la ventana.
 
 ### Compilar y publicar
 
@@ -324,7 +340,7 @@ git diff 3aa1f5e upstream/main -- bajar_subs.py    # 3aa1f5e: último commit de 
 
 Cada cambio se aplica en su módulo:
 
-- `pistas.py`: pistas incrustadas.
+- `pistas.py`: pistas incrustadas (conserva el límite de tiempo de `Plazo`, que la skill no tiene).
 - `texto.py`: idioma y dialecto.
 - `nucleo.py`: proveedores y `procesar()`.
 - `bajar_subs.py`: parámetros.

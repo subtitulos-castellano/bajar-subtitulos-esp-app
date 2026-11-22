@@ -86,6 +86,7 @@ class Ventana(QMainWindow):
     progreso = Signal(int, int)               # vídeo, total
     lote_terminado = Signal(list, bool, list)  # resultados, cancelado, errores
     en_reposo = Signal()                      # no queda nada en marcha ni en la cola
+    oculta = Signal()                         # se ha cerrado la ventana y la app sigue (junto al reloj)
 
     def __init__(self, config, demo=False):
         super().__init__()
@@ -101,6 +102,8 @@ class Ventana(QMainWindow):
         self._normal = None             # posición y tamaño sin maximizar, para recordarlos
         self.mostrada = False           # se ha llegado a ver (en segundo plano puede no verse nunca)
         self.ocultar_al_cerrar = False  # en segundo plano: cerrar con una búsqueda en marcha la oculta
+        self.puede_ir_a_bandeja = False # hay icono junto al reloj (lo pone main): «seguir junto al reloj»
+        self._saliendo = False          # se cierra la app de verdad (Salir, actualizar, apagar Windows)
 
         raiz = QWidget()
         raiz.setObjectName('raiz')
@@ -499,7 +502,7 @@ class Ventana(QMainWindow):
         except OSError as e:
             self._mostrar_aviso('error', self.novedad, f'No se ha podido abrir el instalador ({e.strerror or e}).')
             return
-        self.close()                            # guarda la configuración; el instalador espera a que termine
+        self.salir()                            # guarda la configuración; el instalador espera a que termine
 
     def _abrir_pagina_novedad(self):
         if self.novedad:
@@ -508,13 +511,21 @@ class Ventana(QMainWindow):
     def _abrir_pagina_version(self):
         QDesktopServices.openUrl(QUrl(self._pagina_version()))
 
+    def salir(self):
+        """Cierra de verdad (aunque esté activado «seguir junto al reloj»)."""
+        self._saliendo = True
+        self.close()
+
     def closeEvent(self, e):
-        if self.ocultar_al_cerrar and self.trabajador is not None:
-            # Búsqueda en segundo plano: se vuelve al icono junto al reloj y sigue buscando.
+        al_reloj = ((self.ocultar_al_cerrar and self.trabajador is not None)       # búsqueda en segundo plano
+                    or (self.config.cerrar_a_bandeja and self.puede_ir_a_bandeja))
+        if al_reloj and not self._saliendo:
+            # Se vuelve al icono junto al reloj; si estaba buscando, sigue.
             self._guardar_ventana()
             self.config.guardar()
             e.ignore()
             self.hide()
+            self.oculta.emit()
             return
         self.actualizador.cancelar()
         self._guardar_ventana()

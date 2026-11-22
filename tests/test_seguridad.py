@@ -11,6 +11,7 @@ import sys
 import tempfile
 import threading
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -57,11 +58,21 @@ def mkv_bloque_cero():
     return _cabecera_ebml() + _el(0x18538067, cluster)
 
 
+def mkv_largo(n_bloques=5000):
+    """Una pista de vídeo (2) con muchos bloques y, al final, el subtítulo (1)."""
+    pistas = (_el(0xAE, _el(0xD7, b'\x01') + _el(0x86, b'S_TEXT/UTF8') + _el(0x22B59C, b'spa'))
+              + _el(0xAE, _el(0xD7, b'\x02') + _el(0x86, b'V_MPEG4/ISO/AVC')))
+    video = b''.join(_el(0xA3, b'\x82\x00\x00\x00' + b'\xAA' * 50) for _ in range(n_bloques))
+    sub = _el(0xA0, _el(0xA1, b'\x81\x00\x00\x00' + TEXTO.encode()) + _el(0x9B, (2000).to_bytes(2, 'big')))
+    cluster = _el(0x1F43B675, _el(0xE7, b'\x00') + video + sub)
+    return _cabecera_ebml() + _el(0x18538067, _el(0x1654AE6B, pistas) + cluster)
+
+
 def _caja(tipo, datos):
     return struct.pack('>I4s', 8 + len(datos), tipo) + datos
 
 
-def mp4(tam_fijo=0, n_muestras=1):
+def mp4(tam_fijo=0, n_muestras=1, por_trozo=1):
     muestra = struct.pack('>H', len(TEXTO.encode())) + TEXTO.encode()
     mdat = _caja(b'mdat', muestra)
     lang = sum((ord(c) - 0x60) << s for c, s in zip('spa', (10, 5, 0)))
@@ -70,7 +81,7 @@ def mp4(tam_fijo=0, n_muestras=1):
     hdlr = _caja(b'hdlr', b'\0' * 8 + b'sbtl' + b'\0' * 13)
     stsd = _caja(b'stsd', b'\0' * 4 + struct.pack('>I', 1) + struct.pack('>I4s', 16, b'tx3g') + b'\0' * 8)
     stts = _caja(b'stts', b'\0' * 4 + struct.pack('>III', 1, 1, 2000))
-    stsc = _caja(b'stsc', b'\0' * 4 + struct.pack('>IIII', 1, 1, 1, 1))
+    stsc = _caja(b'stsc', b'\0' * 4 + struct.pack('>IIII', 1, 1, por_trozo, 1))
     if tam_fijo:
         stsz = _caja(b'stsz', b'\0' * 4 + struct.pack('>II', tam_fijo, n_muestras))
     else:
@@ -85,6 +96,17 @@ def mp4(tam_fijo=0, n_muestras=1):
 def mp4_moov_enorme():
     """El índice declara 256 MB: antes se intentaba leer entero en memoria."""
     return struct.pack('>I4s', 256 * 1024 * 1024, b'moov') + b'\0' * 64
+
+
+class RelojFalso:
+    """Cada consulta avanza `paso` segundos."""
+
+    def __init__(self, paso):
+        self.t, self.paso = 0.0, paso
+
+    def __call__(self):
+        self.t += self.paso
+        return self.t
 
 
 # ---------- Ayudas ----------
@@ -174,7 +196,7 @@ class VideosManipulados(ConArchivos):
             with self.subTest(nombre):
                 res, error = sin_colgarse(self, pt.incrustado, self.archivo(nombre, datos))
                 self.assertIsNone(error)
-                self.assertEqual(res, {'castellano': None, 'latino': None, 'ingles': None})
+                self.assertEqual(res, {'castellano': None, 'latino': None, 'ingles': None, 'lento': False})
 
 
 class TextosDeTerceros(ConArchivos):
@@ -190,6 +212,63 @@ class TextosDeTerceros(ConArchivos):
         nucleo.guardar('1\r\n00:00:01,000 --> 00:00:02,000\r\nHola\x1b]0;titulo\x07\r\n', destino)
         self.assertEqual(destino.read_bytes().decode('utf-8'),
                          '1\r\n00:00:01,000 --> 00:00:02,000\r\nHola]0;titulo\r\n')
+
+
+class VideoLento(unittest.TestCase):
+    """Si extraer la pista incrustada va a tardar más del límite, se deja (y se dice por qué)."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+
+    def escribir(self, nombre, datos):
+        ruta = Path(self.dir.name) / nombre
+        ruta.write_bytes(datos)
+        return ruta
+
+    def test_lectura_rapida_extrae_igual(self):
+        ruta = self.escribir('rapido.mkv', mkv_largo())
+        srt = pt.extraer_srt(ruta, [1], pt.Plazo(reloj=RelojFalso(0.0001)))[1]
+        self.assertIn(TEXTO, srt)
+
+    def test_lectura_lenta_se_corta_con_la_estimacion(self):
+        ruta = self.escribir('lento.mkv', mkv_largo())
+        with self.assertRaises(pt.Lento) as e:
+            pt.extraer_srt(ruta, [1], pt.Plazo(reloj=RelojFalso(1.0)))
+        self.assertGreater(e.exception.segundos, pt.LIMITE_EXTRACCION)
+
+    def test_mp4_lento_se_corta(self):
+        ruta = self.escribir('lento.mp4', mp4(tam_fijo=3, n_muestras=5000, por_trozo=5000))
+        with self.assertRaises(pt.Lento):
+            pt.extraer_srt(ruta, [1], pt.Plazo(reloj=RelojFalso(1.0)))
+
+    def test_incrustado_avisa_en_el_detalle(self):
+        ruta = self.escribir('Serie.S01E01.mkv', mkv_largo())
+        lineas = []
+        with unittest.mock.patch.object(pt, 'MUESTRA_EXTRACCION', 0):
+            res = pt.incrustado(ruta, detalle=lineas.append, limite=0)
+        self.assertTrue(res['lento'])
+        self.assertIsNone(res['castellano'])
+        self.assertTrue(any('no se han extraído los subtítulos incrustados del propio vídeo porque leerlo '
+                            'era muy lento' in l for l in lineas), lineas)
+
+    def test_incrustado_sin_prisa(self):
+        res = pt.incrustado(self.escribir('Serie.S01E02.mkv', mkv_largo()))
+        self.assertFalse(res['lento'])
+        self.assertIn(TEXTO, res['castellano'][0])
+
+    def test_ingles_lento(self):
+        datos = mkv_largo().replace(b'spa', b'eng')
+        lineas = []
+        with unittest.mock.patch.object(pt, 'MUESTRA_EXTRACCION', 0):
+            texto, _ = pt.ingles_incrustado(self.escribir('Serie.S01E03.mkv', datos), lineas.append, limite=0)
+        self.assertIsNone(texto)
+        self.assertIn('subtítulos en inglés', lineas[0])
+
+    def test_duracion_legible(self):
+        self.assertEqual(pt.aviso_lento(pt.Lento(40)).split('tardaría ')[1].split(';')[0], 'unos 40 s')
+        self.assertIn('unos 3 min', pt.aviso_lento(pt.Lento(185)))
+        self.assertIn('más de 15 s', pt.aviso_lento(pt.Lento(None)))
 
 
 if __name__ == '__main__':

@@ -20,7 +20,7 @@ sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 try:
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 except ImportError:  # pragma: no cover - sin PySide6 (p. ej. el venv de la skill)
     raise unittest.SkipTest('PySide6 no está instalado')
 
@@ -428,6 +428,89 @@ class SegundoPlano(test_nucleo.ConSimulacion):
         esperar(lambda: self.v.trabajador is None)
         self.assertEqual(len(self.avisos), 1)
         self.assertTrue(self.avisos[0][1].startswith('2 vídeos'))
+
+
+class JuntoAlReloj(test_nucleo.ConSimulacion):
+    """«Al cerrar la ventana, seguir junto al reloj» (Configuración)."""
+
+    def setUp(self):
+        super().setUp()
+        self._d = tempfile.TemporaryDirectory()
+        self.addCleanup(self._d.cleanup)
+        self.config = Config(Path(self._d.name) / 'config.json')
+        self.config.cerrar_a_bandeja = True
+        self.v = Ventana(self.config)
+        self.v.puede_ir_a_bandeja = True
+        self.salidas = []
+        self.b = Bandeja(self.v, icono_app(), lambda: self.salidas.append(1), lambda: self.config.cerrar_a_bandeja)
+        self.b.actualizar()
+        self.avisos = []
+        parche = mock.patch.object(self.b.icono, 'showMessage', lambda *a: self.avisos.append(a))
+        parche.start()
+        self.addCleanup(parche.stop)
+
+    def tearDown(self):
+        self.b.icono.hide()
+        self.v.salir()
+        super().tearDown()
+
+    def test_cerrar_la_oculta_y_el_icono_la_vuelve_a_abrir(self):
+        self.assertTrue(self.b.icono.isVisible())          # con la opción, el icono está siempre
+        self.v.mostrar()
+        ocultas = []
+        self.v.oculta.connect(lambda: ocultas.append(1))
+        self.assertFalse(self.v.close())                   # cerrar no cierra
+        self.assertFalse(self.v.isVisible())
+        self.assertEqual(ocultas, [1])
+        self.assertTrue(self.b.icono.isVisible())
+        self.b._activado(QSystemTrayIcon.Trigger)
+        self.assertTrue(self.v.isVisible())
+        self.assertTrue(self.b.icono.isVisible())
+        self.assertEqual(self.salidas, [])
+
+    def test_salir_desde_el_icono(self):
+        self.v.mostrar()
+        self.v.close()
+        self.b.a_salir.trigger()
+        self.assertEqual(self.salidas, [1])
+
+    def test_salir_cierra_de_verdad(self):
+        self.v.mostrar()
+        ocultas = []
+        self.v.oculta.connect(lambda: ocultas.append(1))
+        self.v.salir()
+        self.assertEqual(ocultas, [])
+        self.assertFalse(self.v.isVisible())
+
+    def test_cerrar_durante_una_busqueda_sigue_y_avisa_sin_cerrarse(self):
+        with mock.patch.object(test_nucleo.nucleo, 'ProviderPool', PoolLento):
+            self.v.mostrar()
+            self.v.procesar([self.videos / 'c_incrustado.mkv', self.videos / 'a_ya.mkv'])
+            self.v.close()
+            self.assertFalse(self.v.isVisible())
+            self.assertTrue(self.b.activa)                 # sigue buscando, en segundo plano
+            esperar(lambda: self.avisos)
+        self.assertEqual(self.avisos[0][0], 'Subtítulos listos')
+        self.b._fin.timeout.emit()
+        self.assertEqual(self.salidas, [])                 # con la opción, la app no se cierra sola
+        self.assertTrue(self.b.icono.isVisible())
+        self.assertFalse(self.b.activa)
+
+    def test_sin_la_opcion_cerrar_cierra(self):
+        self.config.cerrar_a_bandeja = False
+        self.b.actualizar()
+        self.assertFalse(self.b.icono.isVisible())
+        self.v.mostrar()
+        ocultas = []
+        self.v.oculta.connect(lambda: ocultas.append(1))
+        self.assertTrue(self.v.close())
+        self.assertEqual(ocultas, [])
+
+    def test_la_opcion_se_guarda(self):
+        self.v.ajustes.bandeja.setChecked(False)
+        self.assertFalse(Config(self.config.ruta).cerrar_a_bandeja)
+        self.v.ajustes.bandeja.setChecked(True)
+        self.assertTrue(Config(self.config.ruta).cerrar_a_bandeja)
 
 
 class PoolLento(test_nucleo.PoolFalso):

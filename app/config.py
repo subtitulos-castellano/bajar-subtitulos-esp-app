@@ -34,6 +34,7 @@ class Config:
         self.menu_contextual = None   # «Bajar subtítulos» en el Explorador; None = aún sin decidir (ver
                                       # menu_contextual.asegurar)
         self.menu_segundo_plano = False   # desde el menú: buscar sin abrir la ventana
+        self.cerrar_a_bandeja = False     # al cerrar la ventana, la app sigue junto al reloj
         self.cargar()
 
     def cargar(self):
@@ -74,13 +75,15 @@ class Config:
             self.menu_contextual = datos['menu_contextual']
         if isinstance(datos.get('menu_segundo_plano'), bool):
             self.menu_segundo_plano = datos['menu_segundo_plano']
+        if isinstance(datos.get('cerrar_a_bandeja'), bool):
+            self.cerrar_a_bandeja = datos['cerrar_a_bandeja']
 
     def guardar(self):
         datos = {'opciones': asdict(self.opciones), 'tema': self.tema,
                  'usuario_opensubtitles': self.usuario_opensubtitles, 'tamano_texto': self.tamano_texto,
                  'ventana': self.ventana, 'actualizaciones': self.actualizaciones,
                  'ultima_comprobacion': self.ultima_comprobacion, 'version': self.version,
-                 'menu_segundo_plano': self.menu_segundo_plano}
+                 'menu_segundo_plano': self.menu_segundo_plano, 'cerrar_a_bandeja': self.cerrar_a_bandeja}
         if self.menu_contextual is not None:
             datos['menu_contextual'] = self.menu_contextual
         try:

@@ -4,6 +4,7 @@ Solo usa la biblioteca estándar: se puede importar sin cargar subliminal.
 """
 import re
 import struct
+import time
 
 from .texto import ESPANA_NOMBRE, LATINO_NOMBRE, MAX_SRT, dialecto, visible
 
@@ -15,8 +16,48 @@ MAX_MOOV = 64 * 1024 * 1024      # tamaño máximo del índice ('moov') de un MP
 MAX_MUESTRAS = 1_000_000         # entradas de una tabla de muestras de una pista de subtítulos
 
 
+# Extraer una pista incrustada obliga a recorrer el vídeo entero (los subtítulos van repartidos entre
+# la imagen y el sonido). En un disco lento o de red, un vídeo de varios GB tarda minutos: si se
+# calcula que pasará de LIMITE_EXTRACCION segundos, se deja y se buscan en los proveedores.
+LIMITE_EXTRACCION = 15      # segundos
+MUESTRA_EXTRACCION = 1.5    # segundos de lectura antes de estimar el total
+
+
 class ArchivoInvalido(Exception):
     """Vídeo corrupto, cortado o manipulado: se dejan de leer sus pistas incrustadas."""
+
+
+class Lento(Exception):
+    """Extraer la pista tardaría más de LIMITE_EXTRACCION segundos. `segundos`: lo estimado (o None)."""
+
+    def __init__(self, segundos=None):
+        super().__init__('lectura demasiado lenta')
+        self.segundos = segundos
+
+
+class Plazo:
+    """Corta la extracción si, al ritmo de lectura de los primeros segundos, no acabaría a tiempo."""
+
+    def __init__(self, limite=None, reloj=None, muestra=None):
+        self.limite = LIMITE_EXTRACCION if limite is None else limite
+        self.muestra = MUESTRA_EXTRACCION if muestra is None else muestra
+        self.reloj = reloj or time.monotonic
+        self.inicio = self.reloj()
+        self._n = 0
+
+    def comprobar(self, hecho, total):
+        """`hecho` de `total` (bytes leídos, muestras…). Lanza Lento si no da tiempo."""
+        self._n += 1
+        if self._n % 64:                   # mirar el reloj cada 64 bloques basta
+            return
+        t = self.reloj() - self.inicio
+        estimado = t * total / hecho if hecho > 0 and total > 0 else None
+        if t > self.limite or (t >= self.muestra and estimado is not None and estimado > self.limite):
+            raise Lento(estimado)
+
+
+def _sin_plazo():
+    return Plazo(limite=float('inf'))
 
 
 def _ts(ms):
@@ -122,8 +163,9 @@ def pistas_mkv(path):
     return pistas
 
 
-def extraer_srt_mkv(path, nums):
+def extraer_srt_mkv(path, nums, plazo=None):
     """Extrae pistas S_TEXT/UTF8 del MKV. Devuelve {num: texto_srt}. Salta los datos de vídeo/audio."""
+    plazo = plazo or _sin_plazo()
     nums = set(nums)
     subs = {n: [] for n in nums}
     escala, ctc = 1_000_000, 0
@@ -140,6 +182,7 @@ def extraer_srt_mkv(path, nums):
         size = f.seek(0, 2); f.seek(0)
         _eid(f); f.seek(_vint(f), 1); _eid(f); _vint(f)
         while f.tell() < size:
+            plazo.comprobar(f.tell(), size)
             i = _eid(f)
             if i is None:
                 break
@@ -328,7 +371,7 @@ def _texto_muestra(d, codec):
     return txt.replace('\r\n', '\n').replace('\r', '\n').strip()
 
 
-def _muestras_mp4(f, p):
+def _muestras_mp4(f, p, plazo):
     """[(inicio_ms, fin_ms, texto)] de una pista de subtítulos MP4."""
     tams, stsc = p['stsz'], p['stsc']
     if not stsc or not tams:
@@ -359,6 +402,7 @@ def _muestras_mp4(f, p):
             break
     lineas, t = [], 0
     for i, (o, tam) in enumerate(zip(offs, tams)):
+        plazo.comprobar(i, len(tams))
         d = durs[i] if i < len(durs) else 0
         if tam > MAX_ELEMENTO:
             raise ArchivoInvalido('muestra de subtítulo MP4 demasiado grande')
@@ -376,11 +420,12 @@ def _muestras_mp4(f, p):
     return lineas
 
 
-def extraer_srt_mp4(path, nums):
+def extraer_srt_mp4(path, nums, plazo=None):
+    plazo = plazo or _sin_plazo()
     nums = set(nums)
     pistas = [p for p in pistas_mp4(path) if p['num'] in nums]
     with open(path, 'rb') as f:
-        return {p['num']: _a_srt(_muestras_mp4(f, p)) for p in pistas}
+        return {p['num']: _a_srt(_muestras_mp4(f, p, plazo)) for p in pistas}
 
 
 # ---------- Pistas incrustadas (común a MKV y MP4) ----------
@@ -394,8 +439,9 @@ def pistas_texto(path):
     return []
 
 
-def extraer_srt(path, nums):
-    return (extraer_srt_mkv if path.suffix.lower() in MKV_EXT else extraer_srt_mp4)(path, nums)
+def extraer_srt(path, nums, plazo=None):
+    """{num: texto_srt}. Con `plazo`, lanza Lento si la lectura no va a acabar a tiempo."""
+    return (extraer_srt_mkv if path.suffix.lower() in MKV_EXT else extraer_srt_mp4)(path, nums, plazo)
 
 
 def _forzada(p):
@@ -423,11 +469,25 @@ def _nada(linea):
     pass
 
 
-def incrustado(path, con_ingles=False, detalle=_nada):
+def _duracion(segundos):
+    if segundos is None:
+        return f'más de {LIMITE_EXTRACCION} s'
+    if segundos < 90:
+        return f'unos {round(segundos)} s'
+    return f'unos {round(segundos / 60)} min'
+
+
+def aviso_lento(e, que='los subtítulos incrustados'):
+    return (f'  no se han extraído {que} del propio vídeo porque leerlo era muy lento '
+            f'(tardaría {_duracion(e.segundos)}; el límite es {LIMITE_EXTRACCION} s)')
+
+
+def incrustado(path, con_ingles=False, detalle=_nada, limite=None):
     """Busca en las pistas de texto del MKV/MP4.
-    Devuelve {'castellano', 'latino', 'ingles'} -> (texto, descripción) o None.
+    Devuelve {'castellano', 'latino', 'ingles'} -> (texto, descripción) o None, y 'lento': True si
+    no se ha extraído porque leer el vídeo tardaría más de `limite` segundos (LIMITE_EXTRACCION).
     `detalle` recibe las líneas informativas (la CLI las imprime)."""
-    res = {'castellano': None, 'latino': None, 'ingles': None}
+    res = {'castellano': None, 'latino': None, 'ingles': None, 'lento': False}
     try:
         pistas = [p for p in pistas_texto(path) if not _forzada(p)]
     except Exception as e:
@@ -442,7 +502,11 @@ def incrustado(path, con_ingles=False, detalle=_nada):
     if not nums:
         return res
     try:
-        textos = extraer_srt(path, nums)
+        textos = extraer_srt(path, nums, Plazo(limite))
+    except Lento as e:
+        detalle(aviso_lento(e))
+        res['lento'] = True
+        return res
     except Exception as e:
         detalle(f'  (no se pudieron extraer las pistas incrustadas: {visible(e)})')
         return res
@@ -470,14 +534,17 @@ def incrustado(path, con_ingles=False, detalle=_nada):
     return res
 
 
-def ingles_incrustado(path):
+def ingles_incrustado(path, detalle=_nada, limite=None):
     """Extrae la mejor pista inglesa de texto del MKV/MP4 (prefiere SDH). Devuelve (texto | None, nombre)."""
     try:
         pistas = [p for p in pistas_texto(path) if not _forzada(p) and _es_ingles(p)]
         if not pistas:
             return None, ''
         pistas.sort(key=lambda p: 'sdh' not in p['name'].lower())
-        texto = extraer_srt(path, [pistas[0]['num']]).get(pistas[0]['num'])
+        texto = extraer_srt(path, [pistas[0]['num']], Plazo(limite)).get(pistas[0]['num'])
+    except Lento as e:
+        detalle(aviso_lento(e, 'los subtítulos en inglés'))
+        return None, ''
     except Exception:
         return None, ''
     if not texto or len(texto) > MAX_SRT:

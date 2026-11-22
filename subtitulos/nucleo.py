@@ -361,7 +361,8 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
             else:
                 # Ni castellano ni latino: subtítulos en inglés como último recurso.
                 texto, pista = (emb['ingles'] or (None, ''))
-                texto, pista = (texto, pista) if texto else ingles_incrustado(path)
+                if not texto and not emb['lento']:      # si leer el vídeo es lento, no se reintenta
+                    texto, pista = ingles_incrustado(path, detalle)
                 if texto:
                     aplicar('ingles', texto, 'INGLÉS (incrustado)', pista[:30])
                     continue
