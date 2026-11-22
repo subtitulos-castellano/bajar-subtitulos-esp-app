@@ -227,7 +227,7 @@ class VentanaCompleta(test_nucleo.ConSimulacion):
             v.mostrar()
             v.procesar([self.videos])
             v.procesar([self.videos / 'c_incrustado.mkv'])                  # soltado después: a la cola
-            self.assertEqual(v.cola, [[self.videos / 'c_incrustado.mkv']])
+            self.assertEqual(v.cola, [([self.videos / 'c_incrustado.mkv'], True)])
             esperar(lambda: v.trabajador is None)
             self.assertEqual(v.inicio.pila.currentIndex(), 2)                # resumen
             self.assertEqual([r.nombre for r in v.inicio.modelo.filas], ['c_incrustado.mkv'])

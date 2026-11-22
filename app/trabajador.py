@@ -69,8 +69,9 @@ class Trabajador(QObject):
     error = Signal(str)
     terminado = Signal(list, bool, float)  # resultados, cancelado, segundos
 
-    def __init__(self, ruta, opciones, credenciales, parent=None):
+    def __init__(self, ruta, opciones, credenciales, parent=None, recursivo=True):
         super().__init__(parent)
+        self.recursivo = recursivo           # False: solo los vídeos de la propia carpeta
         # Una ruta, o una lista (vídeos sueltos y carpetas soltados a la vez: una sola búsqueda).
         self.ruta = [Path(r) for r in ruta] if isinstance(ruta, (list, tuple)) else Path(ruta)
         self.opciones = opciones
@@ -136,7 +137,8 @@ class Trabajador(QObject):
                     trabajador.resultado.emit(r)
 
             _Avisos.destinos[threading.get_ident()] = lambda linea: self._emitir(self.detalle, linea)
-            n.procesar(self.ruta, self.opciones, Puente(), self._cancelar.is_set, self.credenciales)
+            n.procesar(self.ruta, self.opciones, Puente(), self._cancelar.is_set, self.credenciales,
+                       self.recursivo)
         except Exception as e:  # noqa: BLE001 - se muestra en la interfaz; lo ya guardado se queda
             self._emitir(self.error, f'{type(e).__name__}: {e}')
         finally:

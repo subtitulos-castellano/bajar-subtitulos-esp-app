@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLa
 from subtitulos.archivos import HOME
 from subtitulos.opciones import MAX_DESCARGAS, MAX_VIDEOS, Opciones
 
-from . import __version__, actualizar, credenciales, iconos, tema
+from . import __version__, actualizar, credenciales, iconos, menu_contextual, tema
 from .config import TAMANO_MAX, TAMANO_MIN
 from .componentes import FilaOpcion, IconoLabel
 from .vista_inicio import MARGEN, boton, etiqueta
@@ -177,6 +177,10 @@ class VistaAjustes(QWidget):
         lay.addWidget(t)
         lay.addSpacing(12)
 
+        # Menú contextual del Explorador
+        lay.addWidget(self._menu_contextual())
+        lay.addSpacing(12)
+
         # Actualizaciones
         lay.addWidget(self._actualizaciones())
         lay.addSpacing(16)
@@ -306,6 +310,64 @@ class VistaAjustes(QWidget):
         carpeta = HOME / 'backup'
         carpeta.mkdir(parents=True, exist_ok=True)
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(carpeta)))
+
+    # ---------- Menú contextual ----------
+
+    def _menu_contextual(self):
+        t = Tarjeta('menu', 'Menú contextual del Explorador',
+                    'Busca subtítulos con el botón derecho del ratón, sin abrir antes la app. En Windows 11 '
+                    'está dentro de «Mostrar más opciones».')
+        fila = t.fila(FilaOpcion('Mostrar «Bajar subtítulos» en el menú contextual',
+                                 'En una carpeta: «Bajar subtítulos aquí», solo en esa carpeta o también en sus '
+                                 'subcarpetas. En uno o varios vídeos: «Bajar subtítulos».'))
+        self.menu = fila.control
+        self.estado_menu = fila.findChild(QLabel, 'ayuda')
+        self._texto_menu = self.estado_menu.text()
+        modos = QWidget()
+        ml = QHBoxLayout(modos)
+        ml.setContentsMargins(0, 0, 0, 0)
+        ml.setSpacing(0)
+        self.grupo_modo_menu = QButtonGroup(self)
+        self.b_menu_ventana = QPushButton('Mostrar la ventana')
+        self.b_menu_fondo = QPushButton('En segundo plano')
+        for i, b in enumerate((self.b_menu_ventana, self.b_menu_fondo)):
+            b.setCheckable(True)
+            b.setObjectName('segmento')
+            b.setProperty('pos', ('ini', 'fin')[i])
+            b.setCursor(Qt.PointingHandCursor)
+            self.grupo_modo_menu.addButton(b, i)
+            ml.addWidget(b)
+        self.fila_modo_menu = t.fila(FilaOpcion(
+            'Al usarlo',
+            'Mostrar la ventana: como al arrastrar a la app. En segundo plano: sin ventana; solo un icono junto '
+            'al reloj mientras busca (para ver el progreso o cancelar) y un aviso con el resumen al terminar.',
+            modos))
+        (self.b_menu_fondo if self.config.menu_segundo_plano else self.b_menu_ventana).setChecked(True)
+        self.grupo_modo_menu.idClicked.connect(self._modo_menu)
+        if menu_contextual.disponible():
+            self.menu.setChecked(menu_contextual.registrado())
+        else:
+            self.menu.setEnabled(False)
+            self.estado_menu.setText('Solo en Windows.')
+        self.menu.toggled.connect(self._menu)
+        return t
+
+    def _menu(self, activo):
+        try:
+            menu_contextual.registrar() if activo else menu_contextual.quitar()
+        except OSError as e:
+            self.menu.blockSignals(True)
+            self.menu.setChecked(not activo)
+            self.menu.blockSignals(False)
+            self.estado_menu.setText(f'No se ha podido cambiar el menú contextual ({e.strerror or e}).')
+            return
+        self.estado_menu.setText(self._texto_menu)
+        self.config.menu_contextual = activo
+        self.config.guardar()
+
+    def _modo_menu(self, i):
+        self.config.menu_segundo_plano = i == 1
+        self.config.guardar()
 
     # ---------- Actualizaciones ----------
 

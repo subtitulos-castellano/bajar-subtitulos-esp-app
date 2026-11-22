@@ -1,5 +1,24 @@
 # Cambios
 
+## 1.1.0
+
+- **Menú contextual del Explorador**:
+  - clic derecho en una carpeta (o en el fondo de una carpeta, o en una unidad): *Bajar subtítulos
+    aquí*, con *Solo esta carpeta* o *Esta carpeta y sus subcarpetas*;
+  - clic derecho en uno o varios vídeos: *Bajar subtítulos*. Varios vídeos seleccionados son una
+    sola búsqueda. No aparece en los `.ts` (también son archivos de TypeScript), aunque la app sí
+    los busca dentro de las carpetas;
+  - en Windows 11 aparece dentro de *Mostrar más opciones*.
+- *Configuración › Menú contextual del Explorador*:
+  - mostrarlo u ocultarlo (el instalador lo añade; en la versión portable se activa aquí);
+  - al usarlo, **mostrar la ventana** (como al arrastrar) o buscar **en segundo plano**: sin ventana,
+    con un icono junto al reloj mientras busca (para ver el progreso o cancelar) y un aviso con el
+    resumen al terminar.
+- Solo hay una app abierta a la vez: lo que llega del menú (o al abrirla otra vez) va a la que ya
+  está abierta, a su cola.
+- Se pueden soltar vídeos o carpetas sobre el icono del programa para abrirlo y buscarlos.
+- Al desinstalar, el menú contextual se quita.
+
 ## 1.0.2
 
 - **Icono nuevo**: una pantalla de vídeo con play y subtítulos, y una flecha que entra en una bandeja

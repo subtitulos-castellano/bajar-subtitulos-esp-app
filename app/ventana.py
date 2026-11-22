@@ -1,7 +1,7 @@
 """Ventana principal: barra lateral (Inicio, Buscando…, Configuración), arrastre en toda la ventana y cola."""
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QUrl
+from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QFont, QGuiApplication, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow,
                                QPushButton, QStackedWidget, QVBoxLayout, QWidget)
@@ -82,6 +82,11 @@ class CapaArrastre(QWidget):
 
 
 class Ventana(QMainWindow):
+    # Para el icono junto al reloj (búsquedas en segundo plano, ver bandeja.py).
+    progreso = Signal(int, int)               # vídeo, total
+    lote_terminado = Signal(list, bool, list)  # resultados, cancelado, errores
+    en_reposo = Signal()                      # no queda nada en marcha ni en la cola
+
     def __init__(self, config, demo=False):
         super().__init__()
         self.config = config
@@ -94,6 +99,8 @@ class Ventana(QMainWindow):
         self.trabajador = None
         self.hay_busqueda = False       # hay una búsqueda (en marcha o su resumen) a la que volver
         self._normal = None             # posición y tamaño sin maximizar, para recordarlos
+        self.mostrada = False           # se ha llegado a ver (en segundo plano puede no verse nunca)
+        self.ocultar_al_cerrar = False  # en segundo plano: cerrar con una búsqueda en marcha la oculta
 
         raiz = QWidget()
         raiz.setObjectName('raiz')
@@ -127,7 +134,7 @@ class Ventana(QMainWindow):
         self.inicio.elegido.connect(self.procesar)
         self.inicio.cancelar.connect(self._cancelar)
         self.inicio.ir_ajustes.connect(lambda: self.ir(AJUSTES))
-        self.inicio.repetir.connect(self.procesar)
+        self.inicio.repetir.connect(lambda rutas: self.procesar(rutas, self.inicio.recursivo))
         self.ajustes.cambiado.connect(self._preferencias_cambiadas)
         self.ajustes.tema_elegido.connect(self.cambiar_tema)
         self.ajustes.tamano_elegido.connect(lambda: self.cambiar_tema(self.preferencia_tema))
@@ -173,6 +180,19 @@ class Ventana(QMainWindow):
         else:
             self.show()
 
+    def showEvent(self, e):
+        super().showEvent(e)
+        self.mostrada = True
+
+    def traer_al_frente(self):
+        """La muestra (si estaba oculta o minimizada) y la pone delante."""
+        if not self.isVisible():
+            self.mostrar()
+        elif self.isMinimized():
+            self.showMaximized() if self.config.ventana.get('maximizada') else self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
     def _anotar_normal(self):
         if self.isVisible() and not (self.isMaximized() or self.isMinimized() or self.isFullScreen()):
             f = self.frameGeometry()
@@ -183,6 +203,8 @@ class Ventana(QMainWindow):
         self._anotar_normal()
 
     def _guardar_ventana(self):
+        if not self.mostrada:                     # sin verse, la posición guardada sigue valiendo
+            return
         self._anotar_normal()
         if self._normal:
             x, y, ancho, alto = self._normal
@@ -339,10 +361,11 @@ class Ventana(QMainWindow):
 
     # ---------- Cola y trabajo ----------
 
-    def procesar(self, rutas):
+    def procesar(self, rutas, recursivo=True):
         """Lo soltado de una vez (vídeos sueltos, carpetas o ambos) es una sola búsqueda, como si todo
-        estuviera en la misma carpeta. Va a la cola y empieza si no hay nada en marcha. Sin preguntas."""
-        self.cola.append(list(rutas))
+        estuviera en la misma carpeta. Va a la cola y empieza si no hay nada en marcha. Sin preguntas.
+        Con `recursivo=False` (menú contextual › Solo esta carpeta), sin entrar en las subcarpetas."""
+        self.cola.append((list(rutas), recursivo))
         if self.trabajador is None:
             self._siguiente()
         else:
@@ -352,15 +375,17 @@ class Ventana(QMainWindow):
         if not self.cola:
             self.trabajador = None
             self._actualizar_nav()
+            self.en_reposo.emit()
             return
-        lote = self.cola.pop(0)
+        lote, recursivo = self.cola.pop(0)
         ruta = lote[0] if len(lote) == 1 else lote
         self.inicio.poner_cola(len(self.cola))
         opciones = self.config.opciones       # las preferencias de este momento valen para toda la tanda
         if self.demo:
-            t = TrabajadorDemo(ruta, self)
+            t = TrabajadorDemo(ruta, self, recursivo=recursivo)
         else:
-            t = Trabajador(ruta, opciones, credenciales_proveedores(self.config.usuario_opensubtitles))
+            t = Trabajador(ruta, opciones, credenciales_proveedores(self.config.usuario_opensubtitles),
+                           recursivo=recursivo)
         self.trabajador = t
 
         # Solo se atiende a la búsqueda en curso: tras cancelar, pueden llegar avisos que el hilo envió
@@ -371,10 +396,11 @@ class Ventana(QMainWindow):
             t.error.connect(de_esta(self.inicio.al_error))
         t.inicio.connect(de_esta(self.inicio.al_iniciar))
         t.video.connect(de_esta(self.inicio.al_video))
+        t.video.connect(de_esta(lambda i, total, _: self.progreso.emit(i, total)))
         t.detalle.connect(de_esta(self.inicio.al_detalle))
         t.resultado.connect(de_esta(self.inicio.al_resultado))
         t.terminado.connect(de_esta(self._terminado))
-        self.inicio.empezar(lote, demo=self.demo, simulacion=opciones.dry_run)
+        self.inicio.empezar(lote, demo=self.demo, simulacion=opciones.dry_run, recursivo=recursivo)
         self.hay_busqueda = True
         self.paginas.setCurrentIndex(0)
         self.nav_botones[BUSCANDO].setChecked(True)
@@ -391,6 +417,7 @@ class Ventana(QMainWindow):
         if cancelado:
             self.cola.clear()
             self.inicio.poner_cola(0)
+        self.lote_terminado.emit(list(resultados), cancelado, list(self.inicio.errores))
         self._siguiente()
 
     def _cancelar(self):
@@ -482,6 +509,13 @@ class Ventana(QMainWindow):
         QDesktopServices.openUrl(QUrl(self._pagina_version()))
 
     def closeEvent(self, e):
+        if self.ocultar_al_cerrar and self.trabajador is not None:
+            # Búsqueda en segundo plano: se vuelve al icono junto al reloj y sigue buscando.
+            self._guardar_ventana()
+            self.config.guardar()
+            e.ignore()
+            self.hide()
+            return
         self.actualizador.cancelar()
         self._guardar_ventana()
         self.config.guardar()

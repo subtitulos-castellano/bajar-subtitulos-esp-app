@@ -66,9 +66,16 @@ Name: "{autoprograms}\{#Nombre}"; Filename: "{app}\{#Exe}"
 Name: "{autodesktop}\{#Nombre}"; Filename: "{app}\{#Exe}"; Tasks: escritorio
 
 [Run]
+; Menú contextual del Explorador («Bajar subtítulos»): lo añade la propia app (app/menu_contextual.py) en
+; el registro del usuario, salvo que se haya quitado en Configuración. Al actualizar, lo deja apuntando aquí.
+Filename: "{app}\{#Exe}"; Parameters: "--menu-contextual-instalar"; Flags: runasoriginaluser waituntilterminated
 Filename: "{app}\{#Exe}"; Description: "Abrir {#Nombre}"; Flags: nowait postinstall skipifsilent
 ; Actualización desde la propia app (/REABRIR=1): se vuelve a abrir sola al terminar.
 Filename: "{app}\{#Exe}"; Flags: nowait runasoriginaluser; Check: Reabrir
+
+[UninstallRun]
+; Quita el menú contextual (solo si apunta a este programa: puede apuntar a la versión portable).
+Filename: "{app}\{#Exe}"; Parameters: "--menu-contextual-quitar"; Flags: waituntilterminated; RunOnceId: "QuitarMenuContextual"
 
 ; La configuración (%APPDATA%\BajarSubtitulosEsp), la contraseña guardada en el Administrador de
 ; credenciales y las copias de seguridad (%USERPROFILE%\.subtitulos-esp) se conservan al

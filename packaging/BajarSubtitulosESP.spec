@@ -29,8 +29,10 @@ a = Analysis(
     pathex=[str(RAIZ)],
     binaries=binaries,
     datas=datas,
-    hiddenimports=hiddenimports + ['subtitulos.nucleo', 'app.trabajador', 'keyring.backends.Windows'],
-    excludes=['tkinter', '_tkinter', 'PySide6.QtNetwork', 'PySide6.QtQml', 'PySide6.QtQuick',
+    # QtNetwork: canal local entre aperturas de la app (instancia.py).
+    hiddenimports=hiddenimports + ['subtitulos.nucleo', 'app.trabajador', 'keyring.backends.Windows',
+                                   'PySide6.QtNetwork'],
+    excludes=['tkinter', '_tkinter', 'PySide6.QtQml', 'PySide6.QtQuick',
               'PySide6.QtOpenGL', 'PySide6.QtPdf', 'PySide6.QtDBus', 'IPython', 'pytest',
               # Pruebas y herramientas de las librerías que la app no usa.
               'guessit.test', 'rebulk.test', 'babelfish.tests', 'subliminal.cli', 'click', 'tomlkit',

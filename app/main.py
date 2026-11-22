@@ -1,6 +1,11 @@
 """Arranque de Bajar Subtítulos ESP.
 
     python -I app/main.py [--tema sistema|claro|oscuro] [--demo] [--captura CARPETA] [--config ARCHIVO]
+                          [VÍDEO_O_CARPETA ...]
+
+Con vídeos o carpetas (p. ej., soltados sobre el icono del programa), los busca al abrirse.
+--menu-carpeta, --menu-subcarpetas y --menu-archivos los usa el menú contextual del Explorador
+(menu_contextual.py); --menu-contextual-instalar y --menu-contextual-quitar, el instalador.
 
 --demo usa resultados de demostración (no busca ni descarga nada).
 --captura guarda imágenes de cada pantalla en claro y oscuro sin mostrar la ventana (sirve para
@@ -99,6 +104,20 @@ def autoprueba(salida, con_red=False):
         return (f'instalada con el instalador: {actualizar.instalada()} · '
                 f'modo: {actualizar.modo_instalacion()} · descargas en {actualizar.carpeta_descargas()}')
     paso('actualizaciones', actualizaciones)
+
+    def menu_contextual():
+        """Que el ejecutable lleve QtNetwork (canal entre aperturas) y que el menú se pueda describir."""
+        from PySide6.QtCore import QCoreApplication
+        from app import instancia, menu_contextual as mc
+        _app = QCoreApplication.instance() or QCoreApplication([])  # noqa: F841 - QLocalServer la necesita
+        servidor = instancia.QLocalServer()
+        nombre = f'{instancia.nombre_canal()}-autoprueba'
+        if not servidor.listen(nombre):
+            raise RuntimeError(f'no se puede abrir el canal local: {servidor.errorString()}')
+        servidor.close()
+        return (f'{len(mc.entradas())} claves · registrado: {mc.registrado()} · '
+                f'comando: {mc.comando(mc.ARG_CARPETA, "%V")}')
+    paso('menú contextual y canal local', menu_contextual)
 
     def busqueda_sin_red():
         from subtitulos import nucleo
@@ -215,8 +234,55 @@ def capturar(app, ventana, carpeta):
         barra.setValue(0)
 
 
+def _pedido(args):
+    """Lo que hay que buscar al abrirse: {'rutas', 'recursivo', 'menu'}, o None si no hay nada."""
+    from app import menu_contextual as mc
+    for opcion, recursivo in ((args.menu_carpeta, False), (args.menu_subcarpetas, True),
+                              (args.menu_archivos, True)):
+        if opcion:
+            return {'rutas': [str(mc.ruta_de_argumento(opcion))], 'recursivo': recursivo, 'menu': True}
+    if args.rutas:
+        return {'rutas': [str(Path(r).resolve()) for r in args.rutas], 'recursivo': True, 'menu': False}
+    return None
+
+
+def rutas_del_pedido(pedido):
+    """Solo carpetas y vídeos que existen (lo que llega por el canal local también se comprueba)."""
+    from subtitulos.archivos import es_video
+    rutas = pedido.get('rutas') if isinstance(pedido, dict) else None
+    if not isinstance(rutas, list):
+        return []
+    validas = []
+    for r in rutas[:5000]:
+        if not isinstance(r, str) or not r or len(r) > 4000:
+            continue
+        p = Path(r)
+        try:
+            if p.is_absolute() and (p.is_dir() or (p.is_file() and es_video(p))):
+                validas.append(p)
+        except OSError:
+            continue
+    return validas
+
+
+def _menu_desde_instalador(args):
+    """El instalador añade el menú al instalar (si no se había quitado en Configuración) y lo quita al
+    desinstalar (si es de este programa)."""
+    from app import actualizar, menu_contextual
+    from app.config import Config
+    if args.menu_contextual_instalar:
+        menu_contextual.asegurar(Config(args.config), actualizar.instalada())
+    elif menu_contextual.es_de():
+        try:
+            menu_contextual.quitar()
+        except OSError:
+            return 1
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
+    ap.add_argument('rutas', nargs='*', metavar='VÍDEO_O_CARPETA')
     ap.add_argument('--tema', choices=('sistema', 'claro', 'oscuro'))
     ap.add_argument('--demo', action='store_true')
     ap.add_argument('--captura', metavar='CARPETA')
@@ -226,9 +292,24 @@ def main(argv=None):
     ap.add_argument('--con-red', action='store_true', help=argparse.SUPPRESS)
     # Pruebas de GitHub Actions: lo mismo que pulsar Actualizar con un instalador ya descargado.
     ap.add_argument('--probar-actualizacion', metavar='INSTALADOR', help=argparse.SUPPRESS)
+    ap.add_argument('--menu-carpeta', metavar='CARPETA', help=argparse.SUPPRESS)
+    ap.add_argument('--menu-subcarpetas', metavar='CARPETA', help=argparse.SUPPRESS)
+    ap.add_argument('--menu-archivos', metavar='VÍDEO', help=argparse.SUPPRESS)
+    ap.add_argument('--menu-contextual-instalar', action='store_true', help=argparse.SUPPRESS)
+    ap.add_argument('--menu-contextual-quitar', action='store_true', help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if args.autoprueba:
         return autoprueba(args.autoprueba, args.con_red)
+    if args.menu_contextual_instalar or args.menu_contextual_quitar:
+        return _menu_desde_instalador(args)
+    pedido = _pedido(args)
+    # Una sola app abierta (salvo en las pruebas y capturas): si ya hay una, se le pasa el pedido.
+    unica = not (args.demo or args.captura or args.medir_arranque or args.probar_actualizacion)
+    from app import instancia
+    if unica and not instancia.es_la_primera():
+        _app = QApplication(sys.argv[:1]) if sys.platform != 'win32' else None  # noqa: F841 - QLocalSocket
+        instancia.permitir_primer_plano()
+        return 0 if instancia.enviar(pedido or {'mostrar': True}) else 1
     _id_windows()
     if args.probar_actualizacion:
         from app import actualizar
@@ -248,7 +329,16 @@ def main(argv=None):
     if args.captura:
         capturar(app, ventana, args.captura)
         return 0
-    ventana.mostrar()
+    if unica:
+        from app import actualizar, menu_contextual
+        menu_contextual.asegurar(config, actualizar.instalada())
+        _atender_pedidos(app, ventana, config)
+    if not (pedido and pedido['menu'] and config.menu_segundo_plano and unica):
+        ventana.mostrar()
+    if pedido and unica:
+        app.agrupador.agregar(rutas_del_pedido(pedido), pedido['recursivo'], pedido['menu'])
+    elif pedido and rutas_del_pedido(pedido):
+        ventana.procesar(rutas_del_pedido(pedido), pedido['recursivo'])
     if not args.demo:
         from app.trabajador import precargar
         QTimer.singleShot(300, precargar)     # subliminal se carga cuando la ventana ya se ve
@@ -259,6 +349,45 @@ def main(argv=None):
               f'(subliminal cargado: {"subliminal" in sys.modules})')
         QTimer.singleShot(0, app.quit)
     return app.exec()
+
+
+def _atender_pedidos(app, ventana, config):
+    """Pedidos de esta apertura y de las siguientes (menú contextual, el icono del programa…)."""
+    from app import instancia
+    from app.bandeja import Bandeja
+    from app.ventana import icono_app
+
+    def salir():
+        config.guardar()
+        app.quit()
+
+    app.servidor = instancia.Servidor(app)
+    app.servidor.escuchar()
+    app.agrupador = instancia.Agrupador(parent=app)
+    app.bandeja = None
+
+    def recibido(pedido):
+        if pedido.get('mostrar'):
+            ventana.traer_al_frente()
+            return
+        app.agrupador.agregar(rutas_del_pedido(pedido), pedido.get('recursivo') is not False,
+                              pedido.get('menu') is True)
+
+    def buscar(rutas, recursivo, menu):
+        if not rutas:
+            if not ventana.isVisible() and ventana.trabajador is None:
+                ventana.mostrar()          # nada válido que buscar: al menos se abre la app
+            return
+        if menu and config.menu_segundo_plano and not ventana.isVisible():
+            if app.bandeja is None:
+                app.bandeja = Bandeja(ventana, icono_app(), salir, app)
+            app.bandeja.empezar()
+        elif not (menu and config.menu_segundo_plano):
+            ventana.traer_al_frente()
+        ventana.procesar(rutas, recursivo)
+
+    app.servidor.pedido.connect(recibido)
+    app.agrupador.listo.connect(buscar)
 
 
 if __name__ == '__main__':

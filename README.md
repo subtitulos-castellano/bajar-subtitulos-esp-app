@@ -2,7 +2,8 @@
 
 Aplicación de escritorio para **Windows 10 y 11** que descarga subtítulos en **castellano
 (español de España)** para tus series y películas. Arrastras un vídeo o una carpeta a la ventana
-y se ocupa de todo, sin preguntas.
+y se ocupa de todo, sin preguntas. También funciona con el botón derecho del ratón en el Explorador de
+Windows, sin abrir antes la app.
 
 ![Pantalla de inicio](docs/capturas/claro_1_reposo.png)
 
@@ -91,6 +92,31 @@ gh attestation verify .\BajarSubtitulosESP-<versión>-instalador.exe -R subtitul
 
 ![Resumen](docs/capturas/claro_4_resumen.png)
 
+### Desde el Explorador de Windows
+
+Con el **botón derecho del ratón**, sin abrir antes la app:
+
+- En una **carpeta** (o en el fondo de una carpeta abierta, o en una unidad): *Bajar subtítulos
+  aquí › Solo esta carpeta* o *Esta carpeta y sus subcarpetas*.
+- En **uno o varios vídeos** seleccionados: *Bajar subtítulos*. Todos los seleccionados se revisan
+  en una sola búsqueda. En los `.ts` no aparece, porque esa extensión también es de TypeScript; esos
+  vídeos se buscan con el menú de su carpeta o arrastrándolos a la app.
+
+En **Windows 11** estas opciones están dentro de *Mostrar más opciones* (o con Mayús + clic
+derecho): el menú corto de Windows 11 solo admite programas firmados digitalmente.
+
+Según *Configuración › Menú contextual del Explorador*, la búsqueda:
+
+- **Muestra la ventana** (por defecto): igual que si arrastras los vídeos a la app.
+- O va **en segundo plano**: no se abre la ventana. Mientras busca, hay un icono junto al reloj;
+  desde él puedes ver el progreso o cancelar. Al terminar, un aviso de Windows muestra el resumen
+  (cuántos en castellano, latino, sin subtítulos…), y al pulsarlo se abre. Los `.srt` aparecen
+  junto a los vídeos.
+
+Si la app ya está abierta, lo que pides desde el menú va a su cola. El instalador añade el menú; en
+la versión portable se activa en Configuración. Si mueves la carpeta de la versión portable, abre la
+app una vez para que el menú apunte al nuevo sitio.
+
 ## Configuración
 
 Los cambios se guardan al momento y se usan en la siguiente búsqueda.
@@ -107,6 +133,8 @@ Los cambios se guardan al momento y se usan en la siguiente búsqueda.
 | Cuenta de opensubtitles.org (opcional, da más resultados) | — |
 | Tema: Sistema, Claro u Oscuro | Sistema |
 | Tamaño del texto: como Windows o un porcentaje propio | Como Windows |
+| Mostrar «Bajar subtítulos» en el menú contextual del Explorador | Sí (instalador), No (portable) |
+| Al usar el menú contextual: mostrar la ventana o en segundo plano | Mostrar la ventana |
 | Buscar actualizaciones automáticamente | Sí |
 
 ![Configuración](docs/capturas/claro_6_configuracion.png)
@@ -141,9 +169,10 @@ app solo pregunta a GitHub por la última versión publicada, sin enviar nada tu
 | Copias de los subtítulos sustituidos | `%USERPROFILE%\.subtitulos-esp\backup` (la misma carpeta que la skill) |
 | Preferencias, tamaño y posición de la ventana | `%APPDATA%\BajarSubtitulosEsp\config.json` |
 | Contraseña de OpenSubtitles | Administrador de credenciales de Windows (`BajarSubtitulosESP/opensubtitles`) |
+| Menú contextual del Explorador | Registro de tu usuario (`HKCU\Software\Classes`): se quita al desinstalar |
 | Instalador de la última actualización y su registro | `%TEMP%\BajarSubtitulosESP-actualizacion` (se borra solo) |
 
-Al desinstalar, todo esto se conserva: es tuyo y lo comparte la skill.
+Al desinstalar, todo esto se conserva (salvo el menú contextual): es tuyo y lo comparte la skill.
 
 ## Preguntas frecuentes
 
@@ -163,6 +192,9 @@ latino o el inglés se sustituyen por castellano en cuanto aparece.
 verdad lo necesitas, sube el límite en Configuración. Los proveedores son servicios gratuitos:
 mejor no saturarlos.
 
+**No veo «Bajar subtítulos» al hacer clic derecho.** En Windows 11 está dentro de *Mostrar más
+opciones*. Comprueba también que está activado en *Configuración › Menú contextual del Explorador*.
+
 **¿Sube o comparte algo de mis vídeos?** No. Solo consulta a los proveedores el nombre del
 episodio o de la película, y lee los vídeos desde tu disco.
 
@@ -174,8 +206,11 @@ episodio o de la película, y lee los vídeos desde tu disco.
 
 ```
 app/            interfaz gráfica (Qt / PySide6)
-  main.py       arranque (--tema, --demo, --captura, --config, --autoprueba)
+  main.py       arranque (--tema, --demo, --captura, --config, --autoprueba, rutas y --menu-*)
   ventana.py    ventana principal, menú lateral, arrastrar y soltar, cola
+  menu_contextual.py  menú del Explorador en HKCU\Software\Classes (sin Qt)
+  instancia.py  una sola app abierta: mutex, canal local y agrupar lo que llega seguido
+  bandeja.py    búsquedas en segundo plano: icono junto al reloj y aviso al terminar
   vista_inicio.py  zona de arrastre, búsqueda en curso y resumen con colores
   vista_ajustes.py Configuración
   trabajador.py procesar() en un hilo; señales, avisos y cancelación inmediata
@@ -245,6 +280,8 @@ scripts/windows.sh python -I -m unittest discover -s tests  # todas, con el Pyth
   - el trabajador en su hilo;
   - el menú lateral y la tabla progresiva;
   - la posición de la ventana y el tamaño del texto.
+- `tests/test_menu.py`: el menú contextual en una clave de pruebas del registro, búsquedas sin
+  subcarpetas, una sola app abierta (varias aperturas a la vez) y el segundo plano.
 
 ### Compilar y publicar
 
@@ -264,7 +301,7 @@ proveedores.
 1. Compila.
 2. Prueba lo compilado en **Windows Server 2022** (base de Windows 10) y **2025** (base de
    Windows 11): pruebas, instalación silenciosa, autoprueba del programa instalado y del portable,
-   y desinstalación sin restos.
+   el menú contextual (dos aperturas a la vez, una sola app) y desinstalación sin restos.
 3. Con una etiqueta `vX.Y.Z`, publica la Release con las notas de `CHANGELOG.md`, junto con
    `SHA256SUMS.txt` y la atestación de procedencia de cada archivo.
 

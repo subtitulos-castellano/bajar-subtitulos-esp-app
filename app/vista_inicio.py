@@ -144,6 +144,7 @@ class VistaInicio(QWidget):
         self.pila.addWidget(self._resumen())
         self.ruta_actual = None       # carpeta que contiene lo soltado ('Abrir carpeta')
         self.lote = []                # lo soltado: vídeos y carpetas (una sola búsqueda)
+        self.recursivo = True         # False: solo los vídeos de la propia carpeta (menú contextual)
         self.demo = False
         self.simulacion = False
         self.errores = []
@@ -277,8 +278,9 @@ class VistaInicio(QWidget):
         self.b_cancelar.setText('  Cancelando…')
         self.cancelar.emit()
 
-    def empezar(self, rutas, demo=False, simulacion=False):
+    def empezar(self, rutas, demo=False, simulacion=False, recursivo=True):
         self.lote = [Path(r) for r in rutas] if isinstance(rutas, (list, tuple)) else [Path(rutas)]
+        self.recursivo = recursivo
         self.ruta_actual = carpeta_comun(self.lote)
         self.demo = demo
         self.simulacion = simulacion
@@ -302,6 +304,8 @@ class VistaInicio(QWidget):
             texto = str(self.lote[0])
         else:
             texto = f'{len(self.lote)} elementos de {self.ruta_actual}'
+        if not self.recursivo:
+            texto += ' (sin subcarpetas)'
         fm = QFontMetrics(self.p_ruta.font())
         return fm.elidedText(texto, Qt.ElideMiddle, max(300, self.width() - 2 * MARGEN))
 

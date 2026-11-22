@@ -183,8 +183,9 @@ class _Cancelado(Exception):
     """Uso interno: corta procesar() en cuanto se cancela, sin esperar a terminar el vídeo."""
 
 
-def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=None):
-    """Busca y guarda subtítulos para un vídeo o para todos los de una carpeta (recursivo).
+def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=None, recursivo=True):
+    """Busca y guarda subtítulos para un vídeo o para todos los de una carpeta (con sus subcarpetas,
+    salvo `recursivo=False`).
 
     `ruta` también puede ser una lista de vídeos y carpetas: se revisan todos juntos, como si
     estuvieran en la misma carpeta (el límite de vídeos cuenta sobre el conjunto).
@@ -225,9 +226,9 @@ def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=Non
     providers = [p for p in PROVIDERS if p != 'opensubtitles' or 'opensubtitles' in configs]
 
     if isinstance(ruta, (list, tuple)):
-        videos = buscar_en_varias(ruta)
+        videos = buscar_en_varias(ruta, recursivo)
     else:
-        videos = buscar_videos(Path(ruta))
+        videos = buscar_videos(Path(ruta), recursivo)
     eventos.inicio(videos)
     resultados = []
 

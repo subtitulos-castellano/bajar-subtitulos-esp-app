@@ -31,6 +31,9 @@ class Config:
         self.actualizaciones = True   # buscar versiones nuevas al abrir la app (como mucho una vez al día)
         self.ultima_comprobacion = 0.0
         self.version = ''             # versión de la app la última vez que se abrió (aviso "Actualizada a…")
+        self.menu_contextual = None   # «Bajar subtítulos» en el Explorador; None = aún sin decidir (ver
+                                      # menu_contextual.asegurar)
+        self.menu_segundo_plano = False   # desde el menú: buscar sin abrir la ventana
         self.cargar()
 
     def cargar(self):
@@ -67,12 +70,19 @@ class Config:
             self.ultima_comprobacion = float(u)
         if isinstance(datos.get('version'), str) and len(datos['version']) <= 20:
             self.version = datos['version']
+        if isinstance(datos.get('menu_contextual'), bool):
+            self.menu_contextual = datos['menu_contextual']
+        if isinstance(datos.get('menu_segundo_plano'), bool):
+            self.menu_segundo_plano = datos['menu_segundo_plano']
 
     def guardar(self):
         datos = {'opciones': asdict(self.opciones), 'tema': self.tema,
                  'usuario_opensubtitles': self.usuario_opensubtitles, 'tamano_texto': self.tamano_texto,
                  'ventana': self.ventana, 'actualizaciones': self.actualizaciones,
-                 'ultima_comprobacion': self.ultima_comprobacion, 'version': self.version}
+                 'ultima_comprobacion': self.ultima_comprobacion, 'version': self.version,
+                 'menu_segundo_plano': self.menu_segundo_plano}
+        if self.menu_contextual is not None:
+            datos['menu_contextual'] = self.menu_contextual
         try:
             self.ruta.parent.mkdir(parents=True, exist_ok=True)
             temporal = self.ruta.with_suffix('.tmp')

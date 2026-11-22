@@ -11,18 +11,20 @@ def es_video(ruta):
     return ruta.suffix.lower() in VIDEO_EXT and 'sample' not in ruta.name.lower()
 
 
-def buscar_videos(ruta):
+def buscar_videos(ruta, recursivo=True):
+    """El vídeo, o los vídeos de la carpeta: con sus subcarpetas, o solo los de la propia carpeta."""
     if ruta.is_file():
         return [ruta]
-    return sorted(p for p in ruta.rglob('*') if p.suffix.lower() in VIDEO_EXT and 'sample' not in p.name.lower())
+    candidatos = ruta.rglob('*') if recursivo else (p for p in ruta.iterdir() if p.is_file())
+    return sorted(p for p in candidatos if p.suffix.lower() in VIDEO_EXT and 'sample' not in p.name.lower())
 
 
-def buscar_en_varias(rutas):
+def buscar_en_varias(rutas, recursivo=True):
     """Vídeos de varias rutas (vídeos sueltos y carpetas) en una sola lista, como si estuvieran en la
     misma carpeta: en el orden recibido, cada carpeta con sus vídeos ordenados, y sin repetidos."""
     vistos, videos = set(), []
     for ruta in rutas:
-        for v in buscar_videos(Path(ruta)):
+        for v in buscar_videos(Path(ruta), recursivo):
             clave = v.resolve()
             if clave not in vistos:
                 vistos.add(clave)

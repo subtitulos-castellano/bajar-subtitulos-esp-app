@@ -106,6 +106,28 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "El instalador ha fallado: código $($p.ExitCode)" }
           Autoprueba "$dir\BajarSubtitulosESP.exe" (Join-Path $env:RUNNER_TEMP 'instalado.txt')
 
+          # Menú contextual: lo añade el instalador, apuntando al programa instalado.
+          $carpetas = 'HKCU:\Software\Classes\Directory\shell\BajarSubtitulosESP\shell\1solo\command'
+          $comando = if (Test-Path $carpetas) { (Get-ItemProperty $carpetas).'(default)' }
+          if ($comando -ne "`"$dir\BajarSubtitulosESP.exe`" --menu-carpeta `"%V`"") { throw "Menú contextual de carpetas inesperado: $comando" }
+          if (-not (Test-Path 'HKCU:\Software\Classes\SystemFileAssociations\.mkv\shell\BajarSubtitulosESP\command')) { throw 'Falta el menú contextual de los vídeos' }
+          # Dos vídeos seleccionados: el Explorador abre la app dos veces a la vez; queda una sola, que
+          # busca los dos.
+          $videos = Join-Path $env:RUNNER_TEMP 'menu'
+          python -I -c "import sys; sys.path.insert(0, '.'); from pathlib import Path; from app.main import _mkv_castellano; d = Path(sys.argv[1]); d.mkdir(); [(d / n).write_bytes(_mkv_castellano()) for n in ('A.S01E01.mkv', 'B.S01E02.mkv')]" $videos
+          foreach ($n in 'A.S01E01.mkv', 'B.S01E02.mkv') { Start-Process "$dir\BajarSubtitulosESP.exe" -ArgumentList '--menu-archivos', "`"$videos\$n`"" }
+          $fin = (Get-Date).AddSeconds(90)
+          while (-not ((Test-Path "$videos\A.S01E01.srt") -and (Test-Path "$videos\B.S01E02.srt"))) {
+            if ((Get-Date) -gt $fin) { throw 'Desde el menú contextual no se han guardado los subtítulos' }
+            Start-Sleep -Seconds 1
+          }
+          Start-Sleep -Seconds 3
+          $abiertas = @(Get-Process BajarSubtitulosESP -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$dir\BajarSubtitulosESP.exe" })
+          if ($abiertas.Count -ne 1) { throw "Debería quedar una sola app abierta y hay $($abiertas.Count)" }
+          'Menú contextual correcto: dos aperturas, una sola app, dos subtítulos'
+          $abiertas | Stop-Process -Force
+          Start-Sleep -Seconds 3
+
           # Actualización como la hace la app al pulsar Actualizar: lanza el instalador en silencio y se
           # cierra; el instalador espera a que termine, instala encima y la vuelve a abrir.
           # (WaitForExit y no -Wait: -Wait esperaría también al instalador y a la app que este reabre.)
@@ -135,6 +157,9 @@ jobs:
           if (Test-Path "$dir\BajarSubtitulosESP.exe") { throw 'La desinstalación ha dejado el programa' }
           $clave = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F0C2D8E-3B7A-4E51-9C2F-8A1D5E7B4C93}_is1'
           if (Test-Path $clave) { throw 'La desinstalación ha dejado la entrada en el registro' }
+          foreach ($menu in 'Directory\shell', 'Directory\Background\shell', 'Drive\shell', 'SystemFileAssociations\.mkv\shell') {
+            if (Test-Path "HKCU:\Software\Classes\$menu\BajarSubtitulosESP") { throw "La desinstalación ha dejado el menú contextual ($menu)" }
+          }
           'Instalación y desinstalación correctas'
 
       - name: Versión portable

@@ -63,8 +63,9 @@ class TrabajadorDemo(QObject):
     resultado = Signal(object)             # Resultado
     terminado = Signal(list, bool, float)  # resultados, cancelado, segundos
 
-    def __init__(self, ruta, parent=None):
+    def __init__(self, ruta, parent=None, recursivo=True):
         super().__init__(parent)
+        self.recursivo = recursivo
         self.rutas = list(ruta) if isinstance(ruta, (list, tuple)) else [Path(ruta)]
         self._cancelado = False
         self._resultados = []
@@ -75,7 +76,7 @@ class TrabajadorDemo(QObject):
     def empezar(self):
         self._t0 = time.monotonic()
         try:
-            self._videos = buscar_en_varias(self.rutas)[:500]
+            self._videos = buscar_en_varias(self.rutas, self.recursivo)[:500]
         except OSError:
             self._videos = []
         self._i = 0
