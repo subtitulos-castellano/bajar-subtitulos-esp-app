@@ -24,7 +24,7 @@ material con derechos de autor.
 - El ejecutable, el instalador y la versión portable que se publican en *Releases*.
 - Las actualizaciones automáticas (`app/actualizar.py`).
 
-Fuera del alcance: fallos de los proveedores de subtítulos, de subliminal y demás dependencias
+Fuera del alcance: fallos de los proveedores de subtítulos, de [subliminal](https://github.com/Diaoul/subliminal) y demás dependencias
 (avisa a sus autores) y de los reproductores de vídeo.
 
 ## Medidas que ya aplica

@@ -289,7 +289,7 @@ tests/          pruebas (núcleo, seguridad, app)
 ```
 
 Todos los módulos de `subtitulos/`, menos `nucleo.py`, solo usan la biblioteca estándar. La
-ventana aparece en ~0,6 s y subliminal se carga en segundo plano después.
+ventana aparece en ~0,6 s y [subliminal](https://github.com/Diaoul/subliminal) se carga en segundo plano después.
 
 ### Desarrollo desde WSL
 
