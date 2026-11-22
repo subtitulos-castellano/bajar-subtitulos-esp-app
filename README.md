@@ -15,7 +15,7 @@ Windows, sin abrir antes la app.
   carpeta de red) y extraerla fuese a tardar más de 15 segundos, no lo hace y busca en internet; en
   *Detalles* se indica.
 - Si no la trae, **busca en internet**: OpenSubtitles (si tienes cuenta), Addic7ed, Gestdown y
-  Subtitulamos. Descarga los mejores candidatos y se queda con el que es **castellano de verdad**.
+  Subtitulamos. Descarga los mejores candidatos y se queda con el que es **castellano de España**.
   Para eso comprueba el vocabulario (vosotros, vale, móvil… frente a ustedes, celular, computadora…),
   porque las etiquetas de idioma de las webs no son fiables. También descarta los subtítulos de
   otro episodio o con una duración que no encaja.
