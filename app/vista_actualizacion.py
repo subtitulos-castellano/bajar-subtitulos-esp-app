@@ -6,8 +6,8 @@ porque el receptor es un QObject de ese hilo.
 import threading
 import time
 
-from PySide6.QtCore import QObject, Qt, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout
 
 from subtitulos.idioma import tr
 
@@ -97,6 +97,9 @@ class Actualizador(QObject):
         self._cancelar.set()
 
 
+ALTO_NOTAS = 0.25     # parte del alto de la ventana que pueden ocupar las notas, como mucho (el resto, la página)
+
+
 class AvisoActualizacion(QFrame):
     """Franja discreta con la versión nueva, sus novedades y los botones para instalarla."""
     actualizar = Signal()
@@ -112,7 +115,7 @@ class AvisoActualizacion(QFrame):
         v = QVBoxLayout(self)
         v.setContentsMargins(14, 10, 12, 10)
         v.setSpacing(8)
-        fila = QHBoxLayout()
+        fila = self._fila = QHBoxLayout()
         fila.setSpacing(12)
         self.icono = IconoLabel('actualizar', 'acento', 20)
         fila.addWidget(self.icono, 0, Qt.AlignTop)
@@ -146,8 +149,18 @@ class AvisoActualizacion(QFrame):
         self.notas.setTextFormat(Qt.PlainText)          # las notas vienen de fuera: nunca como HTML
         self.notas.setWordWrap(True)
         self.notas.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.notas.setContentsMargins(tema.px(32), 0, 0, 0)
-        v.addWidget(self.notas)
+        # Las notas largas no caben: van en un marco con barra de desplazamiento (también con la rueda),
+        # tan alto como el texto, pero como mucho ALTO_NOTAS de la ventana.
+        self.marco_notas = QScrollArea()
+        self.marco_notas.setObjectName('avisoNotasMarco')
+        self.marco_notas.viewport().setObjectName('avisoNotasVista')
+        self.marco_notas.setFrameShape(QFrame.NoFrame)
+        self.marco_notas.setWidgetResizable(True)
+        self.marco_notas.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.marco_notas.setWidget(self.notas)
+        self.marco_notas.hide()
+        self._margenes_notas()
+        v.addWidget(self.marco_notas)
         self._ocupada = False
         self.hide()
 
@@ -195,6 +208,7 @@ class AvisoActualizacion(QFrame):
             self.detalle.setText(tr('Puedes ver qué ha cambiado en la página de esta versión.'))
         if novedad is not None:
             self.notas.setText(novedad.notas)
+            self.marco_notas.verticalScrollBar().setValue(0)
         if estado not in ('disponible', 'portable'):
             self.b_notas.setChecked(False)
         self._ver_notas(self.b_notas.isChecked())
@@ -218,8 +232,49 @@ class AvisoActualizacion(QFrame):
         self.b_accion.setToolTip(tr('Disponible cuando termine la búsqueda.') if ocupada and instala else '')
 
     def _ver_notas(self, ver):
-        self.notas.setVisible(bool(ver and self.notas.text()))
+        self.marco_notas.setVisible(bool(ver and self.notas.text()))
         self.b_notas.setText(tr('Ocultar novedades') if ver else tr('Novedades'))
+        self.ajustar_notas()
+        QTimer.singleShot(0, self.ajustar_notas)      # cuando ya tiene su ancho definitivo
+
+    def alto_maximo_notas(self):
+        """ALTO_NOTAS de la ventana, y menos si no, la página de debajo no cabría (ventana pequeña)."""
+        ventana = self.window()
+        if ventana is self:
+            return tema.px(150)
+        tope = max(tema.px(120), int(ventana.height() * ALTO_NOTAS))
+        paginas = getattr(ventana, 'paginas', None)
+        if paginas is not None and paginas.currentWidget() is not None and self.marco_notas.isVisible():
+            # El aviso sin las notas (márgenes, título y botones), con su ancho: no depende del alto actual.
+            m = self.layout().contentsMargins()
+            ancho = self.width() - m.left() - m.right()
+            cabecera = self._fila.heightForWidth(ancho) if self._fila.hasHeightForWidth() else -1
+            if cabecera < 0:
+                cabecera = self._fila.sizeHint().height()
+            resto_aviso = m.top() + m.bottom() + cabecera + self.layout().spacing()
+            libre = (ventana.centralWidget().height() - resto_aviso - tema.px(16)
+                     - paginas.currentWidget().minimumSizeHint().height())
+            tope = min(tope, max(tema.px(60), libre))
+        return tope
+
+    def ajustar_notas(self):
+        """Alto del marco de las notas: el del texto con el ancho que tiene, sin pasar del máximo."""
+        if not self.marco_notas.isVisible():
+            return
+        ancho = self.marco_notas.viewport().width()
+        alto = self.notas.heightForWidth(ancho) if ancho > 0 else -1
+        if alto < 0:
+            alto = self.notas.sizeHint().height()
+        self.marco_notas.setFixedHeight(min(alto, self.alto_maximo_notas()))
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        if e.size().width() != e.oldSize().width():   # cambia el ajuste de línea
+            self.ajustar_notas()
+
+    def _margenes_notas(self):
+        # A la izquierda, alineadas con el título; a la derecha, sitio para la barra.
+        self.notas.setContentsMargins(tema.px(32), 0, tema.px(12), 0)
 
     def _accion(self):
         if self.estado == 'portable':
@@ -229,4 +284,5 @@ class AvisoActualizacion(QFrame):
 
     def refrescar(self):
         self.icono.refrescar()
-        self.notas.setContentsMargins(tema.px(32), 0, 0, 0)
+        self._margenes_notas()
+        self.ajustar_notas()

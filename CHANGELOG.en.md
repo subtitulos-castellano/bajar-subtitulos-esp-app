@@ -3,6 +3,11 @@
 English version of the release notes, shown by the app when it is in English. Earlier versions are
 only in Spanish: see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.2.1
+
+- **What's new in an update**: if it is long, it can be read in full with a scroll bar (or the mouse
+  wheel). It no longer stretches the notice or leaves the rest of the window without room.
+
 ## 1.2.0
 
 - **The app, now also in English**:

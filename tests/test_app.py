@@ -545,6 +545,34 @@ class Actualizaciones(unittest.TestCase):
         aviso.b_tarde.click()
         self.assertFalse(v.marco_aviso.isVisible())
 
+    def test_novedades_largas_con_barra_de_desplazamiento(self):
+        """Las notas largas no estiran el aviso: marco con barra (y rueda) hasta un alto máximo. Las
+        cortas se ven enteras, sin barra."""
+        v = self.v
+        largas = '\n'.join(f'• Novedad número {i}, con una explicación algo larga para que ocupe sitio.'
+                            for i in range(60))
+        for notas, con_barra in ((largas, True), (NOVEDAD.notas, False)):
+            with self.subTest(con_barra=con_barra):
+                v._mostrar_aviso('disponible', actualizar.Novedad('99.0.0', NOVEDAD.pagina, notas,
+                                                                  NOVEDAD.instalador))
+                v.aviso.b_notas.setChecked(True)
+                for _ in range(3):
+                    APP.processEvents()
+                marco = v.aviso.marco_notas
+                self.assertTrue(marco.isVisible())
+                self.assertLessEqual(marco.height(), v.aviso.alto_maximo_notas())
+                barra = marco.verticalScrollBar()
+                self.assertEqual(barra.maximum() > 0, con_barra)
+                if con_barra:
+                    self.assertEqual(marco.height(), v.aviso.alto_maximo_notas())
+                    self.assertLess(v.aviso.height(), v.height())
+                    v.resize(v.width(), v.height() + tema.px(200))     # más alta: el marco crece
+                    APP.processEvents()
+                    self.assertEqual(marco.height(), v.aviso.alto_maximo_notas())
+                else:
+                    self.assertGreaterEqual(marco.height(), v.aviso.notas.heightForWidth(marco.viewport().width()))
+                v.aviso.b_notas.setChecked(False)
+
     def test_version_portable_solo_ofrece_la_descarga(self):
         v = self.v
         with mock.patch.object(actualizar, 'instalada', return_value=False):

@@ -232,7 +232,8 @@ QPushButton#nav:disabled {{ color: {t['texto3']}; background: transparent; }}
 #bannerError {{ background: {t['error_suave']}; border: 1px solid {t['error_borde']}; border-radius: 8px; }}
 #bannerInfo {{ background: {t['acento_suave']}; border: 1px solid {t['acento']}; border-radius: 10px; }}
 #avisoTitulo {{ font-weight: 600; }}
-#avisoNotas {{ color: {t['texto2']}; font-size: {f(9)}; }}
+#avisoNotas {{ color: {t['texto2']}; font-size: {f(9)}; background: transparent; }}
+#avisoNotasMarco, #avisoNotasVista {{ background: transparent; }}
 
 QPushButton {{ padding: {p(7)} {p(14)}; border-radius: 6px; border: 1px solid {t['borde_fuerte']};
                background: {t['superficie']}; color: {t['texto']}; qproperty-iconSize: {p(16)} {p(16)}; }}

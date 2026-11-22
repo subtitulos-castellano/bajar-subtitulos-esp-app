@@ -1,5 +1,10 @@
 # Cambios
 
+## 1.2.1
+
+- **Novedades de una actualización**: si son largas, se leen enteras con una barra de desplazamiento
+  (o con la rueda del ratón). Ya no estiran el aviso ni dejan sin sitio al resto de la ventana.
+
 ## 1.2.0
 
 - **La app, también en inglés** (*English*):

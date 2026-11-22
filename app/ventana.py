@@ -275,6 +275,7 @@ class Ventana(QMainWindow):
             self.paginas.setCurrentIndex(1)
         self.nav_botones[destino].setChecked(True)
         self._actualizar_nav()
+        self.aviso.ajustar_notas()                    # cada página necesita un alto mínimo distinto
 
     def _actualizar_nav(self):
         """Mientras se busca, solo 'Buscando…' (marcado, sin poder pulsarlo). Después, todo disponible.
@@ -364,6 +365,8 @@ class Ventana(QMainWindow):
         self._anotar_normal()
         if self.capa.isVisible():
             self.capa.setGeometry(self.centralWidget().rect())
+        if e.size().height() != e.oldSize().height():
+            self.aviso.ajustar_notas()                # su alto máximo depende del de la ventana
 
     # ---------- Cola y trabajo ----------
 
