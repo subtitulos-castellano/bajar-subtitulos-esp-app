@@ -158,16 +158,26 @@ def _misma(a, b):
 
 
 def asegurar(config, instalada, prog=None):
-    """Al abrir la app (y al instalarla): deja el menú como dice la configuración.
+    """Al abrir la app: deja el menú como dice la configuración. La versión instalada manda; la
+    portable solo lo añade con el interruptor de Configuración.
 
-    - Sin decidir (None): la versión instalada lo añade; la portable no (se activa en Configuración).
-    - Activado: si apunta a otro programa que ya no existe (se movió la portable o se reinstaló en otra
-      carpeta), se rehace apuntando a este. Si apunta a otro que sí existe, se respeta.
-    - Desactivado: no se toca.
+    - Si apunta a un programa que ya no existe (se borró o se movió esa copia): con el menú activado,
+      se rehace apuntando a este; si no, se quita.
+    - Sin decidir (None): la instalada lo añade; la portable no.
+    - Activado: si falta, la instalada lo añade (la portable no). Si apunta a otra copia que sí
+      existe, se respeta; si apunta a esta con otro comando, se rehace.
+    - Desactivado: no se añade.
     Devuelve True si ha cambiado algo. Nunca lanza: el menú no debe impedir abrir la app."""
     if not disponible():
         return False
     try:
+        actual = programa_registrado()
+        if actual is not None and not actual.exists():
+            if config.menu_contextual:
+                registrar(prog)
+            else:
+                quitar()
+            return True
         if config.menu_contextual is None:
             if not instalada:
                 return False
@@ -176,14 +186,40 @@ def asegurar(config, instalada, prog=None):
             config.guardar()
             return True
         if config.menu_contextual:
-            actual = programa_registrado()
-            if (actual is None or not actual.exists()
-                    or (es_de(prog) and comando_registrado() != comando(ARG_CARPETA, '%V', prog))):
+            if actual is None:
+                if instalada:
+                    registrar(prog)
+                    return True
+            elif es_de(prog) and comando_registrado() != comando(ARG_CARPETA, '%V', prog):
                 registrar(prog)
                 return True
     except OSError:
         pass
     return False
+
+
+def al_instalar(config, prog=None):
+    """El instalador (también al actualizar) se queda con el menú, aunque apunte a una portable,
+    salvo que se haya desactivado en Configuración. Lanza OSError si no se puede."""
+    if not disponible() or config.menu_contextual is False:
+        return False
+    registrar(prog)
+    if config.menu_contextual is not True:
+        config.menu_contextual = True
+        config.guardar()
+    return True
+
+
+def al_desinstalar(config):
+    """El desinstalador quita el menú, apunte a la copia que apunte, y lo deja sin decidir: así una
+    portable no lo vuelve a añadir sola, y si se vuelve a instalar, el instalador lo añade.
+    (Si se había desactivado en Configuración, sigue desactivado.) Lanza OSError si no se puede."""
+    if not disponible():
+        return
+    quitar()
+    if config.menu_contextual:
+        config.menu_contextual = None
+        config.guardar()
 
 
 def _avisar_explorador():

@@ -1,5 +1,16 @@
 # Cambios
 
+## 1.1.1
+
+- **Menú contextual con la versión instalada y la portable**: ya no se queda en el Explorador tras
+  desinstalar.
+  - El desinstalador quita el menú aunque apunte a una versión portable.
+  - El instalador (también al actualizar) se queda con el menú aunque lo tuviera una portable, salvo
+    que se haya desactivado en Configuración.
+  - La versión portable solo añade el menú si se activa en su Configuración, y avisa de desactivarlo
+    antes de borrar su carpeta.
+  - Al abrir la app, si el menú apunta a un programa que ya no existe y no está activado, se quita.
+
 ## 1.1.0
 
 - **Menú contextual del Explorador**:

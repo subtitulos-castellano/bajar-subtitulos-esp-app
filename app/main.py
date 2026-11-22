@@ -266,17 +266,17 @@ def rutas_del_pedido(pedido):
 
 
 def _menu_desde_instalador(args):
-    """El instalador añade el menú al instalar (si no se había quitado en Configuración) y lo quita al
-    desinstalar (si es de este programa)."""
-    from app import actualizar, menu_contextual
+    """El instalador se queda con el menú al instalar o actualizar (si no se había desactivado en
+    Configuración); el desinstalador lo quita, apunte a la copia que apunte."""
+    from app import menu_contextual
     from app.config import Config
-    if args.menu_contextual_instalar:
-        menu_contextual.asegurar(Config(args.config), actualizar.instalada())
-    elif menu_contextual.es_de():
-        try:
-            menu_contextual.quitar()
-        except OSError:
-            return 1
+    try:
+        if args.menu_contextual_instalar:
+            menu_contextual.al_instalar(Config(args.config))
+        else:
+            menu_contextual.al_desinstalar(Config(args.config))
+    except OSError:
+        return 1
     return 0
 
 

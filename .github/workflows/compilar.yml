@@ -100,13 +100,24 @@ jobs:
             Get-Content $informe
             if ($p.ExitCode -ne 0) { throw "Autoprueba fallida ($exe): código $($p.ExitCode)" }
           }
+          # Una «portable» (otro programa que existe) tiene el menú, con el menú activado en la
+          # configuración: el instalador debe quedárselo.
+          function MenuDePortable {
+            $k = 'HKCU:\Software\Classes\Directory\shell\BajarSubtitulosESP\shell\1solo\command'
+            New-Item -Path $k -Force | Out-Null
+            Set-Item -Path $k -Value "`"$env:SystemRoot\System32\notepad.exe`" --menu-carpeta `"%V`""
+          }
+          $config = Join-Path $env:APPDATA 'BajarSubtitulosEsp\config.json'
+          New-Item -ItemType Directory -Force (Split-Path $config) | Out-Null
+          '{"menu_contextual": true}' | Set-Content -Encoding utf8 $config
+          MenuDePortable
           $dir = Join-Path $env:RUNNER_TEMP 'instalado'
           $instalador = (Get-Item dist/*-instalador.exe).FullName
           $p = Start-Process $instalador -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=$dir", '/NOICONS' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "El instalador ha fallado: código $($p.ExitCode)" }
           Autoprueba "$dir\BajarSubtitulosESP.exe" (Join-Path $env:RUNNER_TEMP 'instalado.txt')
 
-          # Menú contextual: lo añade el instalador, apuntando al programa instalado.
+          # Menú contextual: lo añade el instalador (aunque fuera de la portable), apuntando al programa instalado.
           $carpetas = 'HKCU:\Software\Classes\Directory\shell\BajarSubtitulosESP\shell\1solo\command'
           $comando = if (Test-Path $carpetas) { (Get-ItemProperty $carpetas).'(default)' }
           if ($comando -ne "`"$dir\BajarSubtitulosESP.exe`" --menu-carpeta `"%V`"") { throw "Menú contextual de carpetas inesperado: $comando" }
@@ -152,6 +163,8 @@ jobs:
           Start-Sleep -Seconds 3
           Autoprueba "$dir\BajarSubtitulosESP.exe" (Join-Path $env:RUNNER_TEMP 'actualizado.txt')
 
+          # El desinstalador quita el menú aunque apunte a otra copia, y lo deja sin decidir.
+          MenuDePortable
           $p = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
           Start-Sleep -Seconds 8
           if (Test-Path "$dir\BajarSubtitulosESP.exe") { throw 'La desinstalación ha dejado el programa' }
@@ -160,6 +173,7 @@ jobs:
           foreach ($menu in 'Directory\shell', 'Directory\Background\shell', 'Drive\shell', 'SystemFileAssociations\.mkv\shell') {
             if (Test-Path "HKCU:\Software\Classes\$menu\BajarSubtitulosESP") { throw "La desinstalación ha dejado el menú contextual ($menu)" }
           }
+          if ((Get-Content -Raw $config | ConvertFrom-Json).menu_contextual -eq $true) { throw 'La desinstalación ha dejado el menú activado en la configuración' }
           'Instalación y desinstalación correctas'
 
       - name: Versión portable

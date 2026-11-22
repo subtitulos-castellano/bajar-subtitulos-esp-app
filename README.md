@@ -116,9 +116,17 @@ Según *Configuración › Menú contextual del Explorador*, la búsqueda:
   (cuántos en castellano, latino, sin subtítulos…), y al pulsarlo se abre. Los `.srt` aparecen
   junto a los vídeos.
 
-Si la app ya está abierta, lo que pides desde el menú va a su cola. El instalador añade el menú; en
-la versión portable se activa en Configuración. Si mueves la carpeta de la versión portable, abre la
-app una vez para que el menú apunte al nuevo sitio.
+Si la app ya está abierta, lo que pides desde el menú va a su cola.
+
+**Versión instalada y portable.** El menú abre una sola de las dos, y manda la instalada:
+
+- El instalador añade el menú, también al actualizar, aunque lo tuviera la portable. Solo lo deja
+  sin añadir si lo has desactivado en Configuración.
+- El desinstalador lo quita, apunte a la que apunte.
+- La portable solo lo añade si lo activas en su *Configuración*. Si mueves su carpeta, ábrela una
+  vez para que el menú apunte al nuevo sitio. **Antes de borrar su carpeta, desactiva ahí el menú**:
+  si no, se queda apuntando a un programa que ya no existe (hasta que abras la app otra vez, que lo
+  arregla).
 
 ## Configuración
 
@@ -198,6 +206,11 @@ mejor no saturarlos.
 
 **No veo «Bajar subtítulos» al hacer clic derecho.** En Windows 11 está dentro de *Mostrar más
 opciones*. Comprueba también que está activado en *Configuración › Menú contextual del Explorador*.
+
+**Sigo viendo «Bajar subtítulos» después de desinstalar o de borrar la versión portable.** Abre la
+app (instalada o portable) una vez: si el menú apunta a un programa que ya no existe, lo quita (o,
+si lo tienes activado, lo hace apuntar a la que has abierto). Si ya no tienes ninguna, descomprime
+la portable, actívalo y desactívalo en Configuración, y bórrala.
 
 **Quiero que la app siga abierta al cerrar la ventana.** Activa *Configuración › Al cerrar la
 ventana, seguir junto al reloj*. Cerrar la ventana la oculta y queda un icono junto al reloj: un
@@ -317,7 +330,8 @@ proveedores.
 1. Compila.
 2. Prueba lo compilado en **Windows Server 2022** (base de Windows 10) y **2025** (base de
    Windows 11): pruebas, instalación silenciosa, autoprueba del programa instalado y del portable,
-   el menú contextual (dos aperturas a la vez, una sola app) y desinstalación sin restos.
+   el menú contextual (el instalador se lo queda aunque fuera de la portable; dos aperturas a la vez,
+   una sola app) y desinstalación sin restos (también si el menú apuntaba a otra copia).
 3. Con una etiqueta `vX.Y.Z`, publica la Release con las notas de `CHANGELOG.md`, junto con
    `SHA256SUMS.txt` y la atestación de procedencia de cada archivo.
 

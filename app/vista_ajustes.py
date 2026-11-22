@@ -330,6 +330,9 @@ class VistaAjustes(QWidget):
                                  'subcarpetas. En uno o varios vídeos: «Bajar subtítulos».'))
         self.menu = fila.control
         self.estado_menu = fila.findChild(QLabel, 'ayuda')
+        if menu_contextual.disponible() and not actualizar.instalada():
+            self.estado_menu.setText(self.estado_menu.text() + ' Versión portable: antes de borrar o mover su '
+                                     'carpeta, desactívalo aquí.')
         self._texto_menu = self.estado_menu.text()
         modos = QWidget()
         ml = QHBoxLayout(modos)

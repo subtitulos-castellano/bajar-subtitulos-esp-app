@@ -214,6 +214,63 @@ class Registro(unittest.TestCase):
         self.assertTrue(mc.asegurar(self.config, instalada=False, prog=[str(self.exe)]))
         self.assertEqual(mc.programa_registrado(), self.exe)
 
+    def test_programa_borrado_sin_activar_se_quita(self):
+        borrado = Path(self._tmp.name) / 'borrada' / 'BajarSubtitulosESP.exe'     # portable borrada
+        for valor in (None, False):
+            mc.registrar([str(borrado)])
+            self.config.menu_contextual = valor
+            self.assertTrue(mc.asegurar(self.config, instalada=False, prog=[str(self.exe)]))
+            self.assertFalse(mc.registrado())
+
+    def test_portable_activado_sin_menu_no_lo_añade(self):
+        self.config.menu_contextual = True
+        self.assertFalse(mc.asegurar(self.config, instalada=False, prog=[str(self.exe)]))
+        self.assertFalse(mc.registrado())
+
+    def test_instalada_activado_sin_menu_lo_añade(self):
+        self.config.menu_contextual = True
+        self.assertTrue(mc.asegurar(self.config, instalada=True, prog=[str(self.exe)]))
+        self.assertTrue(mc.es_de([str(self.exe)]))
+
+    def test_el_instalador_se_queda_con_el_menu(self):
+        portable = Path(self._tmp.name) / 'portable' / 'BajarSubtitulosESP.exe'
+        portable.parent.mkdir()
+        portable.write_bytes(b'')
+        mc.registrar([str(portable)])
+        self.config.menu_contextual = True
+        self.assertTrue(mc.al_instalar(self.config, prog=[str(self.exe)]))
+        self.assertTrue(mc.es_de([str(self.exe)]))
+
+    def test_el_instalador_respeta_el_desactivado(self):
+        self.config.menu_contextual = False
+        self.assertFalse(mc.al_instalar(self.config, prog=[str(self.exe)]))
+        self.assertFalse(mc.registrado())
+
+    def test_el_instalador_sin_decidir_lo_añade(self):
+        self.assertTrue(mc.al_instalar(self.config, prog=[str(self.exe)]))
+        self.assertTrue(Config(self.config.ruta).menu_contextual)
+
+    def test_el_desinstalador_lo_quita_aunque_sea_de_una_portable(self):
+        portable = Path(self._tmp.name) / 'portable' / 'BajarSubtitulosESP.exe'
+        portable.parent.mkdir()
+        portable.write_bytes(b'')
+        mc.registrar([str(portable)])
+        self.config.menu_contextual = True
+        mc.al_desinstalar(self.config)
+        self.assertFalse(mc.registrado())
+        self.assertIsNone(Config(self.config.ruta).menu_contextual)        # sin decidir
+        # La portable ya no lo vuelve a añadir sola; si se reinstala, el instalador sí.
+        self.assertFalse(mc.asegurar(Config(self.config.ruta), instalada=False, prog=[str(portable)]))
+        self.assertFalse(mc.registrado())
+        self.assertTrue(mc.al_instalar(Config(self.config.ruta), prog=[str(self.exe)]))
+        self.assertTrue(mc.es_de([str(self.exe)]))
+
+    def test_el_desinstalador_mantiene_el_desactivado(self):
+        self.config.menu_contextual = False
+        self.config.guardar()
+        mc.al_desinstalar(self.config)
+        self.assertIs(Config(self.config.ruta).menu_contextual, False)
+
     def test_otro_programa_que_existe_se_respeta(self):
         otro = Path(self._tmp.name) / 'portable' / 'BajarSubtitulosESP.exe'
         otro.parent.mkdir()
