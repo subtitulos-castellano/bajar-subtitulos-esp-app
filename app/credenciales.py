@@ -1,12 +1,19 @@
-"""Cuenta de opensubtitles.org: el usuario va en config.json y la contraseña en el
-Administrador de credenciales de Windows (librería keyring), nunca en texto plano.
+"""Cuentas de OpenSubtitles: opensubtitles.org y opensubtitles.com (son cuentas distintas). El usuario va
+en config.json y la contraseña en el Administrador de credenciales de Windows (librería keyring), nunca
+en texto plano.
+
+Cada cuenta se identifica por el nombre de su proveedor en subliminal, el mismo que usa el
+credenciales.json de la skill: 'opensubtitles' (.org) y 'opensubtitlescom' (.com).
 """
 import json
 
 from subtitulos.archivos import HOME
 from subtitulos.idioma import tr
 
-SERVICIO = 'BajarSubtitulosESP/opensubtitles'
+ORG, COM = 'opensubtitles', 'opensubtitlescom'
+CUENTAS = (ORG, COM)
+SERVICIOS = {ORG: 'BajarSubtitulosESP/opensubtitles', COM: 'BajarSubtitulosESP/opensubtitlescom'}
+SERVICIO = SERVICIOS[ORG]
 
 
 def _keyring():
@@ -17,71 +24,81 @@ def _keyring():
         return None
 
 
-def leer_clave(usuario):
+def leer_clave(usuario, cuenta=ORG):
     kr = _keyring()
     if not (kr and usuario):
         return ''
     try:
-        return kr.get_password(SERVICIO, usuario) or ''
+        return kr.get_password(SERVICIOS[cuenta], usuario) or ''
     except Exception:  # noqa: BLE001
         return ''
 
 
-def guardar_clave(usuario, clave, usuario_anterior=''):
+def guardar_clave(usuario, clave, usuario_anterior='', cuenta=ORG):
     """Guarda la contraseña (o la borra si está vacía). Devuelve False si no se pudo."""
     kr = _keyring()
     if not kr:
         return False
     try:
         if usuario_anterior and usuario_anterior != usuario:
-            borrar_clave(usuario_anterior)
+            borrar_clave(usuario_anterior, cuenta)
         if usuario and clave:
-            kr.set_password(SERVICIO, usuario, clave)
+            kr.set_password(SERVICIOS[cuenta], usuario, clave)
         elif usuario:
-            borrar_clave(usuario)
+            borrar_clave(usuario, cuenta)
         return True
     except Exception:  # noqa: BLE001
         return False
 
 
-def borrar_clave(usuario):
+def borrar_clave(usuario, cuenta=ORG):
     kr = _keyring()
     if kr and usuario:
         try:
-            kr.delete_password(SERVICIO, usuario)
+            kr.delete_password(SERVICIOS[cuenta], usuario)
         except Exception:  # noqa: BLE001 - no existía
             pass
 
 
-def credenciales_proveedores(usuario):
-    """Configuración para procesar(): {'opensubtitles': {...}} o {} si no hay cuenta completa."""
-    clave = leer_clave(usuario)
-    if usuario and clave:
-        return {'opensubtitles': {'username': usuario, 'password': clave}}
-    return {}
+def credenciales_proveedores(usuario, usuario_com=''):
+    """Configuración para procesar(): {'opensubtitles': {...}, 'opensubtitlescom': {...}}, solo con las
+    cuentas completas (usuario y contraseña guardada)."""
+    configs = {}
+    for cuenta, u in ((ORG, usuario), (COM, usuario_com)):
+        clave = leer_clave(u, cuenta)
+        if u and clave:
+            configs[cuenta] = {'username': u, 'password': clave}
+    return configs
 
 
-def credenciales_skill():
-    """(usuario, contraseña) del credenciales.json de la skill, si existe y es válido."""
+def credenciales_skill(cuenta=ORG):
+    """(usuario, contraseña) de esa cuenta en el credenciales.json de la skill, si existe y es válido."""
     try:
         datos = json.loads((HOME / 'credenciales.json').read_text(encoding='utf-8'))
-        os_ = datos['opensubtitles']
-        if isinstance(os_.get('username'), str) and isinstance(os_.get('password'), str):
-            return os_['username'], os_['password']
+        c = datos[cuenta]
+        if isinstance(c.get('username'), str) and isinstance(c.get('password'), str):
+            return c['username'], c['password']
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         pass
     return None
 
 
-def probar(usuario, clave):
-    """Inicia sesión en opensubtitles.org. Devuelve (correcto, mensaje). Usa la red: llamar en un hilo."""
+def probar(usuario, clave, cuenta=ORG):
+    """Inicia sesión. Devuelve (correcto, mensaje). Usa la red: llamar en un hilo."""
     try:
-        from subliminal.providers.opensubtitles import OpenSubtitlesProvider
+        from subtitulos.nucleo import preparar_cache
+        preparar_cache()                 # .com guarda ahí la sesión
+        if cuenta == COM:
+            from subliminal.providers.opensubtitlescom import OpenSubtitlesComProvider as Proveedor
+        else:
+            from subliminal.providers.opensubtitles import OpenSubtitlesProvider as Proveedor
     except Exception as e:  # noqa: BLE001
         return False, tr('No se pudo cargar el proveedor: {error}', error=e)
-    proveedor = OpenSubtitlesProvider(usuario, clave)
+    proveedor = Proveedor(usuario, clave)
     try:
         proveedor.initialize()
+        if cuenta == COM:
+            proveedor.login()            # en .com, initialize() no inicia sesión hasta la primera consulta
     except Exception as e:  # noqa: BLE001
         nombre = type(e).__name__
         if 'Authentication' in nombre or 'Unauthorized' in nombre:

@@ -100,10 +100,11 @@ class Configuracion(unittest.TestCase):
         c.opciones = Opciones(force=True, dry_run=True, max_videos=0, max_descargas=9)
         c.tema = 'oscuro'
         c.usuario_opensubtitles = 'pepe'
+        c.usuario_opensubtitlescom = 'eva'
         c.guardar()
         d = Config(self.ruta)
         self.assertEqual(d.opciones, c.opciones)
-        self.assertEqual((d.tema, d.usuario_opensubtitles), ('oscuro', 'pepe'))
+        self.assertEqual((d.tema, d.usuario_opensubtitles, d.usuario_opensubtitlescom), ('oscuro', 'pepe', 'eva'))
         self.assertNotIn('password', self.ruta.read_text(encoding='utf-8'))
 
     def test_archivo_danado_o_valores_invalidos(self):
@@ -136,22 +137,90 @@ class Configuracion(unittest.TestCase):
                 self.assertEqual((c.actualizaciones, c.ultima_comprobacion, c.version), (True, 0.0, ''))
 
 
+class LlaveroFalso:
+    """El Administrador de credenciales de Windows, en memoria: {(servicio, usuario): contraseña}."""
+
+    def __init__(self):
+        self.claves = {}
+
+    def get_password(self, servicio, usuario):
+        return self.claves.get((servicio, usuario))
+
+    def set_password(self, servicio, usuario, clave):
+        self.claves[(servicio, usuario)] = clave
+
+    def delete_password(self, servicio, usuario):
+        del self.claves[(servicio, usuario)]
+
+
 class Credenciales(unittest.TestCase):
+    def setUp(self):
+        self.llavero = LlaveroFalso()
+        parche = mock.patch.object(credenciales, '_keyring', lambda: self.llavero)
+        parche.start()
+        self.addCleanup(parche.stop)
+
     def test_proveedores_solo_con_cuenta_completa(self):
-        with mock.patch.object(credenciales, 'leer_clave', lambda u: 'secreta' if u == 'pepe' else ''):
-            self.assertEqual(credenciales.credenciales_proveedores('pepe'),
-                             {'opensubtitles': {'username': 'pepe', 'password': 'secreta'}})
-            self.assertEqual(credenciales.credenciales_proveedores('otro'), {})
-            self.assertEqual(credenciales.credenciales_proveedores(''), {})
+        credenciales.guardar_clave('pepe', 'secreta')
+        self.assertEqual(credenciales.credenciales_proveedores('pepe'),
+                         {'opensubtitles': {'username': 'pepe', 'password': 'secreta'}})
+        self.assertEqual(credenciales.credenciales_proveedores('otro'), {})
+        self.assertEqual(credenciales.credenciales_proveedores(''), {})
+
+    def test_dos_cuentas_separadas(self):
+        """.org y .com van en entradas distintas del Administrador de credenciales, aunque se llamen igual."""
+        credenciales.guardar_clave('pepe', 'de-org')
+        credenciales.guardar_clave('pepe', 'de-com', cuenta=credenciales.COM)
+        self.assertEqual(credenciales.leer_clave('pepe'), 'de-org')
+        self.assertEqual(credenciales.leer_clave('pepe', credenciales.COM), 'de-com')
+        self.assertEqual(credenciales.credenciales_proveedores('pepe', 'pepe'),
+                         {'opensubtitles': {'username': 'pepe', 'password': 'de-org'},
+                          'opensubtitlescom': {'username': 'pepe', 'password': 'de-com'}})
+        self.assertEqual(credenciales.credenciales_proveedores('', 'pepe'),
+                         {'opensubtitlescom': {'username': 'pepe', 'password': 'de-com'}})
+        credenciales.guardar_clave('pepe', '', cuenta=credenciales.COM)          # borrarla
+        self.assertEqual(credenciales.leer_clave('pepe', credenciales.COM), '')
+        self.assertEqual(credenciales.leer_clave('pepe'), 'de-org')
 
     def test_importar_de_la_skill(self):
         with tempfile.TemporaryDirectory() as d, mock.patch.object(credenciales, 'HOME', Path(d)):
             self.assertIsNone(credenciales.credenciales_skill())
             (Path(d) / 'credenciales.json').write_text(
-                json.dumps({'opensubtitles': {'username': 'ana', 'password': 'x'}}), encoding='utf-8')
+                json.dumps({'opensubtitles': {'username': 'ana', 'password': 'x'},
+                            'opensubtitlescom': {'username': 'eva', 'password': 'y'}}), encoding='utf-8')
             self.assertEqual(credenciales.credenciales_skill(), ('ana', 'x'))
+            self.assertEqual(credenciales.credenciales_skill(credenciales.COM), ('eva', 'y'))
             (Path(d) / 'credenciales.json').write_text('{"opensubtitles": 3}', encoding='utf-8')
             self.assertIsNone(credenciales.credenciales_skill())
+            self.assertIsNone(credenciales.credenciales_skill(credenciales.COM))
+
+    def test_configuracion_con_las_dos_cuentas(self):
+        """Una tarjeta, dos formularios: cada uno guarda su usuario y su contraseña; .com lleva la nota."""
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(credenciales, 'HOME', Path(d)):
+            config = Config(Path(d) / 'config.json')
+            v = Ventana(config)
+            self.addCleanup(v.close)
+            org, com = v.ajustes.cuentas[credenciales.ORG], v.ajustes.cuentas[credenciales.COM]
+            self.assertIn('Sin cuenta: no se usa opensubtitles.com', com.estado.text())
+            notas = [l.text() for l in com.findChildren(type(com.estado)) if 'último proveedor' in l.text()]
+            self.assertEqual(len(notas), 1)
+            self.assertFalse([l for l in org.findChildren(type(org.estado)) if 'último proveedor' in l.text()])
+            com.usuario.setText('eva')
+            com.clave.setText('y')
+            com.actualizar()
+            self.assertTrue(com.b_guardar.isEnabled())
+            com.b_guardar.click()
+            self.assertEqual(Config(config.ruta).usuario_opensubtitlescom, 'eva')
+            self.assertEqual(Config(config.ruta).usuario_opensubtitles, '')
+            self.assertEqual(credenciales.leer_clave('eva', credenciales.COM), 'y')
+            self.assertIn('como último recurso', com.estado.text())
+            self.assertEqual(credenciales.credenciales_proveedores(config.usuario_opensubtitles,
+                                                                   config.usuario_opensubtitlescom),
+                             {'opensubtitlescom': {'username': 'eva', 'password': 'y'}})
+            with mock.patch.object(credenciales, 'probar', return_value=(False, 'Usuario o contraseña incorrectos.')) as p:
+                com.b_probar.click()
+                esperar(lambda: com.estado.text().startswith('✗'))
+            self.assertEqual(p.call_args.args, ('eva', 'y', credenciales.COM))
 
 
 class RutasSoltadas(unittest.TestCase):

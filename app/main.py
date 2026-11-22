@@ -80,10 +80,11 @@ def autoprueba(salida, con_red=False):
     def proveedores():
         from subliminal.extensions import provider_manager, refiner_manager
         nombres = sorted(provider_manager.names())
-        faltan = [p for p in __import__('subtitulos.nucleo', fromlist=['x']).PROVIDERS if p not in nombres]
+        n = __import__('subtitulos.nucleo', fromlist=['x'])
+        faltan = [p for p in n.PROVIDERS + [n.ULTIMO] if p not in nombres]
         if faltan:
             raise RuntimeError(f'faltan proveedores: {faltan}')
-        for p in ('addic7ed', 'gestdown', 'subtitulamos', 'opensubtitles'):
+        for p in ('addic7ed', 'gestdown', 'subtitulamos', 'opensubtitles', 'opensubtitlescom'):
             provider_manager[p].plugin                      # que se puedan importar
         for r in ('hash', 'metadata', 'tvdb'):              # los que usa el núcleo (refine)
             refiner_manager[r].plugin

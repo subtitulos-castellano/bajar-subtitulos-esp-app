@@ -80,6 +80,111 @@ class _Prueba(QObject):
     hecha = Signal(bool, str)
 
 
+class FormCuenta(QWidget):
+    """Usuario, contraseña, Guardar y Probar conexión de una cuenta (opensubtitles.org u opensubtitles.com)."""
+    SITIOS = {credenciales.ORG: 'opensubtitles.org', credenciales.COM: 'opensubtitles.com'}
+    CAMPOS = {credenciales.ORG: 'usuario_opensubtitles', credenciales.COM: 'usuario_opensubtitlescom'}
+
+    def __init__(self, cuenta, config, parent=None):
+        super().__init__(parent)
+        self.cuenta, self.config = cuenta, config
+        self.sitio = self.SITIOS[cuenta]
+        v = QVBoxLayout(self)
+        v.setContentsMargins(16, 12, 16, 12)
+        v.setSpacing(8)
+        v.addWidget(QLabel(self.sitio))
+        if cuenta == credenciales.COM:
+            nota = etiqueta(tr('Solo se usa como último proveedor: se le piden subtítulos únicamente si los demás '
+                               'no han encontrado castellano (o, al final, inglés), porque sus cuentas solo '
+                               'permiten unas pocas descargas al día. Usa el nombre de usuario, no el email.'),
+                          'ayuda', envolver=True)
+            v.addWidget(nota)
+        fila = QHBoxLayout()
+        fila.setSpacing(10)
+        self.usuario = QLineEdit(self.guardado())
+        self.usuario.setPlaceholderText(tr('Usuario'))
+        self.clave = QLineEdit(credenciales.leer_clave(self.guardado(), cuenta))
+        self.clave.setPlaceholderText(tr('Contraseña'))
+        self.clave.setEchoMode(QLineEdit.Password)
+        for e in (self.usuario, self.clave):
+            e.setAcceptDrops(False)
+            e.textEdited.connect(lambda _: self.actualizar())
+            fila.addWidget(e, 1)
+        self.b_guardar = boton(tr('Guardar'), nombre='primario')
+        self.b_guardar.clicked.connect(self.guardar)
+        self.b_probar = boton(tr('Probar conexión'))
+        self.b_probar.clicked.connect(self._probar)
+        fila.addWidget(self.b_guardar)
+        fila.addWidget(self.b_probar)
+        v.addLayout(fila)
+        abajo = QHBoxLayout()
+        self.estado = etiqueta('', 'ayuda', envolver=True)
+        abajo.addWidget(self.estado, 1)
+        self.b_importar = boton(tr('Usar la cuenta de la skill'), nombre='plano')
+        self.b_importar.setToolTip(tr('Importa {archivo}', archivo=HOME / 'credenciales.json'))
+        self.b_importar.clicked.connect(self._importar)
+        abajo.addWidget(self.b_importar)
+        v.addLayout(abajo)
+        self._prueba = _Prueba(self)
+        self._prueba.hecha.connect(self._prueba_hecha)
+        self.actualizar()
+
+    def guardado(self):
+        return getattr(self.config, self.CAMPOS[self.cuenta])
+
+    def actualizar(self, mensaje=None):
+        guardado = self.guardado()
+        cambios = (self.usuario.text().strip() != guardado
+                   or self.clave.text() != credenciales.leer_clave(guardado, self.cuenta))
+        self.b_guardar.setEnabled(cambios)
+        self.b_probar.setEnabled(bool(self.usuario.text().strip() and self.clave.text()))
+        skill = credenciales.credenciales_skill(self.cuenta)
+        self.b_importar.setVisible(bool(skill) and skill[0] != guardado)
+        if mensaje is None:
+            completa = guardado and credenciales.leer_clave(guardado, self.cuenta)
+            if cambios:
+                mensaje = tr('Hay cambios sin guardar.')
+            elif self.cuenta == credenciales.COM:
+                mensaje = (tr('Se usará la cuenta «{usuario}» como último recurso.', usuario=guardado) if completa
+                           else tr('Sin cuenta: no se usa opensubtitles.com.'))
+            elif completa:
+                mensaje = tr('Se usará la cuenta «{usuario}» en las búsquedas.', usuario=guardado)
+            else:
+                mensaje = tr('Sin cuenta: se busca en Addic7ed, Gestdown y Subtitulamos.')
+        self.estado.setText(mensaje)
+
+    def guardar(self):
+        usuario, clave = self.usuario.text().strip(), self.clave.text()
+        if not credenciales.guardar_clave(usuario, clave, self.guardado(), self.cuenta):
+            self.actualizar(tr('No se pudo guardar la contraseña en el Administrador de credenciales.'))
+            return
+        setattr(self.config, self.CAMPOS[self.cuenta], usuario if clave else '')
+        self.config.guardar()
+        self.actualizar()
+
+    def _importar(self):
+        skill = credenciales.credenciales_skill(self.cuenta)
+        if skill:
+            self.usuario.setText(skill[0])
+            self.clave.setText(skill[1])
+            self.guardar()
+
+    def _probar(self):
+        usuario, clave = self.usuario.text().strip(), self.clave.text()
+        self.b_probar.setEnabled(False)
+        self.estado.setText(tr('Comprobando la conexión con {sitio}…', sitio=self.sitio))
+
+        def comprobar():
+            ok, mensaje = credenciales.probar(usuario, clave, self.cuenta)
+            self._prueba.hecha.emit(ok, mensaje)
+
+        threading.Thread(target=comprobar, name=f'probar-{self.cuenta}', daemon=True).start()
+
+    def _prueba_hecha(self, ok, mensaje):
+        self.b_probar.setEnabled(True)
+        self.estado.setText(('✓ ' if ok else '✗ ') + mensaje)
+
+
 class VistaAjustes(QWidget):
     cambiado = Signal()            # cambiaron las opciones (ya guardadas)
     tema_elegido = Signal(str)     # 'sistema' | 'claro' | 'oscuro'
@@ -476,99 +581,17 @@ class VistaAjustes(QWidget):
         self.b_buscar_version.setEnabled(True)
         self.estado_version.setText(texto)
 
-    # ---------- Cuenta de OpenSubtitles ----------
+    # ---------- Cuentas de OpenSubtitles ----------
 
     def _cuenta(self):
-        t = Tarjeta('usuario', tr('Cuenta de OpenSubtitles'),
-                    tr('Opcional, pero da más resultados. Es una cuenta de opensubtitles.org (no de .com). '
-                       'La contraseña se guarda en el Administrador de credenciales de Windows, nunca en un '
-                       'archivo.'))
-        cuenta = QWidget()
-        v = QVBoxLayout(cuenta)
-        v.setContentsMargins(16, 12, 16, 12)
-        v.setSpacing(10)
-        fila = QHBoxLayout()
-        fila.setSpacing(10)
-        self.usuario = QLineEdit(self.config.usuario_opensubtitles)
-        self.usuario.setPlaceholderText(tr('Usuario'))
-        self.clave = QLineEdit(credenciales.leer_clave(self.config.usuario_opensubtitles))
-        self.clave.setPlaceholderText(tr('Contraseña'))
-        self.clave.setEchoMode(QLineEdit.Password)
-        for e in (self.usuario, self.clave):
-            e.setAcceptDrops(False)
-            e.textEdited.connect(self._cuenta_editada)
-            fila.addWidget(e, 1)
-        self.b_guardar = boton(tr('Guardar'), nombre='primario')
-        self.b_guardar.clicked.connect(self._guardar_cuenta)
-        self.b_probar = boton(tr('Probar conexión'))
-        self.b_probar.clicked.connect(self._probar)
-        fila.addWidget(self.b_guardar)
-        fila.addWidget(self.b_probar)
-        v.addLayout(fila)
-        abajo = QHBoxLayout()
-        self.estado_cuenta = etiqueta('', 'ayuda', envolver=True)
-        abajo.addWidget(self.estado_cuenta, 1)
-        self.b_importar = boton(tr('Usar la cuenta de la skill'), nombre='plano')
-        self.b_importar.setToolTip(tr('Importa {archivo}', archivo=HOME / 'credenciales.json'))
-        self.b_importar.clicked.connect(self._importar)
-        abajo.addWidget(self.b_importar)
-        v.addLayout(abajo)
-        t.fila(cuenta)
-        self._prueba = _Prueba(self)
-        self._prueba.hecha.connect(self._prueba_hecha)
-        self._actualizar_cuenta()
+        t = Tarjeta('usuario', tr('Cuentas de OpenSubtitles'),
+                    tr('Opcionales, pero dan más resultados. opensubtitles.org y opensubtitles.com son cuentas '
+                       'distintas. Las contraseñas se guardan en el Administrador de credenciales de Windows, '
+                       'nunca en un archivo.'))
+        self.cuentas = {}
+        for cuenta in credenciales.CUENTAS:
+            self.cuentas[cuenta] = t.fila(FormCuenta(cuenta, self.config))
         return t
-
-    def _actualizar_cuenta(self, mensaje=None):
-        guardado = self.config.usuario_opensubtitles
-        cambios = (self.usuario.text().strip() != guardado
-                   or self.clave.text() != credenciales.leer_clave(guardado))
-        self.b_guardar.setEnabled(cambios)
-        self.b_probar.setEnabled(bool(self.usuario.text().strip() and self.clave.text()))
-        skill = credenciales.credenciales_skill()
-        self.b_importar.setVisible(bool(skill) and skill[0] != guardado)
-        if mensaje is None:
-            if cambios:
-                mensaje = tr('Hay cambios sin guardar.')
-            elif guardado and credenciales.leer_clave(guardado):
-                mensaje = tr('Se usará la cuenta «{usuario}» en las búsquedas.', usuario=guardado)
-            else:
-                mensaje = tr('Sin cuenta: se busca en Addic7ed, Gestdown y Subtitulamos.')
-        self.estado_cuenta.setText(mensaje)
-
-    def _cuenta_editada(self):
-        self._actualizar_cuenta()
-
-    def _guardar_cuenta(self):
-        usuario, clave = self.usuario.text().strip(), self.clave.text()
-        if not credenciales.guardar_clave(usuario, clave, self.config.usuario_opensubtitles):
-            self._actualizar_cuenta(tr('No se pudo guardar la contraseña en el Administrador de credenciales.'))
-            return
-        self.config.usuario_opensubtitles = usuario if clave else ''
-        self.config.guardar()
-        self._actualizar_cuenta()
-
-    def _importar(self):
-        skill = credenciales.credenciales_skill()
-        if skill:
-            self.usuario.setText(skill[0])
-            self.clave.setText(skill[1])
-            self._guardar_cuenta()
-
-    def _probar(self):
-        usuario, clave = self.usuario.text().strip(), self.clave.text()
-        self.b_probar.setEnabled(False)
-        self.estado_cuenta.setText(tr('Comprobando la conexión con opensubtitles.org…'))
-
-        def comprobar():
-            ok, mensaje = credenciales.probar(usuario, clave)
-            self._prueba.hecha.emit(ok, mensaje)
-
-        threading.Thread(target=comprobar, name='probar-opensubtitles', daemon=True).start()
-
-    def _prueba_hecha(self, ok, mensaje):
-        self.b_probar.setEnabled(True)
-        self.estado_cuenta.setText(('✓ ' if ok else '✗ ') + mensaje)
 
     # ---------- Tema ----------
 

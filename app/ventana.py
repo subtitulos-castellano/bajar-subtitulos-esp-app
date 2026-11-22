@@ -393,7 +393,8 @@ class Ventana(QMainWindow):
         if self.demo:
             t = TrabajadorDemo(ruta, self, recursivo=recursivo)
         else:
-            t = Trabajador(ruta, opciones, credenciales_proveedores(self.config.usuario_opensubtitles),
+            t = Trabajador(ruta, opciones, credenciales_proveedores(self.config.usuario_opensubtitles,
+                                                                    self.config.usuario_opensubtitlescom),
                            recursivo=recursivo)
         self.trabajador = t
 

@@ -37,8 +37,8 @@ Fuera del alcance: fallos de los proveedores de subtítulos, de subliminal y dem
   corrupto o manipulado no cuelgue el programa ni agote la memoria. Hay pruebas automáticas para
   esto en `tests/test_seguridad.py`.
 - Los subtítulos de tamaño anormal se descartan.
-- La contraseña de OpenSubtitles se guarda en el Administrador de credenciales de Windows, nunca
-  en un archivo.
+- Las contraseñas de OpenSubtitles (.org y .com) se guardan en el Administrador de credenciales de
+  Windows, nunca en un archivo.
 - Antes de sustituir un subtítulo, se guarda una copia en `%USERPROFILE%\.subtitulos-esp\backup`.
 - Los límites de búsqueda por tanda evitan saturar a los proveedores.
 - Actualizaciones:

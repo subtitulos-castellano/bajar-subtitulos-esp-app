@@ -67,6 +67,16 @@ TEXTOS = {
     'tabla de muestras MP4 demasiado grande': 'MP4 sample table too large',
     'muestra de subtítulo MP4 demasiado grande': 'MP4 subtitle sample too large',
     'aviso': 'warning',
+    '  opensubtitles.com (último recurso): {n} candidatos en español':
+        '  opensubtitles.com (last resort): {n} Spanish candidates',
+    '  opensubtitles.com: quedan {n} descargas por hoy': '  opensubtitles.com: {n} downloads left today',
+    '  opensubtitles.com no responde o no acepta la cuenta: no se le pide nada más en esta búsqueda':
+        '  opensubtitles.com does not respond or does not accept the account: nothing more is asked of it in '
+        'this search',
+    '  opensubtitles.com no deja descargar (cupo de hoy agotado o cuenta no válida): no se le pide nada más en '
+    'esta búsqueda':
+        '  opensubtitles.com does not allow downloading (today’s quota used up or invalid account): nothing more '
+        'is asked of it in this search',
 
     # ---------- Ventana y barra lateral ----------
     'Castellano de España': 'Spanish from Spain',
@@ -283,11 +293,19 @@ TEXTOS = {
     'Tienes la última versión ({version}).': 'You have the latest version ({version}).',
     'No se ha podido comprobar: {mensaje}': 'Could not check: {mensaje}',
     'Restaurar valores por defecto': 'Restore default values',
-    'Cuenta de OpenSubtitles': 'OpenSubtitles account',
-    'Opcional, pero da más resultados. Es una cuenta de opensubtitles.org (no de .com). La contraseña se guarda '
-    'en el Administrador de credenciales de Windows, nunca en un archivo.':
-        'Optional, but it gives more results. It is an opensubtitles.org account (not .com). The password is '
-        'stored in Windows Credential Manager, never in a file.',
+    'Cuentas de OpenSubtitles': 'OpenSubtitles accounts',
+    'Opcionales, pero dan más resultados. opensubtitles.org y opensubtitles.com son cuentas distintas. Las '
+    'contraseñas se guardan en el Administrador de credenciales de Windows, nunca en un archivo.':
+        'Optional, but they give more results. opensubtitles.org and opensubtitles.com are separate accounts. '
+        'Passwords are stored in Windows Credential Manager, never in a file.',
+    'Solo se usa como último proveedor: se le piden subtítulos únicamente si los demás no han encontrado '
+    'castellano (o, al final, inglés), porque sus cuentas solo permiten unas pocas descargas al día. Usa el '
+    'nombre de usuario, no el email.':
+        'Used only as the last provider: it is asked for subtitles only if the others have not found Spanish from '
+        'Spain (or, at the end, English), because its accounts only allow a few downloads a day. Use your '
+        'username, not your email.',
+    'Se usará la cuenta «{usuario}» como último recurso.': 'The account “{usuario}” will be used as a last resort.',
+    'Sin cuenta: no se usa opensubtitles.com.': 'No account: opensubtitles.com is not used.',
     'Usuario': 'Username',
     'Contraseña': 'Password',
     'Guardar': 'Save',
@@ -300,7 +318,7 @@ TEXTOS = {
         'No account: Addic7ed, Gestdown and Subtitulamos are searched.',
     'No se pudo guardar la contraseña en el Administrador de credenciales.':
         'The password could not be saved in Credential Manager.',
-    'Comprobando la conexión con opensubtitles.org…': 'Checking the connection to opensubtitles.org…',
+    'Comprobando la conexión con {sitio}…': 'Checking the connection to {sitio}…',
     'Conexión correcta.': 'Connection OK.',
     'Usuario o contraseña incorrectos.': 'Wrong username or password.',
     'No se pudo cargar el proveedor: {error}': 'The provider could not be loaded: {error}',

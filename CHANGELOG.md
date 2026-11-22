@@ -1,5 +1,17 @@
 # Cambios
 
+## 1.3.0
+
+- **opensubtitles.com**, como último recurso: con cuenta, se le piden subtítulos solo si los demás
+  proveedores no han encontrado castellano (o, al final, inglés), porque sus cuentas solo permiten unas
+  pocas descargas al día.
+  - Para en cuanto encuentra un castellano válido, para gastar el menor cupo posible.
+  - *Detalles* dice cuántas descargas quedan hoy. Si se agota el cupo (o no acepta la cuenta), lo dice
+    y la búsqueda sigue con los demás proveedores.
+- *Configuración › Cuentas de OpenSubtitles*: las cuentas de opensubtitles.org y de opensubtitles.com,
+  cada una con su usuario, contraseña, *Guardar* y *Probar conexión*. *Usar la cuenta de la skill*
+  importa cada una de su `credenciales.json` (`"opensubtitlescom"` para la de .com).
+
 ## 1.2.1
 
 - **Novedades de una actualización**: si son largas, se leen enteras con una barra de desplazamiento

@@ -26,7 +26,8 @@ class Config:
         self.ruta = Path(ruta) if ruta else carpeta() / 'config.json'
         self.opciones = Opciones()
         self.tema = 'sistema'
-        self.usuario_opensubtitles = ''
+        self.usuario_opensubtitles = ''      # cuenta de opensubtitles.org
+        self.usuario_opensubtitlescom = ''   # cuenta de opensubtitles.com (último recurso)
         self.tamano_texto = 0         # 0 = como Windows; si no, porcentaje (80-225)
         self.ventana = {}             # {'x', 'y', 'ancho', 'alto', 'maximizada'}
         self.actualizaciones = True   # buscar versiones nuevas al abrir la app (como mucho una vez al día)
@@ -56,8 +57,9 @@ class Config:
                 self.opciones = Opciones()
         if datos.get('tema') in TEMAS:
             self.tema = datos['tema']
-        if isinstance(datos.get('usuario_opensubtitles'), str):
-            self.usuario_opensubtitles = datos['usuario_opensubtitles']
+        for campo in ('usuario_opensubtitles', 'usuario_opensubtitlescom'):
+            if isinstance(datos.get(campo), str):
+                setattr(self, campo, datos[campo])
         t = datos.get('tamano_texto')
         if isinstance(t, int) and not isinstance(t, bool) and (t == 0 or TAMANO_MIN <= t <= TAMANO_MAX):
             self.tamano_texto = t
@@ -85,7 +87,8 @@ class Config:
 
     def guardar(self):
         datos = {'opciones': asdict(self.opciones), 'tema': self.tema,
-                 'usuario_opensubtitles': self.usuario_opensubtitles, 'tamano_texto': self.tamano_texto,
+                 'usuario_opensubtitles': self.usuario_opensubtitles,
+                 'usuario_opensubtitlescom': self.usuario_opensubtitlescom, 'tamano_texto': self.tamano_texto,
                  'ventana': self.ventana, 'actualizaciones': self.actualizaciones,
                  'ultima_comprobacion': self.ultima_comprobacion, 'version': self.version,
                  'menu_segundo_plano': self.menu_segundo_plano, 'cerrar_a_bandeja': self.cerrar_a_bandeja}

@@ -19,6 +19,7 @@ import contextlib
 import hashlib
 import io
 import json
+import logging
 import subprocess
 import sys
 import tempfile
@@ -74,9 +75,31 @@ class SubFalso(Subtitle):
         return set(self._coinc)
 
 
+# opensubtitles.com (último recurso): (vídeo, idioma) -> [(id, texto, coincidencias)]. Vacío salvo en sus
+# pruebas, que lo rellenan.
+CATALOGO_COM = {}
+
+
+class ProveedorComFalso:
+    """Como el de subliminal: cada descarga pasa por api_post('download'), que dice cuántas quedan."""
+
+    def __init__(self, cupo):
+        self.cupo = cupo
+
+    def api_post(self, path, body=None, **k):
+        self.cupo -= 1
+        return {'link': 'x', 'remaining': self.cupo}
+
+
 class PoolFalso:
+    cupo_com = 100
+    consultas_com = []          # vídeos por los que se ha preguntado a opensubtitles.com
+
     def __init__(self, providers=None, provider_configs=None):
-        pass
+        self.providers = list(providers or [])
+        self.discarded_providers = set()
+        self.initialized_providers = {}
+        self.com = self.providers == ['opensubtitlescom']
 
     def __enter__(self):
         return self
@@ -86,10 +109,20 @@ class PoolFalso:
 
     def list_subtitles(self, video, languages):
         idioma = next(iter(languages)).alpha3
+        if self.com:
+            PoolFalso.consultas_com.append((Path(video.name).stem, idioma))
+            # Como subliminal: el proveedor se inicia al consultarlo por primera vez.
+            self.initialized_providers.setdefault('opensubtitlescom', ProveedorComFalso(PoolFalso.cupo_com))
+            return [SubFalso('opensubtitlescom', i, t, c, idioma)
+                    for i, t, c in CATALOGO_COM.get((Path(video.name).stem, idioma), [])]
         return [SubFalso(p, i, t, c, idioma)
                 for p, i, t, c in CATALOGO.get((Path(video.name).stem, idioma), [])]
 
     def download_subtitle(self, sub):
+        if sub.provider_name == 'opensubtitlescom':
+            if self.initialized_providers['opensubtitlescom'].api_post('download')['remaining'] <= 0:
+                self.discarded_providers.add('opensubtitlescom')      # DownloadLimitReached
+                return False
         sub.content = sub._bytes
         return True
 
@@ -370,6 +403,74 @@ class SinConexion(ConSimulacion):
         with mock.patch.object(nucleo, 'ProviderPool', PoolMedioRoto):
             resumen = nucleo.procesar(self.videos / 'd_red_cast.avi', credenciales={})
         self.assertEqual((resumen[0].estado, resumen[0].fuente), ('CASTELLANO', 'gestdown cast2'))
+
+
+class UltimoRecurso(ConSimulacion):
+    """opensubtitles.com: solo con cuenta, solo si los demás no dan castellano (o, al final, inglés) y sin
+    pasarse del cupo de descargas del día."""
+    COM = {'opensubtitlescom': {'username': 'u', 'password': 'p'}}
+
+    def setUp(self):
+        super().setUp()
+        for parche in (mock.patch.dict(CATALOGO_COM, clear=True),
+                       mock.patch.object(PoolFalso, 'consultas_com', []),
+                       mock.patch.object(PoolFalso, 'cupo_com', 100)):
+            parche.start()
+            self.addCleanup(parche.stop)
+
+    def buscar(self, credenciales):
+        g = Grabadora()
+        r = nucleo.procesar(self.videos, Opciones(max_videos=0), g, credenciales=credenciales)
+        return {x.nombre: (x.estado, x.fuente) for x in r}, '\n'.join(g.lineas)
+
+    def test_sin_cuenta_no_se_usa(self):
+        CATALOGO_COM[('g_nada', 'spa')] = [('com1', CAST, set())]
+        estados, _ = self.buscar({})
+        self.assertEqual(PoolFalso.consultas_com, [])
+        self.assertEqual(estados['g_nada.avi'][0], 'NO ENCONTRADO')
+
+    def test_solo_cuando_los_demas_no_dan_castellano(self):
+        CATALOGO_COM[('g_nada', 'spa')] = [('com1', CAST, set())]
+        CATALOGO_COM[('e_red_lat', 'spa')] = [('com2', LAT, set()), ('com3', CAST2, set()), ('com4', CAST, set())]
+        estados, lineas = self.buscar(self.COM)
+        # d_red_cast, i_mejora y z_pend ya tienen castellano de los demás: a .com no se le pregunta.
+        self.assertEqual(sorted(v for v, idioma in PoolFalso.consultas_com),
+                         ['e_red_lat', 'f_red_eng', 'g_nada', 'h_latino_previo', 'k_lat_incrustado'])
+        self.assertNotIn('eng', {idioma for _, idioma in PoolFalso.consultas_com})   # f_red_eng ya tenía inglés
+        self.assertEqual(estados['g_nada.avi'], ('CASTELLANO', 'opensubtitlescom com1'))
+        self.assertEqual(estados['e_red_lat.avi'][0], 'CASTELLANO')                  # mejor que el latino
+        self.assertEqual(estados['d_red_cast.avi'], ('CASTELLANO', 'opensubtitles cast1'))
+        # Para en el primer castellano válido: com4 no se descarga (cada descarga gasta cupo).
+        self.assertIn('opensubtitlescom id=com3', lineas)
+        self.assertNotIn('id=com4', lineas)
+        self.assertIn('  opensubtitles.com (último recurso): 3 candidatos en español', lineas)
+        self.assertIn('  opensubtitles.com: quedan 98 descargas por hoy', lineas)     # com2 y com3
+
+    def test_ingles_de_com_solo_si_no_hay_otro(self):
+        CATALOGO_COM[('g_nada', 'eng')] = [('en9', ENG, set())]
+        estados, _ = self.buscar(self.COM)
+        self.assertEqual(estados['g_nada.avi'], ('INGLÉS', 'opensubtitlescom en9'))
+        self.assertEqual(estados['f_red_eng.avi'], ('INGLÉS', 'gestdown en1'))
+        self.assertEqual([v for v, idioma in PoolFalso.consultas_com if idioma == 'eng'], ['g_nada'])
+
+    def test_cupo_agotado(self):
+        """Al agotarse, no se le pide nada más en toda la búsqueda y se dice una sola vez."""
+        PoolFalso.cupo_com = 1
+        CATALOGO_COM[('e_red_lat', 'spa')] = [('com2', CAST, set())]
+        CATALOGO_COM[('g_nada', 'spa')] = [('com1', CAST, set())]
+        estados, lineas = self.buscar(self.COM)
+        self.assertEqual(PoolFalso.consultas_com, [('e_red_lat', 'spa')])
+        self.assertEqual(estados['e_red_lat.avi'][0], 'LATINO')
+        self.assertEqual(estados['g_nada.avi'][0], 'NO ENCONTRADO')
+        self.assertEqual(lineas.count('opensubtitles.com no deja descargar'), 1)
+
+    def test_avisos_de_subliminal_sobre_el_cupo_se_filtran(self):
+        filtro = nucleo.SinRuido()
+        for mensaje, pasa in (('download quota exceeded, quota reset on 2026-11-23 UTC', False),
+                              ('Discarding provider opensubtitlescom', False),
+                              ('Discarding provider addic7ed', True)):
+            registro = logging.LogRecord('subliminal', logging.ERROR, '', 0, mensaje, None, None)
+            self.assertEqual(filtro.filter(registro), pasa)
 
 
 class OpcionesValidas(unittest.TestCase):

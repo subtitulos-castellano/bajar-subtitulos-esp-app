@@ -17,8 +17,8 @@ Configuración.
   en segundos, aunque el vídeo ocupe varios GB. Si el disco es lento (una unidad USB, un NAS o una
   carpeta de red) y extraerla fuese a tardar más de 15 segundos, no lo hace y busca en internet; en
   *Detalles* se indica.
-- Si no la trae, **busca en internet**: OpenSubtitles (si tienes cuenta), Addic7ed, Gestdown y
-  Subtitulamos. Descarga los mejores candidatos y se queda con el que es **castellano de España**.
+- Si no la trae, **busca en internet**: opensubtitles.org (si tienes cuenta), Addic7ed, Gestdown y
+  Subtitulamos; y, si con ellos no hay castellano, opensubtitles.com (si tienes cuenta). Descarga los mejores candidatos y se queda con el que es **castellano de España**.
   Para eso comprueba el vocabulario (vosotros, vale, móvil… frente a ustedes, celular, computadora…),
   porque las etiquetas de idioma de las webs no son fiables. También descarta los subtítulos de
   otro episodio o con una duración que no encaja.
@@ -150,6 +150,7 @@ Los cambios se guardan al momento y se usan en la siguiente búsqueda.
 | Vídeos que buscan en internet en cada tanda | 40 |
 | Candidatos que se descargan por vídeo | 5 |
 | Cuenta de opensubtitles.org (opcional, da más resultados) | — |
+| Cuenta de opensubtitles.com (opcional, solo como último recurso) | — |
 | Al cerrar la ventana, seguir junto al reloj | No |
 | Tema: Sistema, Claro u Oscuro | Sistema |
 | Tamaño del texto: como Windows o un porcentaje propio | Como Windows |
@@ -164,9 +165,19 @@ pantalla de Configuración. Cambia todo: la interfaz, los avisos (también las n
 actualizaciones), el registro de *Detalles* y el menú contextual del Explorador. No se puede cambiar
 durante una búsqueda. Es la única forma de cambiarlo en la versión portable.
 
-**Cuenta de OpenSubtitles:** es una cuenta de opensubtitles.org, no de opensubtitles.com. La
-contraseña se guarda en el **Administrador de credenciales de Windows**, nunca en un archivo. Si
-usas la skill, *Usar la cuenta de la skill* la importa de su `credenciales.json`.
+**Cuentas de OpenSubtitles:** opensubtitles.org y opensubtitles.com son cuentas distintas; puedes
+poner una, las dos o ninguna. Las contraseñas se guardan en el **Administrador de credenciales de
+Windows**, nunca en un archivo. Si usas la skill, *Usar la cuenta de la skill* importa cada una de su
+`credenciales.json` (`"opensubtitles"` y `"opensubtitlescom"`).
+
+opensubtitles.com solo se usa como **último recurso**, porque sus cuentas solo permiten unas pocas
+descargas al día:
+
+- se le piden subtítulos solo si los demás no han encontrado castellano (o, al final, inglés), y
+  para en cuanto encuentra un castellano válido;
+- *Detalles* dice cuántas descargas quedan hoy;
+- si se agota el cupo (o no acepta la cuenta), lo dice y no se le pide nada más en esa búsqueda;
+- se usa el nombre de usuario, no el email.
 
 **Tamaño del texto:** por defecto sigue a *Configuración de Windows › Accesibilidad › Tamaño del
 texto*, como el Explorador. Si lo cambias allí, la app se ajusta al volver a ella.
@@ -193,7 +204,7 @@ app solo pregunta a GitHub por la última versión publicada, sin enviar nada tu
 | Subtítulos | Junto a cada vídeo: `<vídeo>.srt` (y `<vídeo>.en.srt` si se pide) |
 | Copias de los subtítulos sustituidos | `%USERPROFILE%\.subtitulos-esp\backup` (la misma carpeta que la skill) |
 | Preferencias, tamaño y posición de la ventana | `%APPDATA%\BajarSubtitulosEsp\config.json` |
-| Contraseña de OpenSubtitles | Administrador de credenciales de Windows (`BajarSubtitulosESP/opensubtitles`) |
+| Contraseñas de OpenSubtitles | Administrador de credenciales de Windows (`BajarSubtitulosESP/opensubtitles` y `BajarSubtitulosESP/opensubtitlescom`) |
 | Menú contextual del Explorador | Registro de tu usuario (`HKCU\Software\Classes`): se quita al desinstalar |
 | Instalador de la última actualización y su registro | `%TEMP%\BajarSubtitulosESP-actualizacion` (se borra solo) |
 
@@ -257,7 +268,7 @@ app/            interfaz gráfica (Qt / PySide6)
   trabajador.py procesar() en un hilo; señales, avisos y cancelación inmediata
   componentes.py   interruptor, tarjetas, barras, tabla de vídeos
   config.py     preferencias (%APPDATA%\BajarSubtitulosEsp\config.json)
-  credenciales.py  cuenta de OpenSubtitles (keyring)
+  credenciales.py  cuentas de opensubtitles.org y .com (keyring)
   actualizar.py consultar la última Release, descargar y verificar el instalador y lanzarlo (sin Qt)
   vista_actualizacion.py  aviso de versión nueva y comprobación/descarga en hilos aparte
   tema.py       colores claro/oscuro, tamaño del texto y hoja de estilos
@@ -374,7 +385,7 @@ se portan a mano:
 
 ```bash
 git fetch upstream
-git diff 3aa1f5e upstream/main -- bajar_subs.py    # 3aa1f5e: último commit de la skill incorporado
+git diff 1a494b1 upstream/main -- bajar_subs.py    # 1a494b1: último commit de la skill incorporado
 ```
 
 Cada cambio se aplica en su módulo:
