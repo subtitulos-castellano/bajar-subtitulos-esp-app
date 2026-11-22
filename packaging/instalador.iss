@@ -47,12 +47,21 @@ WizardStyle=modern
 AppMutex={#MutexApp}
 CloseApplications=yes
 LicenseFile=..\LICENSE
+; Idioma: se pregunta en la primera instalación (propone el de Windows) y vale también para la app. Al
+; actualizar o reinstalar se usa el de la vez anterior sin preguntar; en la app se cambia en Configuración.
+ShowLanguageDialog=yes
+UsePreviousLanguage=yes
 
 [Languages]
 Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
+Name: "en"; MessagesFile: "compiler:Default.isl"
+
+[Messages]
+es.SelectLanguageLabel=Elige el idioma de la instalación y del programa:
+en.SelectLanguageLabel=Select the language for the installation and for the app:
 
 [Tasks]
-Name: "escritorio"; Description: "Crear un acceso directo en el escritorio"; GroupDescription: "Accesos directos:"; Flags: unchecked
+Name: "escritorio"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "{#Origen}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -68,8 +77,9 @@ Name: "{autodesktop}\{#Nombre}"; Filename: "{app}\{#Exe}"; Tasks: escritorio
 [Run]
 ; Menú contextual del Explorador («Bajar subtítulos»): lo añade la propia app (app/menu_contextual.py) en
 ; el registro del usuario, salvo que se haya quitado en Configuración. Al actualizar, lo deja apuntando aquí.
-Filename: "{app}\{#Exe}"; Parameters: "--menu-contextual-instalar"; Flags: runasoriginaluser waituntilterminated
-Filename: "{app}\{#Exe}"; Description: "Abrir {#Nombre}"; Flags: nowait postinstall skipifsilent
+; Con --idioma-inicial, la app apunta el idioma de la instalación si aún no tenía ninguno (ver app/main.py).
+Filename: "{app}\{#Exe}"; Parameters: "--menu-contextual-instalar --idioma-inicial {language}"; Flags: runasoriginaluser waituntilterminated
+Filename: "{app}\{#Exe}"; Description: "{cm:LaunchProgram,{#Nombre}}"; Flags: nowait postinstall skipifsilent
 ; Actualización desde la propia app (/REABRIR=1): se vuelve a abrir sola al terminar.
 Filename: "{app}\{#Exe}"; Flags: nowait runasoriginaluser; Check: Reabrir
 

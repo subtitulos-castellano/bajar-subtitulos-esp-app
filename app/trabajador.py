@@ -54,7 +54,9 @@ def _preparar_avisos(n):
     global _manejador
     if _manejador is None:
         _manejador = _Avisos()
-        _manejador.setFormatter(logging.Formatter('  aviso (%(name)s): %(message)s'))
+        from subtitulos.idioma import tr
+        # %(name)s y %(message)s los pone logging; en el texto traducido, igual que en castellano.
+        _manejador.setFormatter(logging.Formatter('  ' + tr('aviso') + ' (%(name)s): %(message)s'))
         _manejador.addFilter(n.SinRuido())
         raiz = logging.getLogger()
         raiz.addHandler(_manejador)

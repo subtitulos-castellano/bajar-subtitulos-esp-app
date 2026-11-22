@@ -23,6 +23,8 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
+from subtitulos import idioma
+from subtitulos.idioma import tr
 from subtitulos.texto import CONTROL
 
 from . import __version__
@@ -101,13 +103,31 @@ def _leer(url, limite, accept='*/*'):
     with _abrir(url, accept=accept) as r:
         datos = r.read(limite + 1)
     if len(datos) > limite:
-        raise ErrorActualizacion('GitHub ha devuelto una respuesta demasiado grande.')
+        raise ErrorActualizacion(tr('GitHub ha devuelto una respuesta demasiado grande.'))
     return datos
+
+
+# Las notas de cada Release llevan las novedades en castellano y, tras esta marca, en inglés (las
+# escribe el workflow con CHANGELOG.md y CHANGELOG.en.md). Las Releases anteriores solo están en castellano.
+MARCA_INGLES = '<!-- en -->'
+
+
+def notas_del_idioma(texto, codigo=None):
+    """La parte de las notas en el idioma de la app (`codigo`; por defecto, el actual). Sin la marca,
+    todo el texto."""
+    texto = str(texto or '')
+    if MARCA_INGLES not in texto:
+        return texto
+    castellano, ingles = texto.split(MARCA_INGLES, 1)
+    if (codigo or idioma.actual()) != 'en':
+        return castellano
+    # Tras la marca, el título que se ve en GitHub («### English»): en la app sobra.
+    return re.sub(r'\A\s*#+[^\n]*\n', '', ingles.lstrip('\r\n'), count=1)
 
 
 def limpiar_notas(texto):
     """Notas de la Release (Markdown) como texto plano breve para la ventana."""
-    texto = CONTROL.sub('', str(texto or '')).replace('\r\n', '\n').strip()
+    texto = CONTROL.sub('', notas_del_idioma(texto)).replace('\r\n', '\n').strip()
     texto = re.sub(r'\*\*(.+?)\*\*', r'\1', texto)         # negrita
     texto = re.sub(r'`([^`\n]+)`', r'\1', texto)           # código
     texto = re.sub(r'\[([^\[\]\n]+)\]\([^)\n]*\)', r'\1', texto)  # enlaces: solo el texto
@@ -125,12 +145,12 @@ def nombre_instalador(v):
 def interpretar(datos, actual=__version__):
     """Respuesta de /releases/latest -> (Novedad o None si no hay nada más nuevo, url de SHA256SUMS.txt)."""
     if not isinstance(datos, dict):
-        raise ErrorActualizacion('GitHub ha devuelto una respuesta inesperada.')
+        raise ErrorActualizacion(tr('GitHub ha devuelto una respuesta inesperada.'))
     if datos.get('draft') or datos.get('prerelease'):
         return None, None
     v = version(datos.get('tag_name'))
     if v is None:
-        raise ErrorActualizacion('La última versión publicada no tiene un número de versión válido.')
+        raise ErrorActualizacion(tr('La última versión publicada no tiene un número de versión válido.'))
     if v <= version(actual):
         return None, None
     texto_v = '.'.join(map(str, v))
@@ -178,9 +198,9 @@ def consultar(actual=__version__):
     except urllib.error.HTTPError as e:
         if e.code == 404:              # todavía no hay ninguna Release publicada
             return None
-        raise ErrorActualizacion(f'GitHub ha respondido con el error {e.code}.') from e
+        raise ErrorActualizacion(tr('GitHub ha respondido con el error {codigo}.', codigo=e.code)) from e
     except (OSError, ValueError) as e:
-        raise ErrorActualizacion('No se ha podido conectar con GitHub. Comprueba la conexión a internet.') from e
+        raise ErrorActualizacion(tr('No se ha podido conectar con GitHub. Comprueba la conexión a internet.')) from e
     if novedad and novedad.instalador and not novedad.instalador.sha256:
         novedad = Novedad(novedad.version, novedad.pagina, novedad.notas, None)   # sin huella no se instala solo
     return novedad
@@ -207,7 +227,7 @@ def descargar(archivo, carpeta=None, progreso=None, cancelada=None):
     """Descarga `archivo` comprobando su SHA-256 mientras llega. Devuelve la ruta del archivo ya
     verificado; si no coincide, lo borra y lanza ErrorActualizacion."""
     if not (archivo.sha256 and re.fullmatch(r'BajarSubtitulosESP-[0-9.]+-instalador\.exe', archivo.nombre)):
-        raise ErrorActualizacion('La actualización no tiene una huella SHA-256 con la que comprobarla.')
+        raise ErrorActualizacion(tr('La actualización no tiene una huella SHA-256 con la que comprobarla.'))
     carpeta = Path(carpeta or carpeta_descargas())
     carpeta.mkdir(parents=True, exist_ok=True)
     destino = carpeta / archivo.nombre
@@ -218,7 +238,7 @@ def descargar(archivo, carpeta=None, progreso=None, cancelada=None):
             with _abrir(archivo.url, tiempo=60) as r, open(parcial, 'wb') as f:
                 total = archivo.tamano or int(r.headers.get('Content-Length') or 0)
                 if total > TAMANO_MAX:
-                    raise ErrorActualizacion('La actualización es demasiado grande: no se ha descargado.')
+                    raise ErrorActualizacion(tr('La actualización es demasiado grande: no se ha descargado.'))
                 while True:
                     if cancelada and cancelada():
                         raise Cancelada()
@@ -227,7 +247,7 @@ def descargar(archivo, carpeta=None, progreso=None, cancelada=None):
                         break
                     hecho += len(bloque)
                     if hecho > TAMANO_MAX:
-                        raise ErrorActualizacion('La actualización es demasiado grande: no se ha descargado.')
+                        raise ErrorActualizacion(tr('La actualización es demasiado grande: no se ha descargado.'))
                     h.update(bloque)
                     f.write(bloque)
                     if progreso:
@@ -235,10 +255,10 @@ def descargar(archivo, carpeta=None, progreso=None, cancelada=None):
         except (ErrorActualizacion, Cancelada):
             raise
         except (OSError, ValueError) as e:
-            raise ErrorActualizacion('La descarga se ha interrumpido. Comprueba la conexión a internet.') from e
+            raise ErrorActualizacion(tr('La descarga se ha interrumpido. Comprueba la conexión a internet.')) from e
         if h.hexdigest() != archivo.sha256:
-            raise ErrorActualizacion('La descarga no coincide con la huella SHA-256 publicada en GitHub: '
-                                     'no se ha instalado nada.')
+            raise ErrorActualizacion(tr('La descarga no coincide con la huella SHA-256 publicada en GitHub: '
+                                        'no se ha instalado nada.'))
         os.replace(parcial, destino)
     except BaseException:
         try:

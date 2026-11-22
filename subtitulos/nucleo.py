@@ -33,6 +33,7 @@ from subliminal.video import Episode
 from .archivos import HOME, VIDEO_EXT, buscar_en_varias, buscar_videos  # noqa: F401
 from .eventos import (CASTELLANO, INGLES, LATINO, NO_ENCONTRADO, PENDIENTE, SIN_CAMBIOS,  # noqa: F401
                       YA_CASTELLANO, Eventos, Resultado)
+from .idioma import N_, tr
 from .opciones import MAX_DESCARGAS, Opciones
 from .pistas import incrustado, ingles_incrustado
 from .texto import MAX_SRT, dialecto, idioma_srt, limpiar_texto, ultimo_tiempo, visible
@@ -45,7 +46,17 @@ PROVIDERS = ['opensubtitles', 'addic7ed', 'gestdown', 'subtitulamos']
 PAUSA = 3           # segundos de espera entre un vídeo que busca en internet y el siguiente
 
 RANGO = {None: 0, 'otro': 0, 'ingles': 1, 'latino': 2, 'castellano': 3}
-ETIQUETA = {'castellano': 'CASTELLANO', 'latino': 'LATINO', 'ingles': 'INGLÉS'}
+ETIQUETA = {'castellano': N_('CASTELLANO'), 'latino': N_('LATINO'), 'ingles': N_('INGLÉS')}
+
+# Idioma de un .srt que ya existe (idioma_srt), en el registro.
+# (En castellano, 'ingles' sin tilde: la salida de la CLI no cambia.)
+IDIOMA_SRT = {'castellano': N_('castellano'), 'latino': N_('latino'), 'ingles': N_('ingles'), 'otro': N_('otro')}
+
+
+def ya_tenia(tipo):
+    """Estado del resumen cuando se deja el .srt que había: 'LATINO (ya tenía .srt)'."""
+    return tr('{tipo} (ya tenía .srt)', tipo=tr(ETIQUETA[tipo]))
+
 
 def leer_credenciales():
     """Configuración de proveedores de ~/.subtitulos-esp/credenciales.json ({} si no existe)."""
@@ -123,12 +134,14 @@ def ingles_proveedores(pool, video, max_descargas=MAX_DESCARGAS, detalle=lambda 
             continue
         texto = sub.text
         if len(texto) > MAX_SRT:
-            detalle(f'  [inglés] {sub.provider_name:13} id={visible(sub.id)} descartado: tamaño anormal')
+            detalle(tr('  [inglés] {proveedor:13} id={id} descartado: tamaño anormal',
+                       proveedor=sub.provider_name, id=visible(sub.id)))
             continue
         ep_ok = episodio_correcto(sub, video)
         dur_ok = duracion_ok(texto, video)
-        detalle(f'  [inglés] {sub.provider_name:13} id={visible(sub.id)} score={compute_score(sub, video)} '
-                f'episodio_ok={ep_ok} duración_ok={dur_ok}')
+        detalle(tr('  [inglés] {proveedor:13} id={id} score={score} episodio_ok={ep_ok} duración_ok={dur_ok}',
+                   proveedor=sub.provider_name, id=visible(sub.id), score=compute_score(sub, video),
+                   ep_ok=ep_ok, dur_ok=dur_ok))
         if ep_ok and dur_ok:
             return texto, sub
     return None, None
@@ -213,7 +226,7 @@ def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=Non
     def escribir(texto, destino):
         comprobar()
         if opciones.dry_run:
-            detalle(f'  [dry-run] guardaría {destino.name}')
+            detalle(tr('  [dry-run] guardaría {nombre}', nombre=destino.name))
         else:
             guardar(texto, destino)
 
@@ -260,19 +273,20 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
             actual = idioma_srt(previo.read_text(encoding='utf-8', errors='replace')) if previo else None
             nota = '-'
             if previo and previo != destino:
-                nota = f'renombrado desde {previo.suffixes[-2]}.srt'
+                nota = tr('renombrado desde {extension}.srt', extension=previo.suffixes[-2])
                 if opciones.dry_run:
-                    detalle(f'  [dry-run] renombraría {previo.name} -> {destino.name}')
+                    detalle(tr('  [dry-run] renombraría {previo} -> {destino}', previo=previo.name,
+                               destino=destino.name))
                 else:
                     previo.rename(destino)
 
             if actual == 'castellano' and not opciones.force:
-                anotar(path, 'ya tenía castellano', nota, YA_CASTELLANO)
+                anotar(path, tr('ya tenía castellano'), nota, YA_CASTELLANO)
                 continue
 
             detalle(f'\n== {path.name}')
             if actual:
-                detalle(f'  ya tiene {destino.name} en {actual}')
+                detalle(tr('  ya tiene {nombre} en {idioma}', nombre=destino.name, idioma=tr(IDIOMA_SRT[actual])))
 
             def aplicar(tipo, texto, estado, fuente):
                 """Guarda como <video>.srt salvo que el que ya hay sea de un tipo mejor."""
@@ -280,7 +294,7 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
                     escribir(texto, destino)
                     anotar(path, estado, fuente, tipo)
                 else:
-                    anotar(path, f'{ETIQUETA[actual]} (ya tenía .srt)', nota, SIN_CAMBIOS)
+                    anotar(path, ya_tenia(actual), nota, SIN_CAMBIOS)
 
             emb = incrustado(path, opciones.ingles, detalle)
             comprobar()
@@ -288,14 +302,15 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
             if emb['ingles'] and (opciones.force or not destino_en.exists()):
                 escribir(emb['ingles'][0], destino_en)
             if emb['castellano']:
-                aplicar('castellano', emb['castellano'][0], 'CASTELLANO (incrustado)', emb['castellano'][1][:30])
+                aplicar('castellano', emb['castellano'][0], tr('CASTELLANO (incrustado)'), emb['castellano'][1][:30])
                 continue
 
             # A partir de aquí se busca en internet: límite por ejecución y pausa entre vídeos.
             if opciones.max_videos and buscados >= opciones.max_videos:
-                detalle(f'  límite de {opciones.max_videos} vídeos con búsqueda en internet alcanzado: '
-                        f'queda para otra ejecución')
-                anotar(path, 'PENDIENTE (límite)', f'máx. {opciones.max_videos} por ejecución', PENDIENTE)
+                detalle(tr('  límite de {n} vídeos con búsqueda en internet alcanzado: queda para otra ejecución',
+                           n=opciones.max_videos))
+                anotar(path, tr('PENDIENTE (límite)'), tr('máx. {n} por ejecución', n=opciones.max_videos),
+                       PENDIENTE)
                 continue
             if buscados and _esperar(PAUSA, cancelado):
                 break
@@ -315,8 +330,8 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
             candidatos = pool.list_subtitles(video, {Language('spa')})
             comprobar()
             if max_descargas and len(candidatos) > max_descargas:
-                detalle(f'  {len(candidatos)} candidatos en español: se descargan los {max_descargas} '
-                        f'mejores, alternando proveedores')
+                detalle(tr('  {n} candidatos en español: se descargan los {maximo} mejores, alternando proveedores',
+                           n=len(candidatos), maximo=max_descargas))
             castellanos, latinos = [], []
             vistos = set()
             for sub in mejores_candidatos(candidatos, video, max_descargas):
@@ -325,7 +340,8 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
                     continue
                 texto = sub.text
                 if len(texto) > MAX_SRT:
-                    detalle(f'  {sub.provider_name:13} id={visible(sub.id)} descartado: tamaño anormal')
+                    detalle(tr('  {proveedor:13} id={id} descartado: tamaño anormal', proveedor=sub.provider_name,
+                               id=visible(sub.id)))
                     continue
                 if texto in vistos:
                     continue
@@ -335,8 +351,9 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
                 dur_ok = duracion_ok(texto, video)
                 score = compute_score(sub, video)
                 sinc = sincronia(sub, video)
-                detalle(f'  {sub.provider_name:13} id={visible(sub.id)} score={score} sincronía={sinc} '
-                        f'españa={es} latino={la} episodio_ok={ep_ok} duración_ok={dur_ok}')
+                detalle(tr('  {proveedor:13} id={id} score={score} sincronía={sinc} españa={es} latino={la} '
+                           'episodio_ok={ep_ok} duración_ok={dur_ok}', proveedor=sub.provider_name, id=visible(sub.id),
+                           score=score, sinc=sinc, es=es, la=la, ep_ok=ep_ok, dur_ok=dur_ok))
                 if not (ep_ok and dur_ok):
                     continue
                 (castellanos if ok else latinos).append((sinc, es, score, sub, texto))
@@ -346,28 +363,28 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
                 # 3) puntuación de subliminal. Antes mandaba la puntuación y un +2 por coincidir
                 # en resolución y códec ganaba a un candidato con 5 veces más señales.
                 sinc, es, score, sub, texto = max(castellanos, key=lambda c: (c[0], c[1], c[2]))
-                aplicar('castellano', texto, 'CASTELLANO', f'{sub.provider_name} {sub.id}')
+                aplicar('castellano', texto, tr('CASTELLANO'), f'{sub.provider_name} {sub.id}')
             elif emb['latino'] and not opciones.solo_castellano:
                 # La pista incrustada va sincronizada exactamente con el vídeo: mejor que una web.
-                aplicar('latino', emb['latino'][0], 'LATINO (incrustado)', emb['latino'][1][:30])
+                aplicar('latino', emb['latino'][0], tr('LATINO (incrustado)'), emb['latino'][1][:30])
             elif latinos and not opciones.solo_castellano:
                 sinc, es, score, sub, texto = max(latinos, key=lambda c: (c[0], c[2]))
-                aplicar('latino', texto, 'LATINO', f'{sub.provider_name} {sub.id}')
+                aplicar('latino', texto, tr('LATINO'), f'{sub.provider_name} {sub.id}')
             elif RANGO[actual] >= RANGO['ingles'] and (not opciones.force or RANGO[actual] > RANGO['ingles']):
                 # Ya hay latino o inglés y no se ha encontrado nada mejor: se deja como está.
-                anotar(path, f'{ETIQUETA[actual]} (ya tenía .srt)', nota, SIN_CAMBIOS)
+                anotar(path, ya_tenia(actual), nota, SIN_CAMBIOS)
             elif opciones.sin_ingles:
-                anotar(path, 'NO ENCONTRADO', f'{len(latinos)} latinos descartados', NO_ENCONTRADO)
+                anotar(path, tr('NO ENCONTRADO'), tr('{n} latinos descartados', n=len(latinos)), NO_ENCONTRADO)
             else:
                 # Ni castellano ni latino: subtítulos en inglés como último recurso.
                 texto, pista = (emb['ingles'] or (None, ''))
                 if not texto and not emb['lento']:      # si leer el vídeo es lento, no se reintenta
                     texto, pista = ingles_incrustado(path, detalle)
                 if texto:
-                    aplicar('ingles', texto, 'INGLÉS (incrustado)', pista[:30])
+                    aplicar('ingles', texto, tr('INGLÉS (incrustado)'), pista[:30])
                     continue
                 texto, sub = ingles_proveedores(pool, video, max_descargas, detalle, comprobar)
                 if texto:
-                    aplicar('ingles', texto, 'INGLÉS', f'{sub.provider_name} {sub.id}')
+                    aplicar('ingles', texto, tr('INGLÉS'), f'{sub.provider_name} {sub.id}')
                 else:
-                    anotar(path, 'NO ENCONTRADO', 'ni español ni inglés', NO_ENCONTRADO)
+                    anotar(path, tr('NO ENCONTRADO'), tr('ni español ni inglés'), NO_ENCONTRADO)

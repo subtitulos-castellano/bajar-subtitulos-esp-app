@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 from subtitulos.archivos import VIDEO_EXT
+from subtitulos.idioma import N_, tr
 
 CLAVE = 'BajarSubtitulosESP'
 RAIZ = r'Software\Classes'           # las pruebas lo cambian por una clave propia
@@ -24,10 +25,11 @@ ARG_CARPETA = '--menu-carpeta'              # solo los vídeos de la propia carp
 ARG_SUBCARPETAS = '--menu-subcarpetas'      # la carpeta y sus subcarpetas
 ARG_ARCHIVOS = '--menu-archivos'            # un vídeo (uno por proceso si se seleccionan varios)
 
-TEXTO_CARPETA = 'Bajar subtítulos aquí'
-TEXTO_ARCHIVOS = 'Bajar subtítulos'
-SUBMENU = (('1solo', 'Solo esta carpeta', ARG_CARPETA),
-           ('2todo', 'Esta carpeta y sus subcarpetas', ARG_SUBCARPETAS))
+# Textos del menú, en el idioma de la app (si cambia, asegurar() los rehace al abrirla).
+TEXTO_CARPETA = N_('Bajar subtítulos aquí')
+TEXTO_ARCHIVOS = N_('Bajar subtítulos')
+SUBMENU = (('1solo', N_('Solo esta carpeta'), ARG_CARPETA),
+           ('2todo', N_('Esta carpeta y sus subcarpetas'), ARG_SUBCARPETAS))
 
 # %V es la carpeta en las tres (en el fondo de una carpeta, %1 no existe).
 CARPETAS = (r'Directory\shell', r'Directory\Background\shell', r'Drive\shell')
@@ -68,14 +70,14 @@ def entradas(prog=None):
     claves = {}
     for base in CARPETAS:
         k = rf'{base}\{CLAVE}'
-        claves[k] = {'MUIVerb': TEXTO_CARPETA, 'SubCommands': '', **icono}
+        claves[k] = {'MUIVerb': tr(TEXTO_CARPETA), 'SubCommands': '', **icono}
         for nombre, texto, arg in SUBMENU:
-            claves[rf'{k}\shell\{nombre}'] = {'MUIVerb': texto}
+            claves[rf'{k}\shell\{nombre}'] = {'MUIVerb': tr(texto)}
             claves[rf'{k}\shell\{nombre}\command'] = {'': comando(arg, '%V', prog)}
     for base in _archivos():
         k = rf'{base}\{CLAVE}'
         # Player: que aparezca también con más de 15 vídeos seleccionados.
-        claves[k] = {'MUIVerb': TEXTO_ARCHIVOS, 'MultiSelectModel': 'Player', **icono}
+        claves[k] = {'MUIVerb': tr(TEXTO_ARCHIVOS), 'MultiSelectModel': 'Player', **icono}
         claves[rf'{k}\command'] = {'': comando(ARG_ARCHIVOS, '%1', prog)}
     return claves
 
@@ -139,6 +141,33 @@ def registrado():
     return bool(comando_registrado())
 
 
+def texto_registrado():
+    """El texto de «Bajar subtítulos aquí» tal como está en el registro, o ''."""
+    if not disponible():
+        return ''
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf'{RAIZ}\{CARPETAS[0]}\{CLAVE}') as k:
+            return winreg.QueryValueEx(k, 'MUIVerb')[0]
+    except OSError:
+        return ''
+
+
+def retitular():
+    """Pone los textos del menú en el idioma de la app sin tocar los comandos (apunte a la copia que
+    apunte). Solo cambia las claves que ya existen. Lanza OSError si no se puede."""
+    import winreg
+    for sub, valores in entradas().items():
+        if 'MUIVerb' not in valores:
+            continue
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf'{RAIZ}\{sub}', 0, winreg.KEY_WRITE) as k:
+                winreg.SetValueEx(k, 'MUIVerb', 0, winreg.REG_SZ, valores['MUIVerb'])
+        except FileNotFoundError:
+            pass
+    _avisar_explorador()
+
+
 def programa_registrado():
     """Ruta del programa al que apunta el menú (el primer elemento entre comillas), o None."""
     c = comando_registrado()
@@ -167,6 +196,7 @@ def asegurar(config, instalada, prog=None):
     - Activado: si falta, la instalada lo añade (la portable no). Si apunta a otra copia que sí
       existe, se respeta; si apunta a esta con otro comando, se rehace.
     - Desactivado: no se añade.
+    - Si está, con los textos en otro idioma (se ha cambiado en Configuración): se traducen.
     Devuelve True si ha cambiado algo. Nunca lanza: el menú no debe impedir abrir la app."""
     if not disponible():
         return False
@@ -193,6 +223,9 @@ def asegurar(config, instalada, prog=None):
             elif es_de(prog) and comando_registrado() != comando(ARG_CARPETA, '%V', prog):
                 registrar(prog)
                 return True
+        if actual is not None and texto_registrado() != tr(TEXTO_CARPETA):
+            retitular()
+            return True
     except OSError:
         pass
     return False

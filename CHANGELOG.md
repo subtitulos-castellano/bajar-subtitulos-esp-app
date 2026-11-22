@@ -1,5 +1,16 @@
 # Cambios
 
+## 1.2.0
+
+- **La app, también en inglés** (*English*):
+  - el instalador pregunta el idioma la primera vez (propone el de Windows); al actualizar se queda el
+    de antes;
+  - en *Configuración › Idioma · Language* se cambia en cualquier momento (en la versión portable, es
+    la única forma). La app se cierra y se vuelve a abrir sola en el idioma elegido;
+  - cambia todo: la interfaz, los avisos, las novedades de las actualizaciones, el registro de
+    *Detalles* y el menú contextual del Explorador.
+- La línea de comandos y la skill siguen en castellano.
+
 ## 1.1.1
 
 - **Menú contextual con la versión instalada y la portable**: ya no se queda en el Explorador tras

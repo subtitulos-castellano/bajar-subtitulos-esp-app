@@ -1,11 +1,15 @@
 """Arranque de Bajar Subtítulos ESP.
 
-    python -I app/main.py [--tema sistema|claro|oscuro] [--demo] [--captura CARPETA] [--config ARCHIVO]
-                          [VÍDEO_O_CARPETA ...]
+    python -I app/main.py [--tema sistema|claro|oscuro] [--idioma es|en] [--demo] [--captura CARPETA]
+                          [--config ARCHIVO] [VÍDEO_O_CARPETA ...]
 
 Con vídeos o carpetas (p. ej., soltados sobre el icono del programa), los busca al abrirse.
 --menu-carpeta, --menu-subcarpetas y --menu-archivos los usa el menú contextual del Explorador
-(menu_contextual.py); --menu-contextual-instalar y --menu-contextual-quitar, el instalador.
+(menu_contextual.py); --menu-contextual-instalar y --menu-contextual-quitar, el instalador (con
+--idioma-inicial, el idioma elegido al instalar, que solo cuenta si aún no se había elegido).
+--pagina ajustes: abrirse en Configuración (al volver a abrirse tras cambiar el idioma).
+
+--tema e --idioma solo valen para esta apertura (no cambian la configuración).
 
 --demo usa resultados de demostración (no busca ni descarga nada).
 --captura guarda imágenes de cada pantalla en claro y oscuro sin mostrar la ventana (sirve para
@@ -92,6 +96,18 @@ def autoprueba(salida, con_red=False):
         from babelfish import Language
         return f"{Language('spa')} {Language.fromietf('es-ES')} {Language.fromopensubtitles('spa')}"
     paso('idiomas (babelfish)', idiomas)
+    def ingles():
+        from subtitulos import idioma
+        from subtitulos.en import TEXTOS
+        idioma.poner('en')
+        try:
+            texto = idioma.tr('Vídeo {indice} de {total}', indice=1, total=2)
+        finally:
+            idioma.poner('es')
+        if texto != 'Video 1 of 2':
+            raise RuntimeError(f'sin traducción: {texto}')
+        return f'{len(TEXTOS)} textos traducidos'
+    paso('idioma inglés', ingles)
     paso('guessit', lambda: dict(__import__('guessit').guessit('Serie.S01E02.720p.WEB-DL.mkv')))
     paso('keyring', lambda: type(__import__('keyring').get_keyring()).__name__)
     paso('certificados', lambda: __import__('certifi').where())
@@ -182,6 +198,7 @@ def autoprueba(salida, con_red=False):
 
 def capturar(app, ventana, carpeta):
     from app.demo import resultados_demo, NOMBRES_EJEMPLO, lineas_demo
+    from subtitulos.idioma import tr
     carpeta = Path(carpeta)
     carpeta.mkdir(parents=True, exist_ok=True)
     ventana.setAttribute(Qt.WA_DontShowOnScreen)
@@ -199,7 +216,7 @@ def capturar(app, ventana, carpeta):
         ventana.cambiar_tema(nombre_tema)
         ventana.ir(0)
         guardar(f'{nombre_tema}_1_reposo')
-        ventana.capa.mostrar('Suelta para buscar subtítulos', 'Serie de Ejemplo - Temporada 1')
+        ventana.capa.mostrar(tr('Suelta para buscar subtítulos'), 'Serie de Ejemplo - Temporada 1')
         guardar(f'{nombre_tema}_2_arrastrando')
         ventana.capa.hide()
         ventana.inicio.empezar(ejemplo, demo=False)   # sin el aviso de demostración: capturas limpias
@@ -267,12 +284,21 @@ def rutas_del_pedido(pedido):
 
 def _menu_desde_instalador(args):
     """El instalador se queda con el menú al instalar o actualizar (si no se había desactivado en
-    Configuración); el desinstalador lo quita, apunte a la copia que apunte."""
+    Configuración); el desinstalador lo quita, apunte a la copia que apunte.
+
+    Al instalar, también apunta el idioma elegido en el instalador, solo si aún no había ninguno (la
+    primera instalación, o al actualizar desde una versión sin idiomas): después manda Configuración."""
     from app import menu_contextual
     from app.config import Config
+    from subtitulos import idioma
     try:
         if args.menu_contextual_instalar:
-            menu_contextual.al_instalar(Config(args.config))
+            config = Config(args.config)
+            if args.idioma_inicial and config.idioma is None:
+                config.idioma = args.idioma_inicial
+                config.guardar()
+            idioma.poner(config.idioma)          # los textos del menú, en el idioma de la app
+            menu_contextual.al_instalar(config)
         else:
             menu_contextual.al_desinstalar(Config(args.config))
     except OSError:
@@ -284,6 +310,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument('rutas', nargs='*', metavar='VÍDEO_O_CARPETA')
     ap.add_argument('--tema', choices=('sistema', 'claro', 'oscuro'))
+    ap.add_argument('--idioma', choices=('es', 'en'))
     ap.add_argument('--demo', action='store_true')
     ap.add_argument('--captura', metavar='CARPETA')
     ap.add_argument('--config', metavar='ARCHIVO')
@@ -297,6 +324,8 @@ def main(argv=None):
     ap.add_argument('--menu-archivos', metavar='VÍDEO', help=argparse.SUPPRESS)
     ap.add_argument('--menu-contextual-instalar', action='store_true', help=argparse.SUPPRESS)
     ap.add_argument('--menu-contextual-quitar', action='store_true', help=argparse.SUPPRESS)
+    ap.add_argument('--idioma-inicial', choices=('es', 'en'), help=argparse.SUPPRESS)
+    ap.add_argument('--pagina', choices=('ajustes',), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
     if args.autoprueba:
         return autoprueba(args.autoprueba, args.con_red)
@@ -323,16 +352,22 @@ def main(argv=None):
     config = Config(args.config)
     if args.tema:
         config.tema = args.tema
+    from subtitulos import idioma
+    idioma.poner(args.idioma or config.idioma)    # antes de crear la ventana: sus textos ya salen así
     tema.aplicar(app, config.tema, config.tamano_texto)
-    from app.ventana import Ventana
+    from app.ventana import AJUSTES, Ventana
     ventana = Ventana(config, demo=args.demo or bool(args.captura))
     if args.captura:
         capturar(app, ventana, args.captura)
         return 0
+    if args.pagina == 'ajustes':
+        ventana.ir(AJUSTES)
     if unica:
         from app import actualizar, menu_contextual
         menu_contextual.asegurar(config, actualizar.instalada())
-        _atender_pedidos(app, ventana, config)
+        _atender_pedidos(app, ventana, config, args)
+    else:
+        ventana.al_reiniciar = lambda: _reiniciar(args, ventana.salir)
     if not (pedido and pedido['menu'] and config.menu_segundo_plano and unica):
         ventana.mostrar()
     if pedido and unica:
@@ -351,7 +386,31 @@ def main(argv=None):
     return app.exec()
 
 
-def _atender_pedidos(app, ventana, config):
+def _reiniciar(args, salir, antes=None):
+    """Vuelve a abrir la app (en Configuración) para aplicar el idioma nuevo: lanza otra igual y cierra
+    esta. `antes` suelta lo que impediría a la nueva ser «la primera» (ver instancia.py)."""
+    import subprocess
+
+    from app import menu_contextual
+    orden = menu_contextual.programa() + ['--pagina', 'ajustes']
+    if args.config:
+        orden += ['--config', str(Path(args.config).resolve())]
+    if args.demo:
+        orden.append('--demo')
+    if antes:
+        antes()
+    flags = 0
+    if sys.platform == 'win32':
+        flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    try:
+        subprocess.Popen(orden, close_fds=True, creationflags=flags)
+    except OSError:
+        return False
+    salir()
+    return True
+
+
+def _atender_pedidos(app, ventana, config, args):
     """Pedidos de esta apertura y de las siguientes (menú contextual, el icono del programa…)."""
     from PySide6.QtWidgets import QSystemTrayIcon
 
@@ -366,6 +425,11 @@ def _atender_pedidos(app, ventana, config):
 
     app.servidor = instancia.Servidor(app)
     app.servidor.escuchar()
+
+    def soltar_instancia():
+        app.servidor.cerrar()
+        instancia.soltar()
+    ventana.al_reiniciar = lambda: _reiniciar(args, salir, soltar_instancia)
     app.agrupador = instancia.Agrupador(parent=app)
     app.bandeja = Bandeja(ventana, icono_app(), salir, lambda: config.cerrar_a_bandeja, app)
     ventana.puede_ir_a_bandeja = QSystemTrayIcon.isSystemTrayAvailable()

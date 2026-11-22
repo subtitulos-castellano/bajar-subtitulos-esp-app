@@ -6,7 +6,9 @@ from PySide6.QtGui import QDesktopServices, QFont, QFontMetrics
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
                                QScrollArea, QSpinBox, QVBoxLayout, QWidget)
 
+from subtitulos import idioma
 from subtitulos.archivos import HOME
+from subtitulos.idioma import tr
 from subtitulos.opciones import MAX_DESCARGAS, MAX_VIDEOS, Opciones
 
 from . import __version__, actualizar, credenciales, iconos, menu_contextual, tema
@@ -57,7 +59,7 @@ class Limite(QWidget):
         self.numero.setValue(valor)
         self.numero.setFixedWidth(84)
         self.numero.setAlignment(Qt.AlignRight)
-        self.sin = QCheckBox('Sin límite')
+        self.sin = QCheckBox(tr('Sin límite'))
         lay.addWidget(self.numero)
         lay.addWidget(self.sin)
         self.sin.toggled.connect(lambda v: self.numero.setEnabled(not v))
@@ -84,6 +86,7 @@ class VistaAjustes(QWidget):
     tamano_elegido = Signal()      # cambió el tamaño del texto (ya guardado)
     buscar_actualizacion = Signal()  # 'Buscar ahora'
     bandeja_cambiada = Signal()    # cambió «Al cerrar la ventana, seguir junto al reloj» (ya guardado)
+    idioma_elegido = Signal(str)   # 'es' | 'en' (ya guardado): la app se vuelve a abrir
 
     def __init__(self, config, parent=None):
         super().__init__(parent)
@@ -101,46 +104,53 @@ class VistaAjustes(QWidget):
         lay = QVBoxLayout(cuerpo)
         lay.setContentsMargins(MARGEN, MARGEN - 4, MARGEN, MARGEN)
         lay.setSpacing(6)
-        lay.addWidget(etiqueta('Configuración', 'titulo'))
-        lay.addWidget(etiqueta('Los cambios se guardan al momento y se usan en la siguiente búsqueda.',
+        lay.addWidget(etiqueta(tr('Configuración'), 'titulo'))
+        lay.addWidget(etiqueta(tr('Los cambios se guardan al momento y se usan en la siguiente búsqueda.'),
                                'subtitulo'))
         lay.addSpacing(16)
 
+        # Idioma (lo primero: quien no entienda el castellano tiene que encontrarlo)
+        lay.addWidget(self._idioma())
+        lay.addSpacing(12)
+
         # Qué guardar
-        t = Tarjeta('subtitulos', 'Qué subtítulos guardar',
-                    'Siempre se prefiere castellano de España. Nunca se sustituye un subtítulo por otro peor.')
-        self.latino = t.fila(FilaOpcion('Si no hay castellano, guardar latino',
-                                        'El resumen lo marca como Latino para que sepas que no es castellano.')).control
-        self.ingles = t.fila(FilaOpcion('Si no hay nada en español, guardar inglés',
-                                        'Primero la pista inglesa del propio vídeo (mejor si es SDH); si no hay, '
-                                        'de los proveedores.')).control
-        self.ingles_extra = t.fila(FilaOpcion('Extraer también la pista inglesa incrustada',
-                                              'Se guarda aparte como <vídeo>.en.srt, además del subtítulo '
-                                              'principal.')).control
+        t = Tarjeta('subtitulos', tr('Qué subtítulos guardar'),
+                    tr('Siempre se prefiere castellano de España. Nunca se sustituye un subtítulo por otro peor.'))
+        self.latino = t.fila(FilaOpcion(tr('Si no hay castellano, guardar latino'),
+                                        tr('El resumen lo marca como Latino para que sepas que no es '
+                                           'castellano.'))).control
+        self.ingles = t.fila(FilaOpcion(tr('Si no hay nada en español, guardar inglés'),
+                                        tr('Primero la pista inglesa del propio vídeo (mejor si es SDH); si no '
+                                           'hay, de los proveedores.'))).control
+        self.ingles_extra = t.fila(FilaOpcion(tr('Extraer también la pista inglesa incrustada'),
+                                              tr('Se guarda aparte como <vídeo>.en.srt, además del subtítulo '
+                                                 'principal.'))).control
         lay.addWidget(t)
         lay.addSpacing(12)
 
         # Cómo trabajar
-        t = Tarjeta('ajustes', 'Cómo trabajar')
-        self.force = t.fila(FilaOpcion('Rehacer aunque ya haya castellano',
-                                       'Vuelve a buscar en todos los vídeos. El subtítulo anterior se copia a la '
-                                       'carpeta de copias de seguridad.')).control
-        self.simulacion = t.fila(FilaOpcion('Modo simulación',
-                                            'Muestra qué se haría, sin escribir ni renombrar ningún archivo.')).control
+        t = Tarjeta('ajustes', tr('Cómo trabajar'))
+        self.force = t.fila(FilaOpcion(tr('Rehacer aunque ya haya castellano'),
+                                       tr('Vuelve a buscar en todos los vídeos. El subtítulo anterior se copia a '
+                                          'la carpeta de copias de seguridad.'))).control
+        self.simulacion = t.fila(FilaOpcion(tr('Modo simulación'),
+                                            tr('Muestra qué se haría, sin escribir ni renombrar ningún '
+                                               'archivo.'))).control
         lay.addWidget(t)
         lay.addSpacing(12)
 
         # Límites
-        t = Tarjeta('escudo', 'Límites para no saturar a los proveedores',
-                    'Los proveedores de subtítulos son servicios gratuitos. Sube estos límites solo si lo '
-                    'necesitas: los vídeos que pasen del límite quedan como Pendientes para la siguiente vez.')
+        t = Tarjeta('escudo', tr('Límites para no saturar a los proveedores'),
+                    tr('Los proveedores de subtítulos son servicios gratuitos. Sube estos límites solo si lo '
+                       'necesitas: los vídeos que pasen del límite quedan como Pendientes para la siguiente vez.'))
         self.max_videos = Limite(MAX_VIDEOS, 1000)
-        t.fila(FilaOpcion('Vídeos que buscan en internet en cada tanda',
-                          f'Por defecto, {MAX_VIDEOS}. Los que ya tienen castellano o lo traen dentro no cuentan.',
+        t.fila(FilaOpcion(tr('Vídeos que buscan en internet en cada tanda'),
+                          tr('Por defecto, {n}. Los que ya tienen castellano o lo traen dentro no cuentan.',
+                             n=MAX_VIDEOS),
                           self.max_videos))
         self.max_descargas = Limite(MAX_DESCARGAS, 50)
-        t.fila(FilaOpcion('Candidatos que se descargan por vídeo',
-                          f'Por defecto, {MAX_DESCARGAS}. Se eligen los mejores, alternando proveedores.',
+        t.fila(FilaOpcion(tr('Candidatos que se descargan por vídeo'),
+                          tr('Por defecto, {n}. Se eligen los mejores, alternando proveedores.', n=MAX_DESCARGAS),
                           self.max_descargas))
         lay.addWidget(t)
         lay.addSpacing(12)
@@ -150,11 +160,11 @@ class VistaAjustes(QWidget):
         lay.addSpacing(12)
 
         # Apariencia y copias
-        t = Tarjeta('restaurar', 'Ventana, apariencia y copias de seguridad')
-        fila = t.fila(FilaOpcion('Al cerrar la ventana, seguir junto al reloj',
-                                 'La app no se cierra: queda un icono junto al reloj para volver a abrirla. '
-                                 'Si estaba buscando, sigue y avisa al terminar. Para cerrarla del todo: '
-                                 'clic derecho en el icono › Salir.'))
+        t = Tarjeta('restaurar', tr('Ventana, apariencia y copias de seguridad'))
+        fila = t.fila(FilaOpcion(tr('Al cerrar la ventana, seguir junto al reloj'),
+                                 tr('La app no se cierra: queda un icono junto al reloj para volver a abrirla. '
+                                    'Si estaba buscando, sigue y avisa al terminar. Para cerrarla del todo: '
+                                    'clic derecho en el icono › Salir.')))
         self.bandeja = fila.control
         self.bandeja.setChecked(config.cerrar_a_bandeja)
         self.bandeja.toggled.connect(self._bandeja)
@@ -164,7 +174,8 @@ class VistaAjustes(QWidget):
         tl.setSpacing(0)
         self.grupo_tema = QButtonGroup(self)
         self.botones_tema = {}
-        for i, (clave, texto) in enumerate((('sistema', 'Sistema'), ('claro', 'Claro'), ('oscuro', 'Oscuro'))):
+        for i, (clave, texto) in enumerate((('sistema', tr('Sistema')), ('claro', tr('Claro')),
+                                            ('oscuro', tr('Oscuro')))):
             b = QPushButton(texto)
             b.setCheckable(True)
             b.setObjectName('segmento')
@@ -175,13 +186,13 @@ class VistaAjustes(QWidget):
             self.botones_tema[clave] = b
             tl.addWidget(b)
         self.grupo_tema.buttonClicked.connect(self._tema)
-        t.fila(FilaOpcion('Tema', 'Claro, oscuro o el mismo que Windows.', temas))
+        t.fila(FilaOpcion(tr('Tema'), tr('Claro, oscuro o el mismo que Windows.'), temas))
         t.fila(self._fila_tamano())
-        b_copias = boton('Abrir carpeta')
+        b_copias = boton(tr('Abrir carpeta'))
         b_copias.clicked.connect(self._abrir_copias)
-        t.fila(FilaOpcion('Copias de seguridad',
-                          f'Copia de cada subtítulo sustituido, en {HOME / "backup"} '
-                          '(la misma carpeta que usa la skill).', b_copias))
+        t.fila(FilaOpcion(tr('Copias de seguridad'),
+                          tr('Copia de cada subtítulo sustituido, en {carpeta} (la misma carpeta que usa la skill).',
+                             carpeta=HOME / 'backup'), b_copias))
         lay.addWidget(t)
         lay.addSpacing(12)
 
@@ -194,7 +205,7 @@ class VistaAjustes(QWidget):
         lay.addSpacing(16)
 
         pie = QHBoxLayout()
-        self.b_restaurar = boton('  Restaurar valores por defecto', 'restaurar')
+        self.b_restaurar = boton('  ' + tr('Restaurar valores por defecto'), 'restaurar')
         self.b_restaurar.clicked.connect(self.restaurar)
         pie.addWidget(self.b_restaurar)
         pie.addStretch()
@@ -243,6 +254,54 @@ class VistaAjustes(QWidget):
         self.config.guardar()
         self.tema_elegido.emit(b.clave)
 
+    # ---------- Idioma ----------
+
+    def _idioma(self):
+        """Español / English. Cada idioma con su propio nombre, y el título en los dos: quien no entienda
+        el castellano también lo encuentra (la versión portable empieza en castellano)."""
+        t = Tarjeta('idioma', 'Idioma · Language')
+        botones = QWidget()
+        bl = QHBoxLayout(botones)
+        bl.setContentsMargins(0, 0, 0, 0)
+        bl.setSpacing(0)
+        self.grupo_idioma = QButtonGroup(self)
+        self.botones_idioma = {}
+        for i, (codigo, nombre) in enumerate((('es', 'Español'), ('en', 'English'))):
+            b = QPushButton(nombre)
+            b.setCheckable(True)
+            b.setObjectName('segmento')
+            b.setProperty('pos', ('ini', 'fin')[i])
+            b.setCursor(Qt.PointingHandCursor)
+            b.codigo = codigo
+            self.grupo_idioma.addButton(b)
+            self.botones_idioma[codigo] = b
+            bl.addWidget(b)
+        self.botones_idioma[idioma.actual()].setChecked(True)
+        self.grupo_idioma.buttonClicked.connect(self._cambiar_idioma)
+        fila = t.fila(FilaOpcion(tr('Idioma de la app'),
+                                 tr('Al cambiarlo, la app se cierra y se vuelve a abrir sola en el idioma '
+                                    'elegido, en esta misma pantalla.'), botones))
+        self.estado_idioma = fila.findChild(QLabel, 'ayuda')
+        self.estado_idioma.setTextFormat(Qt.PlainText)
+        return t
+
+    def _cambiar_idioma(self, b):
+        if b.codigo == idioma.actual():
+            return
+        self.config.idioma = b.codigo
+        self.config.guardar()
+        for boton_idioma in self.botones_idioma.values():
+            boton_idioma.setEnabled(False)
+        # En el idioma nuevo: es lo que se ve justo antes de cerrarse.
+        self.estado_idioma.setText('Applying the change: the app is restarting…' if b.codigo == 'en'
+                                   else 'Aplicando el cambio: la app se vuelve a abrir…')
+        self.idioma_elegido.emit(b.codigo)
+
+    def poner_error_idioma(self):
+        """No se ha podido volver a abrir la app: el idioma nuevo se verá la próxima vez que se abra."""
+        self.estado_idioma.setText(tr('No se ha podido volver a abrir la app: el idioma nuevo se usará la '
+                                      'próxima vez que la abras.'))
+
     # ---------- Tamaño del texto ----------
 
     def _fila_tamano(self):
@@ -255,8 +314,8 @@ class VistaAjustes(QWidget):
         sl.setContentsMargins(0, 0, 0, 0)
         sl.setSpacing(0)
         self.grupo_tamano = QButtonGroup(self)
-        self.b_tamano_windows = QPushButton('Como Windows')
-        self.b_tamano_propio = QPushButton('Personalizado')
+        self.b_tamano_windows = QPushButton(tr('Como Windows'))
+        self.b_tamano_propio = QPushButton(tr('Personalizado'))
         for i, b in enumerate((self.b_tamano_windows, self.b_tamano_propio)):
             b.setCheckable(True)
             b.setObjectName('segmento')
@@ -283,9 +342,9 @@ class VistaAjustes(QWidget):
         self._espera_tamano.timeout.connect(self._aplicar_tamano)
         self.grupo_tamano.idClicked.connect(self._modo_tamano)
         self.tamano.valueChanged.connect(lambda _: self._espera_tamano.start())
-        self.fila_tamano = FilaOpcion('Tamaño del texto',
-                                      'Como Windows: el de Configuración de Windows › Accesibilidad › Tamaño '
-                                      'del texto. Si lo cambias allí, la app se ajusta al volver a ella.',
+        self.fila_tamano = FilaOpcion(tr('Tamaño del texto'),
+                                      tr('Como Windows: el de Configuración de Windows › Accesibilidad › Tamaño '
+                                         'del texto. Si lo cambias allí, la app se ajusta al volver a ella.'),
                                       control)
         return self.fila_tamano
 
@@ -307,7 +366,7 @@ class VistaAjustes(QWidget):
 
     def _texto_tamano(self):
         windows = tema.escala_windows()
-        self.b_tamano_windows.setText(f'Como Windows ({windows} %)')
+        self.b_tamano_windows.setText(tr('Como Windows ({n} %)', n=windows))
         if not self.b_tamano_propio.isChecked():
             self.tamano.blockSignals(True)
             self.tamano.setValue(windows)
@@ -322,25 +381,25 @@ class VistaAjustes(QWidget):
     # ---------- Menú contextual ----------
 
     def _menu_contextual(self):
-        t = Tarjeta('menu', 'Menú contextual del Explorador',
-                    'Busca subtítulos con el botón derecho del ratón, sin abrir antes la app. En Windows 11 '
-                    'está dentro de «Mostrar más opciones».')
-        fila = t.fila(FilaOpcion('Mostrar «Bajar subtítulos» en el menú contextual',
-                                 'En una carpeta: «Bajar subtítulos aquí», solo en esa carpeta o también en sus '
-                                 'subcarpetas. En uno o varios vídeos: «Bajar subtítulos».'))
+        t = Tarjeta('menu', tr('Menú contextual del Explorador'),
+                    tr('Busca subtítulos con el botón derecho del ratón, sin abrir antes la app. En Windows 11 '
+                       'está dentro de «Mostrar más opciones».'))
+        fila = t.fila(FilaOpcion(tr('Mostrar «Bajar subtítulos» en el menú contextual'),
+                                 tr('En una carpeta: «Bajar subtítulos aquí», solo en esa carpeta o también en '
+                                    'sus subcarpetas. En uno o varios vídeos: «Bajar subtítulos».')))
         self.menu = fila.control
         self.estado_menu = fila.findChild(QLabel, 'ayuda')
         if menu_contextual.disponible() and not actualizar.instalada():
-            self.estado_menu.setText(self.estado_menu.text() + ' Versión portable: antes de borrar o mover su '
-                                     'carpeta, desactívalo aquí.')
+            self.estado_menu.setText(self.estado_menu.text() + ' ' + tr('Versión portable: antes de borrar o '
+                                                                         'mover su carpeta, desactívalo aquí.'))
         self._texto_menu = self.estado_menu.text()
         modos = QWidget()
         ml = QHBoxLayout(modos)
         ml.setContentsMargins(0, 0, 0, 0)
         ml.setSpacing(0)
         self.grupo_modo_menu = QButtonGroup(self)
-        self.b_menu_ventana = QPushButton('Mostrar la ventana')
-        self.b_menu_fondo = QPushButton('En segundo plano')
+        self.b_menu_ventana = QPushButton(tr('Mostrar la ventana'))
+        self.b_menu_fondo = QPushButton(tr('En segundo plano'))
         for i, b in enumerate((self.b_menu_ventana, self.b_menu_fondo)):
             b.setCheckable(True)
             b.setObjectName('segmento')
@@ -349,9 +408,9 @@ class VistaAjustes(QWidget):
             self.grupo_modo_menu.addButton(b, i)
             ml.addWidget(b)
         self.fila_modo_menu = t.fila(FilaOpcion(
-            'Al usarlo',
-            'Mostrar la ventana: como al arrastrar a la app. En segundo plano: sin ventana; solo un icono junto '
-            'al reloj mientras busca (para ver el progreso o cancelar) y un aviso con el resumen al terminar.',
+            tr('Al usarlo'),
+            tr('Mostrar la ventana: como al arrastrar a la app. En segundo plano: sin ventana; solo un icono junto '
+               'al reloj mientras busca (para ver el progreso o cancelar) y un aviso con el resumen al terminar.'),
             modos))
         (self.b_menu_fondo if self.config.menu_segundo_plano else self.b_menu_ventana).setChecked(True)
         self.grupo_modo_menu.idClicked.connect(self._modo_menu)
@@ -359,7 +418,7 @@ class VistaAjustes(QWidget):
             self.menu.setChecked(menu_contextual.registrado())
         else:
             self.menu.setEnabled(False)
-            self.estado_menu.setText('Solo en Windows.')
+            self.estado_menu.setText(tr('Solo en Windows.'))
         self.menu.toggled.connect(self._menu)
         return t
 
@@ -370,7 +429,8 @@ class VistaAjustes(QWidget):
             self.menu.blockSignals(True)
             self.menu.setChecked(not activo)
             self.menu.blockSignals(False)
-            self.estado_menu.setText(f'No se ha podido cambiar el menú contextual ({e.strerror or e}).')
+            self.estado_menu.setText(tr('No se ha podido cambiar el menú contextual ({error}).',
+                                        error=e.strerror or e))
             return
         self.estado_menu.setText(self._texto_menu)
         self.config.menu_contextual = activo
@@ -388,17 +448,17 @@ class VistaAjustes(QWidget):
     # ---------- Actualizaciones ----------
 
     def _actualizaciones(self):
-        t = Tarjeta('actualizar', 'Actualizaciones')
-        fila = t.fila(FilaOpcion('Buscar actualizaciones automáticamente',
-                                 'Al abrir la app, como mucho una vez al día, mira en GitHub si hay una versión '
-                                 'nueva. Antes de instalar nada siempre te pregunta.'))
+        t = Tarjeta('actualizar', tr('Actualizaciones'))
+        fila = t.fila(FilaOpcion(tr('Buscar actualizaciones automáticamente'),
+                                 tr('Al abrir la app, como mucho una vez al día, mira en GitHub si hay una '
+                                    'versión nueva. Antes de instalar nada siempre te pregunta.')))
         self.auto_actualizar = fila.control
         self.auto_actualizar.setChecked(self.config.actualizaciones)
         self.auto_actualizar.toggled.connect(self._auto_actualizar)
-        self.b_buscar_version = boton('Buscar ahora')
+        self.b_buscar_version = boton(tr('Buscar ahora'))
         self.b_buscar_version.clicked.connect(self._buscar_version)
-        fila = t.fila(FilaOpcion(f'Versión instalada: {actualizar.version_corta(__version__)}',
-                                 'Comprueba ahora si hay una versión nueva.', self.b_buscar_version))
+        fila = t.fila(FilaOpcion(tr('Versión instalada: {version}', version=actualizar.version_corta(__version__)),
+                                 tr('Comprueba ahora si hay una versión nueva.'), self.b_buscar_version))
         self.estado_version = fila.findChild(QLabel, 'ayuda')
         self.estado_version.setTextFormat(Qt.PlainText)
         return t
@@ -409,7 +469,7 @@ class VistaAjustes(QWidget):
 
     def _buscar_version(self):
         self.b_buscar_version.setEnabled(False)
-        self.estado_version.setText('Buscando en GitHub…')
+        self.estado_version.setText(tr('Buscando en GitHub…'))
         self.buscar_actualizacion.emit()
 
     def poner_estado_version(self, texto):
@@ -419,9 +479,10 @@ class VistaAjustes(QWidget):
     # ---------- Cuenta de OpenSubtitles ----------
 
     def _cuenta(self):
-        t = Tarjeta('usuario', 'Cuenta de OpenSubtitles',
-                    'Opcional, pero da más resultados. Es una cuenta de opensubtitles.org (no de .com). '
-                    'La contraseña se guarda en el Administrador de credenciales de Windows, nunca en un archivo.')
+        t = Tarjeta('usuario', tr('Cuenta de OpenSubtitles'),
+                    tr('Opcional, pero da más resultados. Es una cuenta de opensubtitles.org (no de .com). '
+                       'La contraseña se guarda en el Administrador de credenciales de Windows, nunca en un '
+                       'archivo.'))
         cuenta = QWidget()
         v = QVBoxLayout(cuenta)
         v.setContentsMargins(16, 12, 16, 12)
@@ -429,17 +490,17 @@ class VistaAjustes(QWidget):
         fila = QHBoxLayout()
         fila.setSpacing(10)
         self.usuario = QLineEdit(self.config.usuario_opensubtitles)
-        self.usuario.setPlaceholderText('Usuario')
+        self.usuario.setPlaceholderText(tr('Usuario'))
         self.clave = QLineEdit(credenciales.leer_clave(self.config.usuario_opensubtitles))
-        self.clave.setPlaceholderText('Contraseña')
+        self.clave.setPlaceholderText(tr('Contraseña'))
         self.clave.setEchoMode(QLineEdit.Password)
         for e in (self.usuario, self.clave):
             e.setAcceptDrops(False)
             e.textEdited.connect(self._cuenta_editada)
             fila.addWidget(e, 1)
-        self.b_guardar = boton('Guardar', nombre='primario')
+        self.b_guardar = boton(tr('Guardar'), nombre='primario')
         self.b_guardar.clicked.connect(self._guardar_cuenta)
-        self.b_probar = boton('Probar conexión')
+        self.b_probar = boton(tr('Probar conexión'))
         self.b_probar.clicked.connect(self._probar)
         fila.addWidget(self.b_guardar)
         fila.addWidget(self.b_probar)
@@ -447,8 +508,8 @@ class VistaAjustes(QWidget):
         abajo = QHBoxLayout()
         self.estado_cuenta = etiqueta('', 'ayuda', envolver=True)
         abajo.addWidget(self.estado_cuenta, 1)
-        self.b_importar = boton('Usar la cuenta de la skill', nombre='plano')
-        self.b_importar.setToolTip(f'Importa {HOME / "credenciales.json"}')
+        self.b_importar = boton(tr('Usar la cuenta de la skill'), nombre='plano')
+        self.b_importar.setToolTip(tr('Importa {archivo}', archivo=HOME / 'credenciales.json'))
         self.b_importar.clicked.connect(self._importar)
         abajo.addWidget(self.b_importar)
         v.addLayout(abajo)
@@ -468,11 +529,11 @@ class VistaAjustes(QWidget):
         self.b_importar.setVisible(bool(skill) and skill[0] != guardado)
         if mensaje is None:
             if cambios:
-                mensaje = 'Hay cambios sin guardar.'
+                mensaje = tr('Hay cambios sin guardar.')
             elif guardado and credenciales.leer_clave(guardado):
-                mensaje = f'Se usará la cuenta «{guardado}» en las búsquedas.'
+                mensaje = tr('Se usará la cuenta «{usuario}» en las búsquedas.', usuario=guardado)
             else:
-                mensaje = 'Sin cuenta: se busca en Addic7ed, Gestdown y Subtitulamos.'
+                mensaje = tr('Sin cuenta: se busca en Addic7ed, Gestdown y Subtitulamos.')
         self.estado_cuenta.setText(mensaje)
 
     def _cuenta_editada(self):
@@ -481,7 +542,7 @@ class VistaAjustes(QWidget):
     def _guardar_cuenta(self):
         usuario, clave = self.usuario.text().strip(), self.clave.text()
         if not credenciales.guardar_clave(usuario, clave, self.config.usuario_opensubtitles):
-            self._actualizar_cuenta('No se pudo guardar la contraseña en el Administrador de credenciales.')
+            self._actualizar_cuenta(tr('No se pudo guardar la contraseña en el Administrador de credenciales.'))
             return
         self.config.usuario_opensubtitles = usuario if clave else ''
         self.config.guardar()
@@ -497,7 +558,7 @@ class VistaAjustes(QWidget):
     def _probar(self):
         usuario, clave = self.usuario.text().strip(), self.clave.text()
         self.b_probar.setEnabled(False)
-        self.estado_cuenta.setText('Comprobando la conexión con opensubtitles.org…')
+        self.estado_cuenta.setText(tr('Comprobando la conexión con opensubtitles.org…'))
 
         def comprobar():
             ok, mensaje = credenciales.probar(usuario, clave)
@@ -528,11 +589,11 @@ class VistaAjustes(QWidget):
 
 def resumen_preferencias(o):
     """Texto corto con las preferencias activas, para la pantalla Inicio."""
-    partes = ['Latino si no hay castellano' if not o.solo_castellano else 'Solo castellano',
-              'inglés como último recurso' if not o.sin_ingles else 'sin inglés']
+    partes = [tr('Latino si no hay castellano') if not o.solo_castellano else tr('Solo castellano'),
+              tr('inglés como último recurso') if not o.sin_ingles else tr('sin inglés')]
     if o.ingles:
-        partes.append('también .en.srt')
+        partes.append(tr('también .en.srt'))
     if o.force:
-        partes.append('rehacer todo')
-    partes.append(f'máx. {o.max_videos} vídeos por tanda' if o.max_videos else 'sin límite de vídeos')
-    return 'Preferencias: ' + ' · '.join(partes)
+        partes.append(tr('rehacer todo'))
+    partes.append(tr('máx. {n} vídeos por tanda', n=o.max_videos) if o.max_videos else tr('sin límite de vídeos'))
+    return tr('Preferencias: {lista}', lista=' · '.join(partes))

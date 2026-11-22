@@ -4,6 +4,7 @@ Administrador de credenciales de Windows (librería keyring), nunca en texto pla
 import json
 
 from subtitulos.archivos import HOME
+from subtitulos.idioma import tr
 
 SERVICIO = 'BajarSubtitulosESP/opensubtitles'
 
@@ -77,17 +78,17 @@ def probar(usuario, clave):
     try:
         from subliminal.providers.opensubtitles import OpenSubtitlesProvider
     except Exception as e:  # noqa: BLE001
-        return False, f'No se pudo cargar el proveedor: {e}'
+        return False, tr('No se pudo cargar el proveedor: {error}', error=e)
     proveedor = OpenSubtitlesProvider(usuario, clave)
     try:
         proveedor.initialize()
     except Exception as e:  # noqa: BLE001
         nombre = type(e).__name__
         if 'Authentication' in nombre or 'Unauthorized' in nombre:
-            return False, 'Usuario o contraseña incorrectos.'
-        return False, f'No se pudo conectar ({nombre}). Revisa la conexión a internet.'
+            return False, tr('Usuario o contraseña incorrectos.')
+        return False, tr('No se pudo conectar ({error}). Revisa la conexión a internet.', error=nombre)
     try:
         proveedor.terminate()
     except Exception:  # noqa: BLE001 - el servidor ya no tiene el método de cierre de sesión
         pass
-    return True, 'Conexión correcta.'
+    return True, tr('Conexión correcta.')

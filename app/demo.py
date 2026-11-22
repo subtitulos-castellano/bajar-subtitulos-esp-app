@@ -12,23 +12,34 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from subtitulos import eventos as ev
 from subtitulos.archivos import buscar_en_varias
 from subtitulos.eventos import Resultado
+from subtitulos.idioma import N_, tr
 
+# (categoría, estado, origen). Los estados y orígenes, como los escribe el núcleo en cada idioma: una
+# pista es (número, nombre) y el resto, un texto para traducir o un dato tal cual (proveedor e id).
 _EJEMPLOS = [
-    (ev.CASTELLANO, 'CASTELLANO', 'addic7ed updated/5/6159/8'),
-    (ev.CASTELLANO, 'CASTELLANO (incrustado)', 'pista 3 Español (España)'),
-    (ev.CASTELLANO, 'CASTELLANO', 'opensubtitles 1955123087'),
-    (ev.YA_CASTELLANO, 'ya tenía castellano', '-'),
-    (ev.YA_CASTELLANO, 'ya tenía castellano', 'renombrado desde .es.srt'),
-    (ev.CASTELLANO, 'CASTELLANO', 'subtitulamos 4821'),
-    (ev.LATINO, 'LATINO', 'opensubtitles 1955120044'),
-    (ev.YA_CASTELLANO, 'ya tenía castellano', '-'),
-    (ev.CASTELLANO, 'CASTELLANO', 'gestdown 7f3a91c2'),
-    (ev.INGLES, 'INGLÉS (incrustado)', 'pista 2 English SDH'),
-    (ev.CASTELLANO, 'CASTELLANO (incrustado)', 'pista 4 Español (Castellano)'),
-    (ev.SIN_CAMBIOS, 'LATINO (ya tenía .srt)', '-'),
-    (ev.NO_ENCONTRADO, 'NO ENCONTRADO', 'ni español ni inglés'),
-    (ev.LATINO, 'LATINO (incrustado)', 'pista 3 Español (Latinoamérica'),
+    (ev.CASTELLANO, N_('CASTELLANO'), 'addic7ed updated/5/6159/8'),
+    (ev.CASTELLANO, N_('CASTELLANO (incrustado)'), (3, 'Español (España)')),
+    (ev.CASTELLANO, N_('CASTELLANO'), 'opensubtitles 1955123087'),
+    (ev.YA_CASTELLANO, N_('ya tenía castellano'), '-'),
+    (ev.YA_CASTELLANO, N_('ya tenía castellano'), N_('renombrado desde {extension}.srt')),
+    (ev.CASTELLANO, N_('CASTELLANO'), 'subtitulamos 4821'),
+    (ev.LATINO, N_('LATINO'), 'opensubtitles 1955120044'),
+    (ev.YA_CASTELLANO, N_('ya tenía castellano'), '-'),
+    (ev.CASTELLANO, N_('CASTELLANO'), 'gestdown 7f3a91c2'),
+    (ev.INGLES, N_('INGLÉS (incrustado)'), (2, 'English SDH')),
+    (ev.CASTELLANO, N_('CASTELLANO (incrustado)'), (4, 'Español (Castellano)')),
+    (ev.SIN_CAMBIOS, 'LATINO', '-'),
+    (ev.NO_ENCONTRADO, N_('NO ENCONTRADO'), N_('ni español ni inglés')),
+    (ev.LATINO, N_('LATINO (incrustado)'), (3, 'Español (Latinoamérica')),
 ]
+
+
+def _origen(origen):
+    if isinstance(origen, tuple):
+        return f"{tr('pista {n}', n=origen[0])} {origen[1]}"
+    if origen.startswith('renombrado'):
+        return tr(origen, extension='.es')
+    return tr(origen) if origen == N_('ni español ni inglés') else origen
 
 NOMBRES_EJEMPLO = [f'Serie.de.Ejemplo.S01E{n:02d}.1080p.WEB-DL.mkv' for n in range(1, 13)] + [
     'Pelicula.de.Ejemplo.2024.2160p.UHD.BluRay.mkv', 'Documental.de.Ejemplo.2023.720p.mp4']
@@ -36,10 +47,15 @@ NOMBRES_EJEMPLO = [f'Serie.de.Ejemplo.S01E{n:02d}.1080p.WEB-DL.mkv' for n in ran
 
 def resultado_demo(path, indice, limite=40):
     if indice > limite:
-        return Resultado(path, 'PENDIENTE (límite)', f'máx. {limite} por ejecución', ev.PENDIENTE)
+        return Resultado(path, tr('PENDIENTE (límite)'), tr('máx. {n} por ejecución', n=limite), ev.PENDIENTE)
     semilla = int(hashlib.md5(path.name.encode()).hexdigest(), 16)
-    categoria, estado, fuente = _EJEMPLOS[(semilla + indice) % len(_EJEMPLOS)]
-    return Resultado(path, estado, fuente, categoria)
+    categoria, estado, origen = _EJEMPLOS[(semilla + indice) % len(_EJEMPLOS)]
+    if categoria == ev.SIN_CAMBIOS:
+        texto = tr('{tipo} (ya tenía .srt)', tipo=tr(estado))
+    else:
+        texto = tr(estado)
+    return Resultado(path, texto, _origen(origen), categoria)
+
 
 
 def resultados_demo(carpeta=Path('C:/Series/Ejemplo')):
@@ -47,13 +63,17 @@ def resultados_demo(carpeta=Path('C:/Series/Ejemplo')):
 
 
 def lineas_demo(r):
+    """Lo que escribiría el núcleo en Detalles (con los mismos textos, en el idioma de la app)."""
     yield f'\n== {r.nombre}'
-    if r.categoria == ev.CASTELLANO and 'incrustado' not in r.estado:
-        yield f'  {r.fuente.split()[0]:13} id={r.fuente.split()[-1]} score=918 sincronía=0 españa=50 latino=0 ' \
-              f'episodio_ok=True duración_ok=True'
-    elif 'incrustado' in r.estado:
-        yield '  3 pistas de subtítulos incrustadas'
-        yield f'  {r.fuente}: españa=41 latino=0'
+    incrustado = r.fuente.startswith(tr('pista {n}', n=''))
+    if r.categoria == ev.CASTELLANO and not incrustado:
+        proveedor, id_ = r.fuente.split()[0], r.fuente.split()[-1]
+        yield tr('  {proveedor:13} id={id} score={score} sincronía={sinc} españa={es} latino={la} '
+                 'episodio_ok={ep_ok} duración_ok={dur_ok}', proveedor=proveedor, id=id_, score=918, sinc=0, es=50,
+                 la=0, ep_ok=True, dur_ok=True)
+    elif incrustado:
+        yield tr('  {n} pistas de subtítulos incrustadas', n=3)
+        yield f'  {r.fuente}: ' + tr('españa={es} latino={la}', es=41, la=0)
 
 
 class TrabajadorDemo(QObject):

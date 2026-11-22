@@ -1,9 +1,14 @@
 """Componentes propios de la interfaz, pintados a mano para que se vean igual en Windows 10 y 11."""
+import re
+
 from PySide6.QtCore import (QAbstractTableModel, QEasingCurve, QModelIndex, QPropertyAnimation, QRectF,
                             QSize, QSortFilterProxyModel, Qt, Property, QVariantAnimation)
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QAbstractButton, QHBoxLayout, QLabel, QSizePolicy, QStyle,
                                QStyledItemDelegate, QVBoxLayout, QWidget)
+
+from subtitulos import idioma
+from subtitulos.idioma import N_, tr
 
 from . import iconos, tema
 
@@ -136,7 +141,7 @@ class TarjetaContador(QAbstractButton):
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setToolTip(f'{tema.explicacion_estado(categoria)}.\nPulsa para ver solo estos vídeos.')
+        self.setToolTip(f'{tema.explicacion_estado(categoria)}.\n' + tr('Pulsa para ver solo estos vídeos.'))
         self.ajustar()
 
     def ajustar(self):
@@ -282,9 +287,17 @@ class BarraProgreso(QWidget):
 
 # ---------- Tabla de vídeos ----------
 
+_IDIOMAS_EN = re.compile(r'\b(spain|spanish|english|latin american)\b', re.IGNORECASE)
+
+
 def estado_legible(estado):
-    """'CASTELLANO (incrustado)' -> 'Castellano (incrustado)'; 'ya tenía castellano' -> 'Ya tenía castellano'."""
-    return estado[:1].upper() + estado[1:].lower()
+    """'CASTELLANO (incrustado)' -> 'Castellano (incrustado)'; 'ya tenía castellano' -> 'Ya tenía castellano'.
+    En inglés, los nombres de idioma siguen en mayúscula: 'SPANISH FROM SPAIN (embedded)' -> 'Spanish from Spain (embedded)'."""
+    texto = estado[:1].upper() + estado[1:].lower()
+    if idioma.actual() == 'en':
+        texto = _IDIOMAS_EN.sub(lambda m: m.group(0).title(), texto)
+        texto = texto[:1].upper() + texto[1:]
+    return texto
 
 
 class Fila:
@@ -305,7 +318,7 @@ class Fila:
 
 class ModeloResultados(QAbstractTableModel):
     """Todos los vídeos de la búsqueda desde el principio; cada fila cambia de estado al revisarse."""
-    COLUMNAS = ('Estado', 'Vídeo', 'Origen')
+    COLUMNAS = (N_('Estado'), N_('Vídeo'), N_('Origen'))
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -324,7 +337,7 @@ class ModeloResultados(QAbstractTableModel):
 
     def headerData(self, seccion, orientacion, rol=Qt.DisplayRole):
         if orientacion == Qt.Horizontal and rol == Qt.DisplayRole:
-            return self.COLUMNAS[seccion].upper()
+            return tr(self.COLUMNAS[seccion]).upper()
         return None
 
     def data(self, indice, rol=Qt.DisplayRole):
@@ -380,7 +393,7 @@ class ModeloResultados(QAbstractTableModel):
         """Al cancelar: lo que no llegó a revisarse queda como 'No revisado'."""
         for i, f in enumerate(self.filas):
             if f.resultado is None:
-                f.categoria, f.estado = tema.NO_REVISADO, 'No revisado'
+                f.categoria, f.estado = tema.NO_REVISADO, tr('No revisado')
                 self._cambiada(i)
 
 

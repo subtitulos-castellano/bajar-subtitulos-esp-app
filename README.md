@@ -5,6 +5,9 @@ Aplicación de escritorio para **Windows 10 y 11** que descarga subtítulos en *
 y se ocupa de todo, sin preguntas. También funciona con el botón derecho del ratón en el Explorador de
 Windows, sin abrir antes la app.
 
+La app está en **castellano o en inglés** (*English*): se elige al instalarla y se cambia en
+Configuración.
+
 ![Pantalla de inicio](docs/capturas/claro_1_reposo.png)
 
 ## Qué hace
@@ -41,6 +44,10 @@ Descarga la última versión desde **Releases**:
   Aplicaciones*.
 - **`BajarSubtitulosESP-<versión>-portable.zip`**: descomprímelo donde quieras y abre
   `BajarSubtitulosESP.exe`. No instala nada.
+
+La primera vez que se instala, el instalador pregunta el idioma (**Español** o **English**; propone el
+de Windows), que es también el de la app. Al actualizar ya no pregunta: se queda el de antes. La
+versión portable empieza en castellano.
 
 El programa no está firmado digitalmente, así que la primera vez Windows puede mostrar
 **"Windows protegió su PC"**. Pulsa *Más información › Ejecutar de todas formas*.
@@ -134,6 +141,7 @@ Los cambios se guardan al momento y se usan en la siguiente búsqueda.
 
 | Opción | Por defecto |
 |---|---|
+| Idioma de la app: Español o English | El elegido al instalar (portable: Español) |
 | Si no hay castellano, guardar latino | Sí |
 | Si no hay nada en español, guardar inglés (primero la pista del vídeo, mejor si es SDH) | Sí |
 | Extraer también la pista inglesa incrustada como `<vídeo>.en.srt` | No |
@@ -150,6 +158,11 @@ Los cambios se guardan al momento y se usan en la siguiente búsqueda.
 | Buscar actualizaciones automáticamente | Sí |
 
 ![Configuración](docs/capturas/claro_6_configuracion.png)
+
+**Idioma:** al cambiarlo, la app se cierra y se vuelve a abrir sola en el idioma elegido, en la misma
+pantalla de Configuración. Cambia todo: la interfaz, los avisos (también las novedades de las
+actualizaciones), el registro de *Detalles* y el menú contextual del Explorador. No se puede cambiar
+durante una búsqueda. Es la única forma de cambiarlo en la versión portable.
 
 **Cuenta de OpenSubtitles:** es una cuenta de opensubtitles.org, no de opensubtitles.com. La
 contraseña se guarda en el **Administrador de credenciales de Windows**, nunca en un archivo. Si
@@ -233,7 +246,8 @@ episodio o de la película, y lee los vídeos desde tu disco.
 
 ```
 app/            interfaz gráfica (Qt / PySide6)
-  main.py       arranque (--tema, --demo, --captura, --config, --autoprueba, rutas y --menu-*)
+  main.py       arranque (--tema, --idioma, --demo, --captura, --config, --autoprueba, rutas y --menu-*);
+                volver a abrirse al cambiar el idioma
   ventana.py    ventana principal, menú lateral, arrastrar y soltar, cola
   menu_contextual.py  menú del Explorador en HKCU\Software\Classes (sin Qt)
   instancia.py  una sola app abierta: mutex, canal local y agrupar lo que llega seguido
@@ -251,12 +265,13 @@ app/            interfaz gráfica (Qt / PySide6)
   demo.py       resultados de demostración (--demo, --captura)
 subtitulos/     núcleo, compartido con la línea de comandos
   archivos.py   qué es un vídeo, buscar en varias rutas, carpeta de datos
+  idioma.py     tr() y N_(): textos en castellano en el código; en.py, su traducción al inglés
   eventos.py    Resultado, Eventos y categorías del resumen
   opciones.py   Opciones de una búsqueda (= los parámetros de la CLI)
   texto.py      limpieza de textos de terceros, idioma y dialecto
   pistas.py     subtítulos incrustados en MKV y MP4 (sin ffmpeg)
   nucleo.py     proveedores y procesar(ruta(s), opciones, eventos, cancelado, credenciales)
-bajar_subs.py   línea de comandos (mismos parámetros y salida que la skill)
+bajar_subs.py   línea de comandos (mismos parámetros y salida que la skill; siempre en castellano)
 packaging/      PyInstaller, Inno Setup, recursos y compilar.py
 scripts/windows.sh  desarrollo desde WSL con el Python de Windows
 tests/          pruebas (núcleo, seguridad, app)
@@ -275,6 +290,7 @@ scripts/windows.sh entorno     # una vez: crea el venv de Windows (requirements-
 scripts/windows.sh app         # abre la app
 scripts/windows.sh app --demo  # con resultados de demostración (no busca ni descarga)
 scripts/windows.sh python -I app/main.py --captura 'C:\ruta\capturas'   # imágenes de cada pantalla
+scripts/windows.sh python -I app/main.py --captura 'C:\ruta\en' --idioma en   # las mismas, en inglés
 scripts/windows.sh compilar    # .exe, zip portable (e instalador si hay Inno Setup) en dist/
 ```
 
@@ -308,6 +324,10 @@ scripts/windows.sh python -I -m unittest discover -s tests  # todas, con el Pyth
   - el trabajador en su hilo;
   - el menú lateral y la tabla progresiva;
   - la posición de la ventana y el tamaño del texto.
+- `tests/test_idioma.py`: que todo texto marcado con `tr()` o `N_()` tenga traducción al inglés
+  con los mismos `{campos}` (y que no sobre ninguna), el núcleo y la ventana en inglés sin restos de
+  castellano, las novedades de cada idioma, el idioma del instalador (solo la primera vez) y volver
+  a abrirse al cambiarlo.
 - `tests/test_menu.py`: el menú contextual en una clave de pruebas del registro, búsquedas sin
   subcarpetas, una sola app abierta (varias aperturas a la vez), el segundo plano y seguir junto
   al reloj al cerrar la ventana.
@@ -331,15 +351,20 @@ proveedores.
 2. Prueba lo compilado en **Windows Server 2022** (base de Windows 10) y **2025** (base de
    Windows 11): pruebas, instalación silenciosa, autoprueba del programa instalado y del portable,
    el menú contextual (el instalador se lo queda aunque fuera de la portable; dos aperturas a la vez,
-   una sola app) y desinstalación sin restos (también si el menú apuntaba a otra copia).
-3. Con una etiqueta `vX.Y.Z`, publica la Release con las notas de `CHANGELOG.md`, junto con
+   una sola app), el idioma (instalación en inglés; al actualizar se respeta el elegido después) y
+   desinstalación sin restos (también si el menú apuntaba a otra copia).
+3. Con una etiqueta `vX.Y.Z`, publica la Release con las notas de `CHANGELOG.md` y, tras la marca
+   `<!-- en -->`, las de `CHANGELOG.en.md` (la app enseña las de su idioma). Junto con
    `SHA256SUMS.txt` y la atestación de procedencia de cada archivo.
 
 Para publicar una versión:
 
 1. Sube `__version__` en `app/__init__.py`.
-2. Añade la versión a `CHANGELOG.md`.
+2. Añade la versión a `CHANGELOG.md` y, traducida, a `CHANGELOG.en.md`.
 3. Haz commit y luego `git tag vX.Y.Z && git push --tags`.
+
+**Textos nuevos:** en el código, en castellano dentro de `tr('…')` (con `{campos}` en vez de
+f-strings), y su traducción en `subtitulos/en.py`. `tests/test_idioma.py` avisa si falta alguna.
 
 ### Traer mejoras de la skill
 

@@ -6,6 +6,7 @@ import re
 import struct
 import time
 
+from .idioma import tr
 from .texto import ESPANA_NOMBRE, LATINO_NOMBRE, MAX_SRT, dialecto, visible
 
 MKV_EXT = {'.mkv'}
@@ -93,7 +94,7 @@ def _vint_b(d, p):
     while l <= 8 and not b & m:
         m >>= 1; l += 1
     if l > 8:                    # byte 0x00: sin este tope el bucle no terminaba nunca
-        raise ArchivoInvalido('número de pista no válido en un bloque MKV')
+        raise ArchivoInvalido(tr('número de pista no válido en un bloque MKV'))
     v = b & (m - 1)
     for x in d[p + 1:p + l]:
         v = (v << 8) | x
@@ -120,10 +121,10 @@ def _leer(f, n, maximo=MAX_ELEMENTO):
     datos vacíos al final del archivo para siempre.
     """
     if n is None or n > maximo:
-        raise ArchivoInvalido('tamaño de elemento no válido')
+        raise ArchivoInvalido(tr('tamaño de elemento no válido'))
     d = f.read(n)
     if len(d) < n:
-        raise ArchivoInvalido('el archivo se acaba antes de tiempo')
+        raise ArchivoInvalido(tr('el archivo se acaba antes de tiempo'))
     return d
 
 
@@ -147,7 +148,7 @@ def pistas_mkv(path):
             while f.tell() < fin:
                 _eid(f); s2 = _vint(f)
                 if s2 is None:
-                    raise ArchivoInvalido('pista sin tamaño')
+                    raise ArchivoInvalido(tr('pista sin tamaño'))
                 fin_t = f.tell() + s2
                 t = {'lang': 'eng', 'ietf': '', 'name': '', 'forced': 0, 'codec': ''}
                 while f.tell() < fin_t:
@@ -210,7 +211,7 @@ def extraer_srt_mkv(path, nums, plazo=None):
                 while f.tell() < fin:
                     j = _eid(f); s2 = _vint(f)
                     if s2 is None:
-                        raise ArchivoInvalido('bloque sin tamaño')
+                        raise ArchivoInvalido(tr('bloque sin tamaño'))
                     if j == 0xA1:
                         blk = _leer(f, s2)
                     elif j == 0x9B:
@@ -256,7 +257,7 @@ def _leer_moov(f):
             break
         if tipo == b'moov':
             if tam - h > MAX_MOOV:
-                raise ArchivoInvalido('índice MP4 (moov) demasiado grande')
+                raise ArchivoInvalido(tr('índice MP4 (moov) demasiado grande'))
             f.seek(pos + h)
             return f.read(tam - h)
         pos += tam
@@ -308,7 +309,7 @@ def _tablas_mp4(m, t):
     def entradas(a, desp=4):
         n = struct.unpack_from('>I', m, a + desp)[0]
         if n > MAX_MUESTRAS:
-            raise ArchivoInvalido('tabla de muestras MP4 demasiado grande')
+            raise ArchivoInvalido(tr('tabla de muestras MP4 demasiado grande'))
         return n
 
     cajas = t.pop('cajas')
@@ -405,7 +406,7 @@ def _muestras_mp4(f, p, plazo):
         plazo.comprobar(i, len(tams))
         d = durs[i] if i < len(durs) else 0
         if tam > MAX_ELEMENTO:
-            raise ArchivoInvalido('muestra de subtítulo MP4 demasiado grande')
+            raise ArchivoInvalido(tr('muestra de subtítulo MP4 demasiado grande'))
         if tam > 2:
             f.seek(o)
             texto = _texto_muestra(f.read(tam), p['codec'])
@@ -471,15 +472,22 @@ def _nada(linea):
 
 def _duracion(segundos):
     if segundos is None:
-        return f'más de {LIMITE_EXTRACCION} s'
+        return tr('más de {n} s', n=LIMITE_EXTRACCION)
     if segundos < 90:
-        return f'unos {round(segundos)} s'
-    return f'unos {round(segundos / 60)} min'
+        return tr('unos {n} s', n=round(segundos))
+    return tr('unos {n} min', n=round(segundos / 60))
 
 
-def aviso_lento(e, que='los subtítulos incrustados'):
-    return (f'  no se han extraído {que} del propio vídeo porque leerlo era muy lento '
-            f'(tardaría {_duracion(e.segundos)}; el límite es {LIMITE_EXTRACCION} s)')
+def aviso_lento(e, ingles=False):
+    que = tr('los subtítulos en inglés') if ingles else tr('los subtítulos incrustados')
+    return tr('  no se han extraído {que} del propio vídeo porque leerlo era muy lento '
+              '(tardaría {tiempo}; el límite es {limite} s)', que=que, tiempo=_duracion(e.segundos),
+              limite=LIMITE_EXTRACCION)
+
+
+def _desc(p):
+    """Descripción corta de una pista para el resumen: 'pista 3 Español (España)'."""
+    return visible(f"{tr('pista {n}', n=p['num'])} {p['name']}".strip())
 
 
 def incrustado(path, con_ingles=False, detalle=_nada, limite=None):
@@ -491,11 +499,11 @@ def incrustado(path, con_ingles=False, detalle=_nada, limite=None):
     try:
         pistas = [p for p in pistas_texto(path) if not _forzada(p)]
     except Exception as e:
-        detalle(f'  (no se pudieron leer las pistas incrustadas: {visible(e)})')
+        detalle(tr('  (no se pudieron leer las pistas incrustadas: {error})', error=visible(e)))
         return res
     if not pistas:
         return res
-    detalle(f'  {len(pistas)} pistas de subtítulos incrustadas')
+    detalle(tr('  {n} pistas de subtítulos incrustadas', n=len(pistas)))
     esp = [p for p in pistas if _es_espanol(p)]
     eng = sorted((p for p in pistas if _es_ingles(p)), key=lambda p: 'sdh' not in p['name'].lower())
     nums = [p['num'] for p in esp] + ([eng[0]['num']] if eng and con_ingles else [])
@@ -508,7 +516,7 @@ def incrustado(path, con_ingles=False, detalle=_nada, limite=None):
         res['lento'] = True
         return res
     except Exception as e:
-        detalle(f'  (no se pudieron extraer las pistas incrustadas: {visible(e)})')
+        detalle(tr('  (no se pudieron extraer las pistas incrustadas: {error})', error=visible(e)))
         return res
     cast, lat = [], []
     for p in esp:
@@ -516,9 +524,9 @@ def incrustado(path, con_ingles=False, detalle=_nada, limite=None):
         if not texto or len(texto) > MAX_SRT:
             continue
         es, la, ok = dialecto(texto)
-        detalle(f'  pista incrustada {p["num"]} [{visible(p["ietf"] or p["lang"])}] {visible(p["name"])}: '
-                f'españa={es} latino={la}')
-        desc = visible(f'pista {p["num"]} {p["name"]}'.strip())
+        detalle(tr('  pista incrustada {n} [{idioma}] {nombre}: españa={es} latino={la}', n=p['num'],
+                   idioma=visible(p['ietf'] or p['lang']), nombre=visible(p['name']), es=es, la=la))
+        desc = _desc(p)
         # En las pistas oficiales la etiqueta latina es fiable, y el detector de dialecto no
         # basta (una pista "LA" de Disney+ dio españa=26 latino=11 y pasaba por castellano).
         if ok and not _etiqueta_latina(p):
@@ -530,7 +538,7 @@ def incrustado(path, con_ingles=False, detalle=_nada, limite=None):
     if lat:
         res['latino'] = max(lat, key=lambda c: c[0])[1:]
     if eng and con_ingles and textos.get(eng[0]['num']) and len(textos[eng[0]['num']]) <= MAX_SRT:
-        res['ingles'] = (textos[eng[0]['num']], visible(f'pista {eng[0]["num"]} {eng[0]["name"]}'.strip()))
+        res['ingles'] = (textos[eng[0]['num']], _desc(eng[0]))
     return res
 
 
@@ -543,10 +551,10 @@ def ingles_incrustado(path, detalle=_nada, limite=None):
         pistas.sort(key=lambda p: 'sdh' not in p['name'].lower())
         texto = extraer_srt(path, [pistas[0]['num']], Plazo(limite)).get(pistas[0]['num'])
     except Lento as e:
-        detalle(aviso_lento(e, 'los subtítulos en inglés'))
+        detalle(aviso_lento(e, ingles=True))
         return None, ''
     except Exception:
         return None, ''
     if not texto or len(texto) > MAX_SRT:
         return None, ''
-    return texto, visible(f'pista {pistas[0]["num"]} {pistas[0]["name"]}'.strip())
+    return texto, _desc(pistas[0])

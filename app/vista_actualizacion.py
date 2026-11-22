@@ -9,6 +9,8 @@ import time
 from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout
 
+from subtitulos.idioma import tr
+
 from . import actualizar, tema
 from .componentes import IconoLabel
 from .vista_inicio import boton, etiqueta
@@ -50,7 +52,7 @@ class Actualizador(QObject):
                 return
             except Exception as e:  # noqa: BLE001 - nunca debe romper la app
                 self.consultando = False
-                self.fallo.emit(f'Error inesperado ({type(e).__name__}).', manual)
+                self.fallo.emit(tr('Error inesperado ({error}).', error=type(e).__name__), manual)
                 return
             self.consultando = False
             if novedad:
@@ -83,7 +85,7 @@ class Actualizador(QObject):
                 return
             except Exception as e:  # noqa: BLE001
                 self.descargando = False
-                self.fallo_descarga.emit(f'Error inesperado al descargar ({type(e).__name__}).')
+                self.fallo_descarga.emit(tr('Error inesperado al descargar ({error}).', error=type(e).__name__))
                 return
             self.descargando = False
             if not self._cancelar.is_set():
@@ -123,18 +125,18 @@ class AvisoActualizacion(QFrame):
         textos.addWidget(self.titulo)
         textos.addWidget(self.detalle)
         fila.addLayout(textos, 1)
-        self.b_notas = boton('Novedades', nombre='plano')
+        self.b_notas = boton(tr('Novedades'), nombre='plano')
         self.b_notas.setCheckable(True)
         self.b_notas.toggled.connect(self._ver_notas)
-        self.b_pagina = boton('Ver en GitHub', nombre='plano')
+        self.b_pagina = boton(tr('Ver en GitHub'), nombre='plano')
         self.b_pagina.clicked.connect(self.novedades)
-        self.b_tarde = boton('Más tarde')
+        self.b_tarde = boton(tr('Más tarde'))
         self.b_tarde.clicked.connect(self.mas_tarde)
-        self.b_cerrar = boton('Cerrar')
+        self.b_cerrar = boton(tr('Cerrar'))
         self.b_cerrar.clicked.connect(self.mas_tarde)
-        self.b_cancelar = boton('Cancelar')
+        self.b_cancelar = boton(tr('Cancelar'))
         self.b_cancelar.clicked.connect(self.cancelar)
-        self.b_accion = boton('Actualizar', nombre='primario')
+        self.b_accion = boton(tr('Actualizar'), nombre='primario')
         self.b_accion.clicked.connect(self._accion)
         for b in (self.b_notas, self.b_pagina, self.b_tarde, self.b_cerrar, self.b_cancelar, self.b_accion):
             fila.addWidget(b, 0, Qt.AlignVCenter)
@@ -170,27 +172,27 @@ class AvisoActualizacion(QFrame):
             self.style().polish(self)
         self.icono.poner('aviso' if estado == 'error' else 'actualizar')
         if estado == 'disponible':
-            self.titulo.setText(f'Hay una versión nueva: {v}')
-            self.detalle.setText('Se descarga, se comprueba que es la publicada en GitHub y se instala sola. '
-                                 'La app se cerrará y se volverá a abrir.')
-            self.b_accion.setText('Actualizar')
+            self.titulo.setText(tr('Hay una versión nueva: {version}', version=v))
+            self.detalle.setText(tr('Se descarga, se comprueba que es la publicada en GitHub y se instala sola. '
+                                    'La app se cerrará y se volverá a abrir.'))
+            self.b_accion.setText(tr('Actualizar'))
         elif estado == 'portable':
-            self.titulo.setText(f'Hay una versión nueva: {v}')
-            self.detalle.setText(mensaje or 'Descárgala desde su página en GitHub.')
-            self.b_accion.setText('Descargar')
+            self.titulo.setText(tr('Hay una versión nueva: {version}', version=v))
+            self.detalle.setText(mensaje or tr('Descárgala desde su página en GitHub.'))
+            self.b_accion.setText(tr('Descargar'))
         elif estado == 'descargando':
-            self.titulo.setText(f'Descargando la versión {v}…')
-            self.detalle.setText(mensaje or 'Comprobando la huella SHA-256 mientras se descarga.')
+            self.titulo.setText(tr('Descargando la versión {version}…', version=v))
+            self.detalle.setText(mensaje or tr('Comprobando la huella SHA-256 mientras se descarga.'))
         elif estado == 'instalando':
-            self.titulo.setText(f'Instalando la versión {v}…')
-            self.detalle.setText('La app se cierra ahora y se volverá a abrir sola en unos segundos.')
+            self.titulo.setText(tr('Instalando la versión {version}…', version=v))
+            self.detalle.setText(tr('La app se cierra ahora y se volverá a abrir sola en unos segundos.'))
         elif estado == 'error':
-            self.titulo.setText('No se ha podido actualizar')
+            self.titulo.setText(tr('No se ha podido actualizar'))
             self.detalle.setText(mensaje)
-            self.b_accion.setText('Reintentar')
+            self.b_accion.setText(tr('Reintentar'))
         elif estado == 'actualizada':
-            self.titulo.setText(f'Actualizada a la versión {v}')
-            self.detalle.setText('Puedes ver qué ha cambiado en la página de esta versión.')
+            self.titulo.setText(tr('Actualizada a la versión {version}', version=v))
+            self.detalle.setText(tr('Puedes ver qué ha cambiado en la página de esta versión.'))
         if novedad is not None:
             self.notas.setText(novedad.notas)
         if estado not in ('disponible', 'portable'):
@@ -203,7 +205,8 @@ class AvisoActualizacion(QFrame):
         if self.estado == 'descargando':
             mb = hecho / 1024 / 1024
             if total:
-                self.detalle.setText(f'{hecho * 100 // total} % · {mb:.1f} de {total / 1024 / 1024:.1f} MB')
+                self.detalle.setText(tr('{porcentaje} % · {hecho:.1f} de {total:.1f} MB', porcentaje=hecho * 100 // total,
+                                        hecho=mb, total=total / 1024 / 1024))
             else:
                 self.detalle.setText(f'{mb:.1f} MB')
 
@@ -212,11 +215,11 @@ class AvisoActualizacion(QFrame):
         self._ocupada = ocupada
         instala = self.estado in ('disponible', 'error')
         self.b_accion.setEnabled(not (ocupada and instala))
-        self.b_accion.setToolTip('Disponible cuando termine la búsqueda.' if ocupada and instala else '')
+        self.b_accion.setToolTip(tr('Disponible cuando termine la búsqueda.') if ocupada and instala else '')
 
     def _ver_notas(self, ver):
         self.notas.setVisible(bool(ver and self.notas.text()))
-        self.b_notas.setText('Ocultar novedades' if ver else 'Novedades')
+        self.b_notas.setText(tr('Ocultar novedades') if ver else tr('Novedades'))
 
     def _accion(self):
         if self.estado == 'portable':

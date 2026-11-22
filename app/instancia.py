@@ -44,6 +44,19 @@ def es_la_primera():
     return ctypes.get_last_error() != ERROR_ALREADY_EXISTS
 
 
+def soltar():
+    """Deja de ser «la primera» antes de cerrarse para volver a abrirse (cambio de idioma): así la
+    nueva apertura no le pasa el pedido a esta, que se está cerrando."""
+    global _mutex
+    if _mutex and sys.platform == 'win32':
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+        k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        k32.CloseHandle(_mutex)
+    _mutex = None
+
+
 def permitir_primer_plano():
     """La app que ya está abierta puede ponerse delante (Windows solo deja hacerlo a quien tiene el
     foco, que es este proceso recién lanzado)."""
@@ -109,6 +122,9 @@ class Servidor(QObject):
             QLocalServer.removeServer(nombre)       # resto de una app que se cerró de golpe (Linux)
             return self.servidor.listen(nombre)
         return True
+
+    def cerrar(self):
+        self.servidor.close()
 
     def _conexion(self):
         while self.servidor.hasPendingConnections():

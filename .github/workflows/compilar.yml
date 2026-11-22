@@ -113,9 +113,16 @@ jobs:
           MenuDePortable
           $dir = Join-Path $env:RUNNER_TEMP 'instalado'
           $instalador = (Get-Item dist/*-instalador.exe).FullName
-          $p = Start-Process $instalador -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=$dir", '/NOICONS' -Wait -PassThru
+          # Primera instalación en inglés (/LANG: lo mismo que elegir English en el instalador).
+          $p = Start-Process $instalador -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', "/DIR=$dir", '/NOICONS', '/LANG=en' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "El instalador ha fallado: código $($p.ExitCode)" }
           Autoprueba "$dir\BajarSubtitulosESP.exe" (Join-Path $env:RUNNER_TEMP 'instalado.txt')
+
+          # Idioma: el de la instalación queda en la configuración, y el menú contextual sale en inglés.
+          $idioma = (Get-Content -Raw $config | ConvertFrom-Json).idioma
+          if ($idioma -ne 'en') { throw "El instalador no ha guardado el idioma elegido: $idioma" }
+          $texto = (Get-ItemProperty 'HKCU:\Software\Classes\Directory\shell\BajarSubtitulosESP').MUIVerb
+          if ($texto -ne 'Get subtitles here') { throw "Menú contextual en otro idioma: $texto" }
 
           # Menú contextual: lo añade el instalador (aunque fuera de la portable), apuntando al programa instalado.
           $carpetas = 'HKCU:\Software\Classes\Directory\shell\BajarSubtitulosESP\shell\1solo\command'
@@ -139,6 +146,11 @@ jobs:
           $abiertas | Stop-Process -Force
           Start-Sleep -Seconds 3
 
+          # Después se cambia a castellano en Configuración: al actualizar, el instalador no lo toca.
+          $datos = Get-Content -Raw $config | ConvertFrom-Json
+          $datos.idioma = 'es'
+          $datos | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 $config
+
           # Actualización como la hace la app al pulsar Actualizar: lanza el instalador en silencio y se
           # cierra; el instalador espera a que termine, instala encima y la vuelve a abrir.
           # (WaitForExit y no -Wait: -Wait esperaría también al instalador y a la app que este reabre.)
@@ -159,6 +171,15 @@ jobs:
             Start-Sleep -Seconds 1
           }
           'Actualización correcta: la app se ha vuelto a abrir sola'
+          $idioma = (Get-Content -Raw $config | ConvertFrom-Json).idioma
+          if ($idioma -ne 'es') { throw "La actualización ha cambiado el idioma elegido en Configuración: $idioma" }
+          # Al abrirse, la app pone el menú contextual en su idioma.
+          $fin = (Get-Date).AddSeconds(30)
+          while (($texto = (Get-ItemProperty 'HKCU:\Software\Classes\Directory\shell\BajarSubtitulosESP').MUIVerb) -ne 'Bajar subtítulos aquí') {
+            if ((Get-Date) -gt $fin) { throw "El menú contextual no ha pasado a castellano: $texto" }
+            Start-Sleep -Seconds 1
+          }
+          'Idioma correcto: inglés al instalar, castellano tras cambiarlo y actualizar'
           $reabierta | Stop-Process -Force
           Start-Sleep -Seconds 3
           Autoprueba "$dir\BajarSubtitulosESP.exe" (Join-Path $env:RUNNER_TEMP 'actualizado.txt')
@@ -219,6 +240,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notas=$(awk -v v="${GITHUB_REF_NAME#v}" '$0 ~ "^## " v {s=1; next} /^## / {s=0} s' CHANGELOG.md)
+          # Novedades en castellano y, tras la marca <!-- en --> (la app enseña la parte de su idioma), en inglés.
+          seccion() { awk -v v="${GITHUB_REF_NAME#v}" '$0 ~ "^## " v {s=1; next} /^## / {s=0} s' "$1"; }
+          notas=$(seccion CHANGELOG.md)
+          notas_en=$(seccion CHANGELOG.en.md)
+          if [ -n "$notas_en" ]; then
+            notas="${notas}"$'\n\n<!-- en -->\n\n### English\n\n'"${notas_en}"
+          fi
           gh release create "$GITHUB_REF_NAME" dist/*-instalador.exe dist/*-portable.zip dist/SHA256SUMS.txt \
             --title "Bajar Subtítulos ESP $GITHUB_REF_NAME" --notes "${notas:-Ver CHANGELOG.md}"

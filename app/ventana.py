@@ -1,12 +1,13 @@
 """Ventana principal: barra lateral (Inicio, Buscando…, Configuración), arrastre en toda la ventana y cola."""
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QUrl, Signal
+from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QFont, QGuiApplication, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow,
                                QPushButton, QStackedWidget, QVBoxLayout, QWidget)
 
 from subtitulos.archivos import es_video
+from subtitulos.idioma import tr
 
 from . import actualizar, iconos, tema
 from .componentes import IconoLabel, color
@@ -104,6 +105,7 @@ class Ventana(QMainWindow):
         self.ocultar_al_cerrar = False  # en segundo plano: cerrar con una búsqueda en marcha la oculta
         self.puede_ir_a_bandeja = False # hay icono junto al reloj (lo pone main): «seguir junto al reloj»
         self._saliendo = False          # se cierra la app de verdad (Salir, actualizar, apagar Windows)
+        self.al_reiniciar = None        # la pone main: vuelve a abrir la app (para cambiar el idioma)
 
         raiz = QWidget()
         raiz.setObjectName('raiz')
@@ -142,6 +144,7 @@ class Ventana(QMainWindow):
         self.ajustes.tema_elegido.connect(self.cambiar_tema)
         self.ajustes.tamano_elegido.connect(lambda: self.cambiar_tema(self.preferencia_tema))
         self.ajustes.buscar_actualizacion.connect(lambda: self.actualizador.comprobar(manual=True))
+        self.ajustes.idioma_elegido.connect(self._idioma_elegido)
         self.actualizador.novedad.connect(self._novedad)
         self.actualizador.al_dia.connect(self._al_dia)
         self.actualizador.fallo.connect(self._fallo_consulta)
@@ -230,7 +233,7 @@ class Ventana(QMainWindow):
         textos.setSpacing(0)
         t1 = QLabel('Bajar Subtítulos')
         t1.setObjectName('marca')
-        t2 = QLabel('Castellano de España')
+        t2 = QLabel(tr('Castellano de España'))
         t2.setObjectName('marcaSub')
         textos.addWidget(t1)
         textos.addWidget(t2)
@@ -240,9 +243,9 @@ class Ventana(QMainWindow):
         self.nav = QButtonGroup(self)
         self.nav_botones = []
         for i, (texto, ico, ayuda) in enumerate((
-                ('Inicio', 'inicio', 'Pantalla para arrastrar vídeos o carpetas'),
-                ('Buscando…', 'buscar', 'La búsqueda en marcha o la última que se hizo'),
-                ('Configuración', 'ajustes', 'Preferencias de la búsqueda y de la app'))):
+                (tr('Inicio'), 'inicio', tr('Pantalla para arrastrar vídeos o carpetas')),
+                (tr('Buscando…'), 'buscar', tr('La búsqueda en marcha o la última que se hizo')),
+                (tr('Configuración'), 'ajustes', tr('Preferencias de la búsqueda y de la app')))):
             b = QPushButton('  ' + texto)
             b.setObjectName('nav')
             b.setCheckable(True)
@@ -255,7 +258,7 @@ class Ventana(QMainWindow):
         self.nav_botones[INICIO].setChecked(True)
         self.nav.idClicked.connect(self.ir)
         v.addStretch()
-        ver = QLabel(f'Versión {VERSION}')
+        ver = QLabel(tr('Versión {version}', version=VERSION))
         ver.setObjectName('version')
         v.addWidget(ver)
         return self.lateral
@@ -336,11 +339,11 @@ class Ventana(QMainWindow):
         e.acceptProposedAction()
         n = len(rutas)
         if self.trabajador:
-            texto = 'Suelta para añadir a la cola'
-            detalle = 'Se procesará en cuanto termine lo que está en marcha.'
+            texto = tr('Suelta para añadir a la cola')
+            detalle = tr('Se procesará en cuanto termine lo que está en marcha.')
         else:
-            texto = 'Suelta para buscar subtítulos'
-            detalle = (f'{n} elementos' if n > 1 else rutas[0].name)
+            texto = tr('Suelta para buscar subtítulos')
+            detalle = (tr('{n} elementos', n=n) if n > 1 else rutas[0].name)
         self.capa.mostrar(texto, detalle)
 
     def dragMoveEvent(self, e):
@@ -459,24 +462,24 @@ class Ventana(QMainWindow):
     def _novedad(self, novedad, manual):
         self.novedad = novedad
         v = actualizar.version_corta(novedad.version)
-        self.ajustes.poner_estado_version(f'Hay una versión nueva: {v}.')
+        self.ajustes.poner_estado_version(tr('Hay una versión nueva: {version}.', version=v))
         if self.actualizador.descargando or self.aviso.estado == 'instalando':
             return
         if novedad.instalador and actualizar.instalada():
             self._mostrar_aviso('disponible', novedad)
         elif novedad.instalador:
-            self._mostrar_aviso('portable', novedad, 'Estás usando la versión portable: descarga la nueva '
-                                                     'desde su página en GitHub.')
+            self._mostrar_aviso('portable', novedad, tr('Estás usando la versión portable: descarga la nueva '
+                                                        'desde su página en GitHub.'))
         else:
             self._mostrar_aviso('portable', novedad)
 
     def _al_dia(self, manual):
-        self.ajustes.poner_estado_version(f'Tienes la última versión ({VERSION}).')
+        self.ajustes.poner_estado_version(tr('Tienes la última versión ({version}).', version=VERSION))
 
     def _fallo_consulta(self, mensaje, manual):
         # La comprobación automática falla en silencio (sin internet, por ejemplo): ya se intentará otro día.
-        self.ajustes.poner_estado_version(f'No se ha podido comprobar: {mensaje}' if manual
-                                          else 'Comprueba ahora si hay una versión nueva.')
+        self.ajustes.poner_estado_version(tr('No se ha podido comprobar: {mensaje}', mensaje=mensaje) if manual
+                                          else tr('Comprueba ahora si hay una versión nueva.'))
 
     def _actualizar(self):
         if self.novedad is None or self.trabajador is not None:
@@ -500,7 +503,8 @@ class Ventana(QMainWindow):
         try:
             actualizar.lanzar_instalador(ruta)
         except OSError as e:
-            self._mostrar_aviso('error', self.novedad, f'No se ha podido abrir el instalador ({e.strerror or e}).')
+            self._mostrar_aviso('error', self.novedad,
+                                tr('No se ha podido abrir el instalador ({error}).', error=e.strerror or e))
             return
         self.salir()                            # guarda la configuración; el instalador espera a que termine
 
@@ -510,6 +514,20 @@ class Ventana(QMainWindow):
 
     def _abrir_pagina_version(self):
         QDesktopServices.openUrl(QUrl(self._pagina_version()))
+
+    # ---------- Idioma ----------
+
+    def _idioma_elegido(self, codigo):
+        """Ya guardado en la configuración: la app se vuelve a abrir para que todo salga en el idioma nuevo
+        (en Configuración). Durante una búsqueda no se llega aquí: Configuración no se puede abrir."""
+        if self.trabajador is not None or self.al_reiniciar is None:
+            return
+        # Un instante para que se vea el botón marcado y el aviso antes de cerrarse.
+        QTimer.singleShot(400, self._reiniciar)
+
+    def _reiniciar(self):
+        if self.trabajador is None and not self.al_reiniciar():
+            self.ajustes.poner_error_idioma()
 
     def salir(self):
         """Cierra de verdad (aunque esté activado «seguir junto al reloj»)."""

@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QPalette
 
 from subtitulos import eventos as ev
+from subtitulos.idioma import N_, tr
 
 CLARO = {
     'nombre': 'claro',
@@ -42,22 +43,22 @@ NO_REVISADO = 'no_revisado'    # se canceló antes de llegar a él
 # Categoría -> (color claro, color oscuro, icono, nombre corto, explicación)
 # "Ya lo tenían" usa un verde más suave que "Castellano": los dos son buenos, pero solo uno es nuevo.
 ESTADOS = {
-    ev.CASTELLANO: ('#0ca30c', '#0ca30c', 'ok', 'Castellano', 'Subtítulo en castellano guardado ahora'),
-    ev.YA_CASTELLANO: ('#79c779', '#2f7a2f', 'ya', 'Ya lo tenían', 'Ya tenían subtítulo en castellano'),
-    ev.LATINO: ('#e09a00', '#fab219', 'aviso', 'Latino', 'Solo había latino: se ha guardado latino'),
-    ev.INGLES: ('#e0703f', '#ec835a', 'idioma', 'Inglés', 'No había nada en español: se ha guardado inglés'),
-    ev.SIN_CAMBIOS: ('#8a8984', '#8f8e86', 'igual', 'Sin cambios',
-                     'Ya tenían latino o inglés y no se ha encontrado nada mejor'),
-    ev.PENDIENTE: ('#6250d6', '#9085e9', 'reloj', 'Pendientes',
-                   'Superan el límite de vídeos por tanda: se harán la próxima vez'),
-    ev.NO_ENCONTRADO: ('#d03b3b', '#e05555', 'error', 'Sin subtítulos', 'No se ha encontrado ningún subtítulo'),
-    NO_REVISADO: ('#a3a29b', '#6f6e68', 'circulo', 'No revisados',
-                  'No se llegaron a revisar porque se canceló la búsqueda'),
+    ev.CASTELLANO: ('#0ca30c', '#0ca30c', 'ok', N_('Castellano'), N_('Subtítulo en castellano guardado ahora')),
+    ev.YA_CASTELLANO: ('#79c779', '#2f7a2f', 'ya', N_('Ya lo tenían'), N_('Ya tenían subtítulo en castellano')),
+    ev.LATINO: ('#e09a00', '#fab219', 'aviso', N_('Latino'), N_('Solo había latino: se ha guardado latino')),
+    ev.INGLES: ('#e0703f', '#ec835a', 'idioma', N_('Inglés'), N_('No había nada en español: se ha guardado inglés')),
+    ev.SIN_CAMBIOS: ('#8a8984', '#8f8e86', 'igual', N_('Sin cambios'),
+                     N_('Ya tenían latino o inglés y no se ha encontrado nada mejor')),
+    ev.PENDIENTE: ('#6250d6', '#9085e9', 'reloj', N_('Pendientes'),
+                   N_('Superan el límite de vídeos por tanda: se harán la próxima vez')),
+    ev.NO_ENCONTRADO: ('#d03b3b', '#e05555', 'error', N_('Sin subtítulos'), N_('No se ha encontrado ningún subtítulo')),
+    NO_REVISADO: ('#a3a29b', '#6f6e68', 'circulo', N_('No revisados'),
+                  N_('No se llegaron a revisar porque se canceló la búsqueda')),
 }
 ORDEN_ESTADOS = list(ESTADOS)
 ESTADOS_PROGRESO = {
-    EN_ESPERA: (None, None, 'circulo', 'En espera', 'Todavía no se ha revisado'),
-    BUSCANDO: (None, None, 'buscar', 'Buscando…', 'Se está revisando ahora'),
+    EN_ESPERA: (None, None, 'circulo', N_('En espera'), N_('Todavía no se ha revisado')),
+    BUSCANDO: (None, None, 'buscar', N_('Buscando…'), N_('Se está revisando ahora')),
 }
 
 _actual = CLARO
@@ -91,11 +92,11 @@ def icono_estado(categoria):
 
 
 def nombre_estado(categoria):
-    return _estado(categoria)[3]
+    return tr(_estado(categoria)[3])
 
 
 def explicacion_estado(categoria):
-    return _estado(categoria)[4]
+    return tr(_estado(categoria)[4])
 
 
 # ---------- Tamaño del texto ----------

@@ -9,6 +9,7 @@ import os
 from dataclasses import asdict, fields
 from pathlib import Path
 
+from subtitulos.idioma import IDIOMAS
 from subtitulos.opciones import Opciones
 
 TEMAS = ('sistema', 'claro', 'oscuro')
@@ -35,6 +36,8 @@ class Config:
                                       # menu_contextual.asegurar)
         self.menu_segundo_plano = False   # desde el menú: buscar sin abrir la ventana
         self.cerrar_a_bandeja = False     # al cerrar la ventana, la app sigue junto al reloj
+        self.idioma = None            # 'es' | 'en'; None = aún sin elegir (castellano). Lo elige el
+                                      # instalador la primera vez o Configuración
         self.cargar()
 
     def cargar(self):
@@ -77,6 +80,8 @@ class Config:
             self.menu_segundo_plano = datos['menu_segundo_plano']
         if isinstance(datos.get('cerrar_a_bandeja'), bool):
             self.cerrar_a_bandeja = datos['cerrar_a_bandeja']
+        if datos.get('idioma') in IDIOMAS:
+            self.idioma = datos['idioma']
 
     def guardar(self):
         datos = {'opciones': asdict(self.opciones), 'tema': self.tema,
@@ -86,6 +91,8 @@ class Config:
                  'menu_segundo_plano': self.menu_segundo_plano, 'cerrar_a_bandeja': self.cerrar_a_bandeja}
         if self.menu_contextual is not None:
             datos['menu_contextual'] = self.menu_contextual
+        if self.idioma is not None:
+            datos['idioma'] = self.idioma
         try:
             self.ruta.parent.mkdir(parents=True, exist_ok=True)
             temporal = self.ruta.with_suffix('.tmp')
