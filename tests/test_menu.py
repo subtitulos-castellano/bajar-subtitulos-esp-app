@@ -371,7 +371,7 @@ class UnaSolaApp(unittest.TestCase):
 
         def mandar(datos):
             with mock.patch.object(instancia, 'nombre_canal', lambda: nombre):
-                instancia._enviar_tuberia(datos) if WINDOWS else instancia._enviar_qt(datos)
+                instancia._enviar_tuberia(datos) if WINDOWS else instancia._enviar_socket(datos)
         nombre = instancia.nombre_canal()
         for datos in (b'no es json\n', b'[1, 2]\n', '{"mostrar": true}\n'.encode()):
             h = threading.Thread(target=mandar, args=(datos,))

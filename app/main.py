@@ -31,7 +31,7 @@ from PySide6.QtCore import Qt, QTimer  # noqa: E402
 from PySide6.QtWidgets import QApplication, QScrollArea  # noqa: E402
 
 from app import tema  # noqa: E402
-from app.plataforma import WINDOWS  # noqa: E402
+from app.plataforma import LINUX, WINDOWS  # noqa: E402
 
 ID_APP = 'subtitulos-castellano.BajarSubtitulosESP'
 
@@ -337,7 +337,6 @@ def main(argv=None):
     unica = not (args.demo or args.captura or args.medir_arranque or args.probar_actualizacion)
     from app import instancia
     if unica and not instancia.es_la_primera():
-        _app = QApplication(sys.argv[:1]) if not WINDOWS else None  # noqa: F841 - QLocalSocket
         instancia.permitir_primer_plano()
         return 0 if instancia.enviar(pedido or {'mostrar': True}) else 1
     _identificarse()
@@ -349,6 +348,9 @@ def main(argv=None):
     app = QApplication(sys.argv[:1])
     app.setApplicationName('Bajar Subtítulos ESP')
     app.setOrganizationName('subtitulos-castellano')
+    if LINUX:
+        from app.plataforma import linux
+        app.setDesktopFileName(linux.ID_ESCRITORIO)     # su icono en la barra de tareas
     from app.config import Config
     config = Config(args.config)
     if args.tema:
@@ -441,6 +443,9 @@ def _atender_pedidos(app, ventana, config, args):
     app.commitDataRequest.connect(lambda _gestor: setattr(ventana, '_saliendo', True))
 
     def recibido(pedido):
+        if LINUX:
+            from app.plataforma import linux
+            linux.usar_token_activacion(pedido.get('activacion'))    # para poder ponerse delante
         if pedido.get('mostrar'):
             ventana.traer_al_frente()
             return

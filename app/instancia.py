@@ -1,8 +1,8 @@
 """Una sola app abierta a la vez por usuario.
 
 Con varios vídeos seleccionados, el Explorador abre la app una vez por vídeo, casi a la vez. La primera
-que arranca se queda (se decide con un mutex de Windows) y abre un canal local; las demás le mandan lo
-que han recibido y se cierran al momento. La primera junta lo que llega seguido (Agrupador) y lo
+que arranca se queda (se decide con un mutex de Windows o, en Linux, con un bloqueo de archivo) y abre
+un canal local; las demás le mandan lo que han recibido y se cierran al momento. La primera junta lo que llega seguido (Agrupador) y lo
 busca todo de una vez, como cuando se sueltan varios vídeos en la ventana.
 
 Lo mismo si la app ya estaba abierta: lo nuevo va a su cola, y abrirla otra vez desde el menú Inicio
@@ -10,34 +10,46 @@ solo trae la ventana al frente.
 """
 import getpass
 import json
+import os
+import socket
+import tempfile
 import time
 
-from PySide6.QtCore import QByteArray, QObject, QTimer, Signal
-from PySide6.QtNetwork import QLocalServer, QLocalSocket
+from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtNetwork import QLocalServer
 
-from .plataforma import WINDOWS
+from .plataforma import LINUX, WINDOWS
 
 MUTEX = 'Local\\BajarSubtitulosESP-instancia'
 _mutex = None
 
 
 def nombre_canal():
+    """En Windows, una tubería con nombre; en Linux, un socket en la carpeta privada del usuario."""
     try:
         usuario = getpass.getuser()
     except Exception:  # noqa: BLE001 - sin usuario conocido: un nombre fijo
         usuario = 'usuario'
-    return 'BajarSubtitulosESP-' + ''.join(c for c in usuario if c.isalnum())[:40]
+    nombre = 'BajarSubtitulosESP-' + ''.join(c for c in usuario if c.isalnum())[:40]
+    if LINUX:
+        from .plataforma import linux
+        return str(linux.carpeta_ejecucion() / nombre)
+    return nombre
 
 
 def es_la_primera():
-    """True si no hay otra app abierta por este usuario en esta sesión de Windows. El mutex dura lo
-    que dure el proceso (Windows lo suelta solo, aunque la app se cierre de golpe)."""
+    """True si no hay otra app abierta por este usuario en esta sesión. El mutex (o el bloqueo, en
+    Linux) dura lo que dure el proceso: el sistema lo suelta solo, aunque la app se cierre de golpe."""
     global _mutex
-    if not WINDOWS:
-        return True
-    from .plataforma import windows
-    _mutex, existia = windows.crear_mutex(MUTEX)
-    return not existia
+    if WINDOWS:
+        from .plataforma import windows
+        _mutex, existia = windows.crear_mutex(MUTEX)
+        return not existia
+    if LINUX:
+        from .plataforma import linux
+        _mutex = linux.bloquear(nombre_canal() + '.lock')
+        return _mutex is not None       # False (no se ha podido comprobar): mejor abrirse
+    return True
 
 
 def soltar():
@@ -47,6 +59,9 @@ def soltar():
     if _mutex and WINDOWS:
         from .plataforma import windows
         windows.cerrar(_mutex)
+    elif _mutex and LINUX:
+        from .plataforma import linux
+        linux.soltar(_mutex)
     _mutex = None
 
 
@@ -61,13 +76,17 @@ def permitir_primer_plano():
 def enviar(pedido, segundos=10):
     """Manda el pedido a la app ya abierta. Reintenta un rato: puede estar arrancando aún. True si lo
     ha recibido (la otra app cierra la conexión en cuanto lo lee)."""
+    if LINUX:
+        from .plataforma import linux
+        if linux.token_activacion():
+            pedido = {**pedido, 'activacion': linux.token_activacion()}
     datos = (json.dumps(pedido, ensure_ascii=False) + '\n').encode('utf-8')
     fin = time.monotonic() + segundos
     while True:
         try:
             if WINDOWS:
                 return _enviar_tuberia(datos)
-            return _enviar_qt(datos)
+            return _enviar_socket(datos)
         except OSError:
             pass                      # aún no escucha, o está atendiendo a otra apertura
         if time.monotonic() > fin:
@@ -86,14 +105,24 @@ def _enviar_tuberia(datos):
     return True
 
 
-def _enviar_qt(datos):
-    s = QLocalSocket()
-    s.connectToServer(nombre_canal())
-    if not s.waitForConnected(500):
-        raise OSError(s.errorString())
-    s.write(QByteArray(datos))
-    s.waitForBytesWritten(2000)
-    s.waitForDisconnected(3000)
+def ruta_socket(nombre=None):
+    """Dónde escucha QLocalServer fuera de Windows: la ruta tal cual si es absoluta; si no, en la carpeta
+    temporal (como Qt)."""
+    nombre = nombre or nombre_canal()
+    return nombre if os.path.isabs(nombre) else os.path.join(tempfile.gettempdir(), nombre)
+
+
+def _enviar_socket(datos):
+    """QLocalServer fuera de Windows es un socket Unix. Sin Qt: así la apertura que solo pasa el pedido
+    no necesita crear una aplicación Qt (ni conectarse a la pantalla)."""
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        s.settimeout(3)
+        s.connect(ruta_socket())
+        s.sendall(datos)
+        try:
+            s.recv(1)                 # vuelve cuando la otra app cierra la conexión
+        except OSError:
+            pass                      # se ha agotado el tiempo: también vale, el pedido ya está enviado
     return True
 
 
@@ -123,7 +152,7 @@ class Servidor(QObject):
             s = self.servidor.nextPendingConnection()
             self._buffers[s] = b''
             s.readyRead.connect(lambda s=s: self._leer(s))
-            s.disconnected.connect(s.deleteLater)
+            s.disconnected.connect(lambda s=s: (self._leer(s), self._buffers.pop(s, None), s.deleteLater()))
             if s.bytesAvailable():
                 self._leer(s)
 

@@ -138,7 +138,7 @@ class Configuracion(unittest.TestCase):
 
 
 class LlaveroFalso:
-    """El Administrador de credenciales de Windows, en memoria: {(servicio, usuario): contraseña}."""
+    """El llavero del sistema, en memoria: {(servicio, usuario): contraseña}."""
 
     def __init__(self):
         self.claves = {}
@@ -159,6 +159,8 @@ class Credenciales(unittest.TestCase):
         parche = mock.patch.object(credenciales, '_keyring', lambda: self.llavero)
         parche.start()
         self.addCleanup(parche.stop)
+        credenciales.olvidar()
+        self.addCleanup(credenciales.olvidar)
 
     def test_proveedores_solo_con_cuenta_completa(self):
         credenciales.guardar_clave('pepe', 'secreta')

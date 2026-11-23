@@ -14,6 +14,7 @@ from subtitulos.opciones import MAX_DESCARGAS, MAX_VIDEOS, Opciones
 from . import __version__, actualizar, credenciales, iconos, menu_contextual, tema
 from .config import TAMANO_MAX, TAMANO_MIN
 from .componentes import FilaOpcion, IconoLabel
+from .plataforma import WINDOWS
 from .vista_inicio import MARGEN, boton, etiqueta
 
 
@@ -75,6 +76,10 @@ class Limite(QWidget):
             self.numero.setValue(valor)
 
 
+class _Llavero(QObject):
+    contesto = Signal()            # el llavero del sistema ha terminado algo que tardaba (Linux)
+
+
 class _Prueba(QObject):
     """Recibe en el hilo de la ventana el resultado de 'Probar conexión' (que usa la red)."""
     hecha = Signal(bool, str)
@@ -103,6 +108,10 @@ class FormCuenta(QWidget):
         fila.setSpacing(10)
         self.usuario = QLineEdit(self.guardado())
         self.usuario.setPlaceholderText(tr('Usuario'))
+        self._pendiente = None          # (usuario, contraseña) que el llavero aún no ha guardado
+        self._llavero = _Llavero(self)
+        self._llavero.contesto.connect(self._llavero_contesto)
+        credenciales.al_terminar(self._llavero.contesto.emit)
         self.clave = QLineEdit(credenciales.leer_clave(self.guardado(), cuenta))
         self.clave.setPlaceholderText(tr('Contraseña'))
         self.clave.setEchoMode(QLineEdit.Password)
@@ -133,6 +142,8 @@ class FormCuenta(QWidget):
         return getattr(self.config, self.CAMPOS[self.cuenta])
 
     def actualizar(self, mensaje=None):
+        if self._pendiente:
+            return                       # «Esperando al llavero…» hasta que conteste
         guardado = self.guardado()
         cambios = (self.usuario.text().strip() != guardado
                    or self.clave.text() != credenciales.leer_clave(guardado, self.cuenta))
@@ -155,11 +166,34 @@ class FormCuenta(QWidget):
 
     def guardar(self):
         usuario, clave = self.usuario.text().strip(), self.clave.text()
-        if not credenciales.guardar_clave(usuario, clave, self.guardado(), self.cuenta):
-            self.actualizar(tr('No se pudo guardar la contraseña en el Administrador de credenciales.'))
+        hecho = credenciales.guardar_clave(usuario, clave, self.guardado(), self.cuenta)
+        if hecho == credenciales.PENDIENTE:
+            self._pendiente = (usuario, clave)
+            self.b_guardar.setEnabled(False)
+            self.estado.setText(tr('Esperando al llavero del sistema. Si te pide su contraseña, desbloquéalo.'))
             return
+        if not hecho:
+            self.actualizar(tr('No se pudo guardar la contraseña en el Administrador de credenciales.') if WINDOWS
+                            else tr('No se pudo guardar la contraseña en el llavero del sistema.'))
+            return
+        self._guardado(usuario, clave)
+
+    def _guardado(self, usuario, clave):
         setattr(self.config, self.CAMPOS[self.cuenta], usuario if clave else '')
         self.config.guardar()
+        self.actualizar()
+
+    def _llavero_contesto(self):
+        """El llavero ha terminado de leer o de guardar algo que tardaba (estaba bloqueado)."""
+        if self._pendiente:
+            usuario, clave = self._pendiente
+            if credenciales.leer_clave(usuario, self.cuenta) == clave:
+                self._pendiente = None
+                self._guardado(usuario, clave)
+            return
+        guardado = self.guardado()
+        if guardado and self.usuario.text().strip() == guardado and not self.clave.text():
+            self.clave.setText(credenciales.leer_clave(guardado, self.cuenta))
         self.actualizar()
 
     def _importar(self):
@@ -291,7 +325,8 @@ class VistaAjustes(QWidget):
             self.botones_tema[clave] = b
             tl.addWidget(b)
         self.grupo_tema.buttonClicked.connect(self._tema)
-        t.fila(FilaOpcion(tr('Tema'), tr('Claro, oscuro o el mismo que Windows.'), temas))
+        t.fila(FilaOpcion(tr('Tema'), tr('Claro, oscuro o el mismo que Windows.') if WINDOWS
+                          else tr('Claro, oscuro o el mismo que el sistema.'), temas))
         t.fila(self._fila_tamano())
         b_copias = boton(tr('Abrir carpeta'))
         b_copias.clicked.connect(self._abrir_copias)
@@ -419,7 +454,7 @@ class VistaAjustes(QWidget):
         sl.setContentsMargins(0, 0, 0, 0)
         sl.setSpacing(0)
         self.grupo_tamano = QButtonGroup(self)
-        self.b_tamano_windows = QPushButton(tr('Como Windows'))
+        self.b_tamano_windows = QPushButton(tr('Como Windows') if WINDOWS else tr('Normal'))
         self.b_tamano_propio = QPushButton(tr('Personalizado'))
         for i, b in enumerate((self.b_tamano_windows, self.b_tamano_propio)):
             b.setCheckable(True)
@@ -449,7 +484,10 @@ class VistaAjustes(QWidget):
         self.tamano.valueChanged.connect(lambda _: self._espera_tamano.start())
         self.fila_tamano = FilaOpcion(tr('Tamaño del texto'),
                                       tr('Como Windows: el de Configuración de Windows › Accesibilidad › Tamaño '
-                                         'del texto. Si lo cambias allí, la app se ajusta al volver a ella.'),
+                                         'del texto. Si lo cambias allí, la app se ajusta al volver a ella.')
+                                      if WINDOWS else
+                                      tr('Normal: el tamaño de siempre, que ya se adapta al escalado de la pantalla '
+                                         'del sistema. Personalizado: más grande o más pequeño.'),
                                       control)
         return self.fila_tamano
 
@@ -471,7 +509,8 @@ class VistaAjustes(QWidget):
 
     def _texto_tamano(self):
         windows = tema.escala_windows()
-        self.b_tamano_windows.setText(tr('Como Windows ({n} %)', n=windows))
+        self.b_tamano_windows.setText(tr('Como Windows ({n} %)', n=windows) if WINDOWS
+                                      else tr('Normal ({n} %)', n=windows))
         if not self.b_tamano_propio.isChecked():
             self.tamano.blockSignals(True)
             self.tamano.setValue(windows)
@@ -587,7 +626,12 @@ class VistaAjustes(QWidget):
         t = Tarjeta('usuario', tr('Cuentas de OpenSubtitles'),
                     tr('Opcionales, pero dan más resultados. opensubtitles.org y opensubtitles.com son cuentas '
                        'distintas. Las contraseñas se guardan en el Administrador de credenciales de Windows, '
-                       'nunca en un archivo.'))
+                       'nunca en un archivo.') if WINDOWS else
+                    tr('Opcionales, pero dan más resultados. opensubtitles.org y opensubtitles.com son cuentas '
+                       'distintas. Las contraseñas se guardan en el llavero del sistema (KWallet o GNOME Keyring), '
+                       'nunca en un archivo.') + ('' if credenciales.disponible() else ' ' + tr(
+                        'Este sistema no tiene llavero: para usar las cuentas, instala uno (por ejemplo, '
+                        'gnome-keyring) y vuelve a abrir la app.')))
         self.cuentas = {}
         for cuenta in credenciales.CUENTAS:
             self.cuentas[cuenta] = t.fila(FormCuenta(cuenta, self.config))

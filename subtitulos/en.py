@@ -247,6 +247,23 @@ TEXTOS = {
     'Claro': 'Light',
     'Oscuro': 'Dark',
     'Claro, oscuro o el mismo que Windows.': 'Light, dark or the same as Windows.',
+    'Claro, oscuro o el mismo que el sistema.': 'Light, dark or the same as the system.',
+    'Normal': 'Normal',
+    'Normal ({n} %)': 'Normal ({n} %)',
+    'Normal: el tamaño de siempre, que ya se adapta al escalado de la pantalla del sistema. Personalizado: más '
+    'grande o más pequeño.':
+        'Normal: the usual size, which already follows the system display scaling. Custom: bigger or smaller.',
+    'Opcionales, pero dan más resultados. opensubtitles.org y opensubtitles.com son cuentas distintas. Las '
+    'contraseñas se guardan en el llavero del sistema (KWallet o GNOME Keyring), nunca en un archivo.':
+        'Optional, but they give more results. opensubtitles.org and opensubtitles.com are separate accounts. '
+        'Passwords are stored in the system keyring (KWallet or GNOME Keyring), never in a file.',
+    'Este sistema no tiene llavero: para usar las cuentas, instala uno (por ejemplo, gnome-keyring) y vuelve a '
+    'abrir la app.':
+        'This system has no keyring: to use the accounts, install one (for example, gnome-keyring) and open the '
+        'app again.',
+    'No se pudo guardar la contraseña en el llavero del sistema.': 'The password could not be saved in the system keyring.',
+    'Esperando al llavero del sistema. Si te pide su contraseña, desbloquéalo.':
+        'Waiting for the system keyring. If it asks for its password, unlock it.',
     'Tamaño del texto': 'Text size',
     'Como Windows': 'Like Windows',
     'Como Windows ({n} %)': 'Like Windows ({n} %)',

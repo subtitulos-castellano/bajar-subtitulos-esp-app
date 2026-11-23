@@ -1,8 +1,9 @@
-"""Preferencias de la app en %APPDATA%\\BajarSubtitulosEsp\\config.json.
+"""Preferencias de la app en %APPDATA%\\BajarSubtitulosEsp\\config.json (en Linux,
+~/.config/BajarSubtitulosEsp/config.json).
 
 Se guardan al momento, en cada cambio. Si el archivo no existe o está dañado, se usan los
 valores por defecto (los mismos que la CLI sin parámetros). La contraseña de OpenSubtitles
-NO se guarda aquí: va al Administrador de credenciales de Windows (ver credenciales.py).
+NO se guarda aquí: va al llavero del sistema (ver credenciales.py).
 """
 import json
 import os
@@ -12,11 +13,16 @@ from pathlib import Path
 from subtitulos.idioma import IDIOMAS
 from subtitulos.opciones import Opciones
 
+from .plataforma import LINUX
+
 TEMAS = ('sistema', 'claro', 'oscuro')
 TAMANO_MIN, TAMANO_MAX = 80, 225    # % del tamaño del texto si no se usa el de Windows (0)
 
 
 def carpeta():
+    if LINUX:
+        from .plataforma import linux
+        return linux.carpeta_config() / 'BajarSubtitulosEsp'
     base = os.environ.get('APPDATA')
     return (Path(base) if base else Path.home() / '.config') / 'BajarSubtitulosEsp'
 
