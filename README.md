@@ -287,7 +287,8 @@ subtitulos/     núcleo, compartido con la línea de comandos
   nucleo.py     proveedores y procesar(ruta(s), opciones, eventos, cancelado, credenciales)
 bajar_subs.py   línea de comandos (mismos parámetros y salida que la skill; siempre en castellano)
 packaging/      recursos comunes (icono, licencias) y, en windows/, PyInstaller, Inno Setup y compilar.py
-scripts/windows.sh  desarrollo desde WSL con el Python de Windows
+scripts/        windows.sh: desarrollo desde WSL con el Python de Windows;
+                linux.sh: desarrollo en Linux
 tests/          pruebas (núcleo, seguridad, app)
 ```
 
@@ -306,6 +307,19 @@ scripts/windows.sh app --demo  # con resultados de demostración (no busca ni de
 scripts/windows.sh python -I app/main.py --captura 'C:\ruta\capturas'   # imágenes de cada pantalla
 scripts/windows.sh python -I app/main.py --captura 'C:\ruta\en' --idioma en   # las mismas, en inglés
 scripts/windows.sh compilar    # .exe, zip portable (e instalador si hay Inno Setup) en dist/
+```
+
+### Desarrollo en Linux
+
+La versión para Linux está en preparación (llegará en la 1.5.0). Desde el código ya funciona: hace
+falta Python 3.10 o posterior.
+
+```bash
+scripts/linux.sh entorno       # una vez: crea .venv e instala las dependencias (requirements-app.txt)
+scripts/linux.sh app           # abre la app
+scripts/linux.sh app --demo    # con resultados de demostración (no busca ni descarga)
+scripts/linux.sh pruebas       # pruebas automáticas, sin ventanas
+scripts/linux.sh info          # sistema, escritorio, versiones y llavero (para informar de un fallo)
 ```
 
 ### Línea de comandos
