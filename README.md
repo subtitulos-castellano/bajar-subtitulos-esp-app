@@ -260,7 +260,9 @@ app/            interfaz gráfica (Qt / PySide6)
   main.py       arranque (--tema, --idioma, --demo, --captura, --config, --autoprueba, rutas y --menu-*);
                 volver a abrirse al cambiar el idioma
   ventana.py    ventana principal, menú lateral, arrastrar y soltar, cola
-  menu_contextual.py  menú del Explorador en HKCU\Software\Classes (sin Qt)
+  menu_contextual.py  menú contextual: cuándo se pone y se quita (sin Qt)
+  plataforma/   lo que depende del sistema: windows.py (mutex, registro, shell32) y
+                menu_windows.py (el menú del Explorador en HKCU\Software\Classes)
   instancia.py  una sola app abierta: mutex, canal local y agrupar lo que llega seguido
   bandeja.py    icono junto al reloj: segundo plano, aviso al terminar y seguir abierta al cerrar
   vista_inicio.py  zona de arrastre, búsqueda en curso y resumen con colores
@@ -269,7 +271,8 @@ app/            interfaz gráfica (Qt / PySide6)
   componentes.py   interruptor, tarjetas, barras, tabla de vídeos
   config.py     preferencias (%APPDATA%\BajarSubtitulosEsp\config.json)
   credenciales.py  cuentas de opensubtitles.org y .com (keyring)
-  actualizar.py consultar la última Release, descargar y verificar el instalador y lanzarlo (sin Qt)
+  actualizar.py consultar las Releases (solo las que cambian algo para este sistema), descargar y
+                verificar el instalador y lanzarlo (sin Qt)
   vista_actualizacion.py  aviso de versión nueva y comprobación/descarga en hilos aparte
   tema.py       colores claro/oscuro, tamaño del texto y hoja de estilos
   iconos.py     iconos SVG (Lucide, ISC)
@@ -283,7 +286,7 @@ subtitulos/     núcleo, compartido con la línea de comandos
   pistas.py     subtítulos incrustados en MKV y MP4 (sin ffmpeg)
   nucleo.py     proveedores y procesar(ruta(s), opciones, eventos, cancelado, credenciales)
 bajar_subs.py   línea de comandos (mismos parámetros y salida que la skill; siempre en castellano)
-packaging/      PyInstaller, Inno Setup, recursos y compilar.py
+packaging/      recursos comunes (icono, licencias) y, en windows/, PyInstaller, Inno Setup y compilar.py
 scripts/windows.sh  desarrollo desde WSL con el Python de Windows
 tests/          pruebas (núcleo, seguridad, app)
 ```
@@ -345,13 +348,13 @@ scripts/windows.sh python -I -m unittest discover -s tests  # todas, con el Pyth
 
 ### Compilar y publicar
 
-`packaging/compilar.py` hace, en orden:
+`packaging/windows/compilar.py` hace, en orden:
 
 1. Genera el icono, la versión del `.exe` y los avisos de licencias.
 2. Compila con PyInstaller en modo carpeta, sin UPX y sin `-O`.
 3. Ejecuta la **autoprueba del `.exe` empaquetado**: proveedores, refinadores, idiomas, keyring,
    certificados, una búsqueda sin red con un MKV y una ruta larga con acentos.
-4. Crea el zip portable y, si está Inno Setup, el instalador (`packaging/instalador.iss`).
+4. Crea el zip portable y, si está Inno Setup, el instalador (`packaging/windows/instalador.iss`).
 
 `<exe> --autoprueba informe.txt --con-red` añade una búsqueda real (en simulación) contra los
 proveedores.
@@ -371,7 +374,9 @@ proveedores.
 Para publicar una versión:
 
 1. Sube `__version__` en `app/__init__.py`.
-2. Añade la versión a `CHANGELOG.md` y, traducida, a `CHANGELOG.en.md`.
+2. Añade la versión a `CHANGELOG.md` y, traducida, a `CHANGELOG.en.md`. Cada novedad que solo
+   afecta a un sistema empieza por `[Windows]` o `[Linux]` (`- [Windows] Arreglado…`); sin marca, es
+   de los dos. La app solo avisa de una versión nueva si alguna novedad es para su sistema.
 3. Haz commit y luego `git tag vX.Y.Z && git push --tags`.
 
 **Textos nuevos:** en el código, en castellano dentro de `tr('…')` (con `{campos}` en vez de

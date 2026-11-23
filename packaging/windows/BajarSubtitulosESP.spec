@@ -1,12 +1,12 @@
 # Receta de PyInstaller: un .exe sin consola y su carpeta (_internal) con Python, Qt y las librerías.
 # Modo carpeta (onedir) y sin UPX: arranca rápido (nada que descomprimir) y da menos falsos
 # positivos de antivirus. Uso (desde la raíz del proyecto, tras packaging/generar_recursos.py):
-#     pyinstaller --noconfirm --clean packaging/BajarSubtitulosESP.spec
+#     pyinstaller --noconfirm --clean packaging/windows/BajarSubtitulosESP.spec
 from pathlib import Path
 
 from PyInstaller.utils.hooks import collect_all
 
-RAIZ = Path(SPECPATH).parent
+RAIZ = Path(SPECPATH).parent.parent
 RECURSOS = RAIZ / 'packaging' / 'build'
 
 # Librerías que cargan módulos o datos por nombre (proveedores, refinadores, conversores de idioma,

@@ -1,15 +1,15 @@
-; Instalador de Bajar Subtítulos ESP (Inno Setup 6). Lo compila packaging/compilar.py:
-;   ISCC /DVersion=0.5.0 /DOrigen=dist\BajarSubtitulosESP /DSalida=dist packaging\instalador.iss
+; Instalador de Bajar Subtítulos ESP (Inno Setup 6). Lo compila packaging/windows/compilar.py:
+;   ISCC /DVersion=0.5.0 /DOrigen=dist\BajarSubtitulosESP /DSalida=dist packaging\windows\instalador.iss
 ; Instalación por usuario: no pide permisos de administrador.
 
 #ifndef Version
   #define Version "0.0.0"
 #endif
 #ifndef Origen
-  #define Origen "..\dist\BajarSubtitulosESP"
+  #define Origen "..\..\dist\BajarSubtitulosESP"
 #endif
 #ifndef Salida
-  #define Salida "..\dist"
+  #define Salida "..\..\dist"
 #endif
 #define Nombre "Bajar Subtítulos ESP"
 #define Exe "BajarSubtitulosESP.exe"
@@ -37,7 +37,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 OutputDir={#Salida}
 OutputBaseFilename=BajarSubtitulosESP-{#Version}-instalador
-SetupIconFile=build\icono.ico
+SetupIconFile=..\build\icono.ico
 UninstallDisplayIcon={app}\{#Exe}
 UninstallDisplayName={#Nombre}
 Compression=lzma2/max
@@ -46,7 +46,7 @@ WizardStyle=modern
 ; Si la app está abierta, el instalador pide cerrarla (la app crea este mutex al arrancar).
 AppMutex={#MutexApp}
 CloseApplications=yes
-LicenseFile=..\LICENSE
+LicenseFile=..\..\LICENSE
 ; Idioma: se pregunta en la primera instalación (propone el de Windows) y vale también para la app. Al
 ; actualizar o reinstalar se usa el de la vez anterior sin preguntar; en la app se cambia en Configuración.
 ShowLanguageDialog=yes

@@ -1,5 +1,14 @@
 # Cambios
 
+## 1.4.0
+
+- [Windows] **Avisos de actualización solo cuando hay algo para Windows.** Es el primer paso hacia
+  la versión para Linux: las dos tendrán siempre el mismo número de versión, y cada una solo avisará
+  de las versiones que traigan cambios para su sistema. Si se salta alguna, enseña también sus
+  novedades.
+- [Windows] Por dentro, el código está reorganizado para la versión de Linux. En Windows todo
+  funciona igual que antes.
+
 ## 1.3.0
 
 - **opensubtitles.com**, como último recurso: con cuenta, se le piden subtítulos solo si los demás

@@ -10,11 +10,12 @@ solo trae la ventana al frente.
 """
 import getpass
 import json
-import sys
 import time
 
 from PySide6.QtCore import QByteArray, QObject, QTimer, Signal
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
+
+from .plataforma import WINDOWS
 
 MUTEX = 'Local\\BajarSubtitulosESP-instancia'
 _mutex = None
@@ -32,38 +33,29 @@ def es_la_primera():
     """True si no hay otra app abierta por este usuario en esta sesión de Windows. El mutex dura lo
     que dure el proceso (Windows lo suelta solo, aunque la app se cierre de golpe)."""
     global _mutex
-    if sys.platform != 'win32':
+    if not WINDOWS:
         return True
-    import ctypes
-    from ctypes import wintypes
-    k32 = ctypes.WinDLL('kernel32', use_last_error=True)
-    k32.CreateMutexW.restype = wintypes.HANDLE
-    k32.CreateMutexW.argtypes = (wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR)
-    _mutex = k32.CreateMutexW(None, False, MUTEX)
-    ERROR_ALREADY_EXISTS = 183
-    return ctypes.get_last_error() != ERROR_ALREADY_EXISTS
+    from .plataforma import windows
+    _mutex, existia = windows.crear_mutex(MUTEX)
+    return not existia
 
 
 def soltar():
     """Deja de ser «la primera» antes de cerrarse para volver a abrirse (cambio de idioma): así la
     nueva apertura no le pasa el pedido a esta, que se está cerrando."""
     global _mutex
-    if _mutex and sys.platform == 'win32':
-        import ctypes
-        from ctypes import wintypes
-        k32 = ctypes.WinDLL('kernel32', use_last_error=True)
-        k32.CloseHandle.argtypes = (wintypes.HANDLE,)
-        k32.CloseHandle(_mutex)
+    if _mutex and WINDOWS:
+        from .plataforma import windows
+        windows.cerrar(_mutex)
     _mutex = None
 
 
 def permitir_primer_plano():
     """La app que ya está abierta puede ponerse delante (Windows solo deja hacerlo a quien tiene el
     foco, que es este proceso recién lanzado)."""
-    if sys.platform == 'win32':
-        import ctypes
-        ASFW_ANY = -1
-        ctypes.windll.user32.AllowSetForegroundWindow(ASFW_ANY)
+    if WINDOWS:
+        from .plataforma import windows
+        windows.permitir_primer_plano()
 
 
 def enviar(pedido, segundos=10):
@@ -73,7 +65,7 @@ def enviar(pedido, segundos=10):
     fin = time.monotonic() + segundos
     while True:
         try:
-            if sys.platform == 'win32':
+            if WINDOWS:
                 return _enviar_tuberia(datos)
             return _enviar_qt(datos)
         except OSError:

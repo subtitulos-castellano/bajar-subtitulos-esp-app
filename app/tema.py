@@ -8,13 +8,14 @@ Tamaño del texto: por defecto sigue a Windows (Configuración › Accesibilidad
 texto, que guarda TextScaleFactor en el registro), igual que el Explorador. Todo lo que tiene
 que ver con texto (letra, márgenes, alturas de filas y tarjetas) se multiplica por esa escala.
 """
-import sys
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QPalette
 
 from subtitulos import eventos as ev
 from subtitulos.idioma import N_, tr
+
+from .plataforma import WINDOWS
 
 CLARO = {
     'nombre': 'claro',
@@ -103,15 +104,10 @@ def explicacion_estado(categoria):
 
 def escala_windows():
     """Porcentaje de 'Tamaño del texto' de Windows (100-225). 100 si no se puede leer."""
-    if sys.platform != 'win32':
+    if not WINDOWS:
         return 100
-    try:
-        import winreg
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Accessibility') as k:
-            valor, _ = winreg.QueryValueEx(k, 'TextScaleFactor')
-        return min(225, max(100, int(valor)))
-    except (OSError, ValueError, TypeError):
-        return 100
+    from .plataforma import windows
+    return windows.escala_texto()
 
 
 def porcentaje(tamano_texto):

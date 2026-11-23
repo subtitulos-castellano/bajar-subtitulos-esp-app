@@ -56,9 +56,14 @@ class Versiones(unittest.TestCase):
         self.assertEqual(act.version_corta('1.0.2'), '1.0.2')
 
 
+def interpretar(*releases, actual='1.0.0', sistema='windows'):
+    """Como la respuesta de /releases: una lista (las pruebas de Windows salvo que se diga otra cosa)."""
+    return act.interpretar(list(releases), actual=actual, sistema=sistema)
+
+
 class Interpretar(unittest.TestCase):
     def test_version_nueva(self):
-        n, sumas = act.interpretar(release(), actual='1.0.1')
+        n, sumas = interpretar(release(), actual='1.0.1')
         self.assertEqual(n.version, '1.0.2')
         self.assertEqual(n.pagina, f'{REPO}/releases/tag/v1.0.2')
         self.assertEqual(n.instalador.nombre, 'BajarSubtitulosESP-1.0.2-instalador.exe')
@@ -69,40 +74,55 @@ class Interpretar(unittest.TestCase):
 
     def test_misma_o_anterior_no_es_novedad(self):
         for actual in ('1.0.2', '1.0.3', '2.0.0'):
-            self.assertEqual(act.interpretar(release(), actual=actual), (None, None))
+            self.assertEqual(interpretar(release(), actual=actual), (None, None))
 
     def test_borradores_y_versiones_previas_no_cuentan(self):
-        self.assertEqual(act.interpretar(release(prerelease=True), actual='1.0.0'), (None, None))
-        self.assertEqual(act.interpretar(release(draft=True), actual='1.0.0'), (None, None))
+        self.assertEqual(interpretar(release(prerelease=True)), (None, None))
+        self.assertEqual(interpretar(release(draft=True)), (None, None))
+        self.assertEqual(interpretar(release(draft=True, tag='v1.0.3'), release())[0].version, '1.0.2')
 
-    def test_etiqueta_no_valida(self):
-        with self.assertRaises(act.ErrorActualizacion):
-            act.interpretar(release(tag_name='ultima'), actual='1.0.0')
-        with self.assertRaises(act.ErrorActualizacion):
-            act.interpretar(['no', 'es', 'un', 'diccionario'], actual='1.0.0')
+    def test_etiqueta_no_valida_no_cuenta(self):
+        self.assertEqual(interpretar(release(tag_name='ultima')), (None, None))
+        self.assertEqual(interpretar(release(tag_name='v9.0.0-beta'), release())[0].version, '1.0.2')
+        self.assertEqual(interpretar('no es un diccionario', 7, None, release())[0].version, '1.0.2')
+
+    def test_respuesta_que_no_es_una_lista(self):
+        for malo in (release(), 'texto', None, 3):
+            with self.assertRaises(act.ErrorActualizacion):
+                act.interpretar(malo, actual='1.0.0')
+
+    def test_la_mas_nueva_aunque_github_las_ordene_de_otra_forma(self):
+        n, sumas = interpretar(release('v1.0.2'), release('v1.0.10'), release('v1.0.9'))
+        self.assertEqual(n.version, '1.0.10')
+        self.assertEqual(n.instalador.nombre, 'BajarSubtitulosESP-1.0.10-instalador.exe')
+        self.assertIn('/v1.0.10/', sumas)
 
     def test_solo_descargas_de_este_repositorio_y_con_el_nombre_exacto(self):
         d = release()
         d['assets'][0]['browser_download_url'] = 'https://ejemplo.com/BajarSubtitulosESP-1.0.2-instalador.exe'
-        self.assertIsNone(act.interpretar(d, actual='1.0.0')[0].instalador)
+        self.assertIsNone(interpretar(d)[0].instalador)
         d = release()
         d['assets'][0]['name'] = 'BajarSubtitulosESP-1.0.3-instalador.exe'    # otra versión que la etiqueta
-        self.assertIsNone(act.interpretar(d, actual='1.0.0')[0].instalador)
+        self.assertIsNone(interpretar(d)[0].instalador)
         d = release(html_url='https://ejemplo.com/engaño')
-        self.assertEqual(act.interpretar(d, actual='1.0.0')[0].pagina, f'{REPO}/releases/latest')
+        self.assertEqual(interpretar(d)[0].pagina, f'{REPO}/releases/latest')
 
     def test_huella_no_valida_queda_vacia(self):
         for digest in (None, 'md5:abc', 'sha256:xyz', f'sha256:{SHA}00', 7):
-            n, _ = act.interpretar(release(digest=digest), actual='1.0.0')
+            n, _ = interpretar(release(digest=digest))
             self.assertEqual(n.instalador.sha256, '', digest)
 
     def test_notas_como_texto_plano_y_limitadas(self):
-        n, _ = act.interpretar(release(body='Hola\x1b[31m\u202e [enlace](https://x.y) <b>sin html</b>'),
-                               actual='1.0.0')
+        n, _ = interpretar(release(body='Hola\x1b[31m\u202e [enlace](https://x.y) <b>sin html</b>'))
         self.assertEqual(n.notas, 'Hola[31m enlace <b>sin html</b>')       # la ventana lo pinta como texto
-        n, _ = act.interpretar(release(body='línea\n' * 2000), actual='1.0.0')
+        n, _ = interpretar(release(body='línea\n' * 2000))
         self.assertLessEqual(len(n.notas), act.MAX_NOTAS + 2)
         self.assertTrue(n.notas.endswith('…'))
+
+    def test_en_linux_aun_no_se_instala_sola(self):
+        n, _ = interpretar(release(), sistema='linux')
+        self.assertEqual(n.version, '1.0.2')
+        self.assertIsNone(n.instalador)                     # solo se ofrece abrir la página
 
     def test_leer_sumas(self):
         texto = f'{SHA}  BajarSubtitulosESP-1.0.2-instalador.exe\n{"cd" * 32} *otro.zip\nbasura\n'
@@ -111,31 +131,95 @@ class Interpretar(unittest.TestCase):
         self.assertEqual(act.leer_sumas(texto, 'no-esta.exe'), '')
 
 
+class NovedadesPorSistema(unittest.TestCase):
+    """«- [Windows] …» y «- [Linux] …» en el CHANGELOG: solo para ese sistema; sin marca, para los dos."""
+    NOTAS = ('- Opción nueva para todos.\n'
+             '- [Windows] Arreglado el menú del Explorador.\n'
+             '  - Con sus detalles.\n'
+             '- [Linux] El icono junto al reloj.\n'
+             '  - También con detalles.\n'
+             '\n'
+             'Un párrafo final.')
+
+    def test_filtrar(self):
+        texto, propia = act.notas_del_sistema(self.NOTAS, 'linux')
+        self.assertTrue(propia)
+        self.assertEqual(texto, '- Opción nueva para todos.\n- El icono junto al reloj.\n'
+                                '  - También con detalles.\n\nUn párrafo final.')
+        texto, _ = act.notas_del_sistema(self.NOTAS, 'windows')
+        self.assertEqual(texto, '- Opción nueva para todos.\n- Arreglado el menú del Explorador.\n'
+                                '  - Con sus detalles.\nUn párrafo final.')
+
+    def test_solo_de_otro_sistema(self):
+        self.assertFalse(act.notas_del_sistema('- [Windows] Algo.\n- [windows] Otra cosa.', 'linux')[1])
+        self.assertTrue(act.notas_del_sistema('- [Linux] Algo.', 'linux')[1])
+        self.assertTrue(act.notas_del_sistema('Sin lista de novedades.', 'linux')[1])     # cuenta para todos
+        self.assertTrue(act.notas_del_sistema('', 'linux')[1])
+
+    def test_sin_cambios_para_este_sistema_no_avisa(self):
+        solo_windows = release('v1.0.2', body='- [Windows] Arreglo.')
+        self.assertIsNone(interpretar(solo_windows, sistema='linux')[0])
+        self.assertEqual(interpretar(solo_windows, sistema='windows')[0].notas, '• Arreglo.')
+
+    def test_junta_las_versiones_que_se_salta_y_actualiza_a_la_ultima(self):
+        """En la 1.0.0: la 1.0.3 solo cambia Windows, pero la 1.0.2 traía algo de Linux."""
+        lista = [release('v1.0.3', body='- [Windows] Solo Windows.'),
+                 release('v1.0.2', body='- [Linux] Para Linux.\n- Para todos.'),
+                 release('v1.0.1', body='- [Windows] Otro de Windows.'),
+                 release('v1.0.0', body='- Ya instalada.')]
+        n, _ = act.interpretar(lista, actual='1.0.0', sistema='linux')
+        self.assertEqual(n.version, '1.0.3')
+        self.assertEqual(n.pagina, f'{REPO}/releases/tag/v1.0.3')
+        self.assertEqual(n.notas, '• Para Linux.\n• Para todos.')
+        n, _ = act.interpretar(lista, actual='1.0.0', sistema='windows')
+        self.assertEqual(n.version, '1.0.3')
+        self.assertEqual(n.instalador.nombre, 'BajarSubtitulosESP-1.0.3-instalador.exe')
+        self.assertEqual(n.notas, 'Versión 1.0.3\n• Solo Windows.\n\nVersión 1.0.2\n• Para todos.\n\n'
+                                  'Versión 1.0.1\n• Otro de Windows.')
+
+    def test_en_ingles(self):
+        from subtitulos import idioma
+        self.addCleanup(idioma.poner, 'es')
+        idioma.poner('en')
+        cuerpo = '- [Linux] Para Linux.\n\n<!-- en -->\n\n### English\n\n- [Linux] For Linux.\n- For both.'
+        lista = [release('v1.0.2', body=cuerpo), release('v1.0.1', body='- For both, again.')]
+        n, _ = act.interpretar(lista, actual='1.0.0', sistema='linux')
+        self.assertEqual(n.notas, 'Version 1.0.2\n• For Linux.\n• For both.\n\nVersion 1.0.1\n• For both, again.')
+        n, _ = act.interpretar([release('v1.0.2', body=cuerpo)], actual='1.0.0', sistema='windows')
+        self.assertEqual(n.notas, '• For both.')
+
+
+def lista(*releases):
+    return json.dumps(list(releases)).encode()
+
+
 class Consultar(unittest.TestCase):
     def test_usa_sha256sums_si_falta_la_huella(self):
-        respuestas = {act.URL_API: json.dumps(release(digest=None)).encode(),
+        respuestas = {act.URL_API: lista(release(digest=None)),
                       f'{REPO}/releases/download/v1.0.2/SHA256SUMS.txt':
                           f'{SHA}  BajarSubtitulosESP-1.0.2-instalador.exe\n'.encode()}
         with mock.patch.object(act, '_leer', side_effect=lambda url, *a, **k: respuestas[url]):
-            n = act.consultar('1.0.0')
+            n = act.consultar('1.0.0', 'windows')
         self.assertEqual(n.instalador.sha256, SHA)
 
     def test_sin_huella_no_hay_instalacion_automatica(self):
         d = release(digest=None)
         d['assets'] = d['assets'][:1]                       # ni digest ni SHA256SUMS.txt
-        with mock.patch.object(act, '_leer', return_value=json.dumps(d).encode()):
-            n = act.consultar('1.0.0')
+        with mock.patch.object(act, '_leer', return_value=lista(d)):
+            n = act.consultar('1.0.0', 'windows')
         self.assertEqual(n.version, '1.0.2')
         self.assertIsNone(n.instalador)                     # solo se ofrece abrir la página
 
     def test_al_dia(self):
-        with mock.patch.object(act, '_leer', return_value=json.dumps(release()).encode()):
+        with mock.patch.object(act, '_leer', return_value=lista(release())):
             self.assertIsNone(act.consultar('1.0.2'))
+        with mock.patch.object(act, '_leer', return_value=lista()):
+            self.assertIsNone(act.consultar('1.0.2'))       # aún no hay ninguna Release
 
     def test_errores_con_mensaje_legible(self):
         error_404 = urllib.error.HTTPError(act.URL_API, 404, 'Not Found', {}, None)
         with mock.patch.object(act, '_leer', side_effect=error_404):
-            self.assertIsNone(act.consultar('1.0.0'))       # aún no hay ninguna Release
+            self.assertIsNone(act.consultar('1.0.0'))       # el repositorio aún no tiene Releases
         error_403 = urllib.error.HTTPError(act.URL_API, 403, 'rate limit', {}, None)
         for fallo in (error_403, urllib.error.URLError('sin red'), TimeoutError(), ValueError('json')):
             with mock.patch.object(act, '_leer', side_effect=fallo):
@@ -229,6 +313,10 @@ class Descargar(unittest.TestCase):
 
 
 class Instalar(unittest.TestCase):
+    def test_nombre_del_instalador(self):
+        self.assertEqual(act.nombre_instalador('1.4.0', 'windows'), 'BajarSubtitulosESP-1.4.0-instalador.exe')
+        self.assertIsNone(act.nombre_instalador('1.4.0', 'linux'))
+
     def test_argumentos(self):
         args = act.argumentos_instalador(Path('C:/t/inst.exe'), 'usuario', Path('C:/t/instalacion.log'))
         for a in ('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER', '/REABRIR=1'):

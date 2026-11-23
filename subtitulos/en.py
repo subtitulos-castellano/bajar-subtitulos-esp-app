@@ -371,8 +371,6 @@ TEXTOS = {
     'Error inesperado al descargar ({error}).': 'Unexpected error while downloading ({error}).',
     'GitHub ha devuelto una respuesta demasiado grande.': 'GitHub returned a response that is too large.',
     'GitHub ha devuelto una respuesta inesperada.': 'GitHub returned an unexpected response.',
-    'La última versión publicada no tiene un número de versión válido.':
-        'The latest published version does not have a valid version number.',
     'GitHub ha respondido con el error {codigo}.': 'GitHub responded with error {codigo}.',
     'No se ha podido conectar con GitHub. Comprueba la conexión a internet.':
         'Could not connect to GitHub. Check your internet connection.',

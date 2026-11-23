@@ -40,7 +40,7 @@ case "$orden" in
         (cd "$DEST" && "$PY_VENV" -I app/main.py "$@") ;;
     compilar)
         sync
-        (cd "$DEST" && "$PY_VENV" -m pip install -q -r requirements-build.txt && "$PY_VENV" -I packaging/compilar.py)
+        (cd "$DEST" && "$PY_VENV" -m pip install -q -r requirements-build.txt && "$PY_VENV" -I packaging/windows/compilar.py)
         mkdir -p "$RAIZ/dist"
         cp "$DEST"/dist/*.zip "$DEST"/dist/*.exe "$RAIZ/dist/" 2>/dev/null || true
         echo "Resultado en $WIN_DEV\\dist (copia en $RAIZ/dist)" ;;

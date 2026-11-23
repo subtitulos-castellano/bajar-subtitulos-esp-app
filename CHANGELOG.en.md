@@ -3,6 +3,15 @@
 English version of the release notes, shown by the app when it is in English. Earlier versions are
 only in Spanish: see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.4.0
+
+- [Windows] **Update notices only when there is something for Windows.** This is the first step
+  towards the Linux version: both will always share the same version number, and each one will only
+  announce the versions that bring changes for its system. If it skips some, it also shows their
+  news.
+- [Windows] Under the hood, the code has been reorganised for the Linux version. On Windows everything
+  works as before.
+
 ## 1.3.0
 
 - **opensubtitles.com**, as a last resort: with an account, it is asked for subtitles only if the other

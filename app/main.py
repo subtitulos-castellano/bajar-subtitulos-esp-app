@@ -31,16 +31,17 @@ from PySide6.QtCore import Qt, QTimer  # noqa: E402
 from PySide6.QtWidgets import QApplication, QScrollArea  # noqa: E402
 
 from app import tema  # noqa: E402
+from app.plataforma import WINDOWS  # noqa: E402
 
 ID_APP = 'subtitulos-castellano.BajarSubtitulosESP'
 
 
-def _id_windows():
-    """Para que Windows agrupe la app en la barra de tareas con su propio icono, y para que el
+def _identificarse():
+    """En Windows: para que agrupe la app en la barra de tareas con su propio icono, y para que el
     instalador sepa si la app está abierta (y, al actualizar, cuándo se ha cerrado)."""
-    if sys.platform == 'win32':
-        import ctypes
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(ID_APP)
+    if WINDOWS:
+        from app.plataforma import windows
+        windows.id_de_app(ID_APP)
     from app import actualizar
     actualizar.crear_mutex()
 
@@ -132,8 +133,7 @@ def autoprueba(salida, con_red=False):
         if not servidor.listen(nombre):
             raise RuntimeError(f'no se puede abrir el canal local: {servidor.errorString()}')
         servidor.close()
-        return (f'{len(mc.entradas())} claves · registrado: {mc.registrado()} · '
-                f'comando: {mc.comando(mc.ARG_CARPETA, "%V")}')
+        return mc.describir()
     paso('menú contextual y canal local', menu_contextual)
 
     def busqueda_sin_red():
@@ -337,10 +337,10 @@ def main(argv=None):
     unica = not (args.demo or args.captura or args.medir_arranque or args.probar_actualizacion)
     from app import instancia
     if unica and not instancia.es_la_primera():
-        _app = QApplication(sys.argv[:1]) if sys.platform != 'win32' else None  # noqa: F841 - QLocalSocket
+        _app = QApplication(sys.argv[:1]) if not WINDOWS else None  # noqa: F841 - QLocalSocket
         instancia.permitir_primer_plano()
         return 0 if instancia.enviar(pedido or {'mostrar': True}) else 1
-    _id_windows()
+    _identificarse()
     if args.probar_actualizacion:
         from app import actualizar
         actualizar.lanzar_instalador(args.probar_actualizacion)
@@ -400,11 +400,12 @@ def _reiniciar(args, salir, antes=None):
         orden.append('--demo')
     if antes:
         antes()
-    flags = 0
-    if sys.platform == 'win32':
-        flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     try:
-        subprocess.Popen(orden, close_fds=True, creationflags=flags)
+        if WINDOWS:
+            from app.plataforma import windows
+            subprocess.Popen(orden, close_fds=True, creationflags=windows.INDEPENDIENTE)
+        else:
+            subprocess.Popen(orden, close_fds=True, start_new_session=True)
     except OSError:
         return False
     salir()

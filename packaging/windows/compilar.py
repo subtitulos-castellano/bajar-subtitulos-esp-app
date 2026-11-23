@@ -1,6 +1,6 @@
 """Compila Bajar Subtítulos ESP para Windows (en el PC o en GitHub Actions).
 
-    python -I packaging/compilar.py
+    python -I packaging/windows/compilar.py
 
 1. Genera el icono, la versión del .exe y los avisos de licencias (generar_recursos.py).
 2. PyInstaller: dist/BajarSubtitulosESP/ (el .exe y su carpeta _internal).
@@ -17,7 +17,7 @@ import time
 import zipfile
 from pathlib import Path
 
-RAIZ = Path(__file__).resolve().parent.parent
+RAIZ = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(RAIZ))
 from app import __version__  # noqa: E402
 
@@ -59,7 +59,7 @@ def main():
     paso('PyInstaller')
     shutil.rmtree(CARPETA, ignore_errors=True)
     ejecutar(sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--log-level', 'WARN',
-             '--distpath', str(DIST), '--workpath', str(RAIZ / 'build'), 'packaging/BajarSubtitulosESP.spec')
+             '--distpath', str(DIST), '--workpath', str(RAIZ / 'build'), 'packaging/windows/BajarSubtitulosESP.spec')
     print(f'{CARPETA.name}: {mb(tamano(CARPETA))}')
 
     paso('Autoprueba del ejecutable')
@@ -87,7 +87,7 @@ def main():
         print('Inno Setup no está instalado: se omite el instalador (lo genera GitHub Actions).')
         return
     ejecutar(compilador, '/Q', f'/DVersion={__version__}', f'/DOrigen={CARPETA}', f'/DSalida={DIST}',
-             'packaging/instalador.iss')
+             'packaging/windows/instalador.iss')
     instalador = DIST / f'BajarSubtitulosESP-{__version__}-instalador.exe'
     print(f'{instalador.name}: {mb(tamano(instalador))}')
 

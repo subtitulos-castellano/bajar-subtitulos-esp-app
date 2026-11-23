@@ -1,8 +1,12 @@
-"""Actualizaciones: consulta la última Release en GitHub, descarga el instalador, comprueba su SHA-256
+"""Actualizaciones: consulta las Releases en GitHub, descarga el instalador, comprueba su SHA-256
 y lo ejecuta en silencio. Sin Qt: la ventana lo usa desde hilos aparte (ver vista_actualizacion.py).
 
 - Solo cuentan las Releases publicadas (no borradores ni versiones previas) con una etiqueta vX.Y.Z
   mayor que la versión de la app.
+- Cada versión sale para Windows y Linux con el mismo número, pero la app solo avisa si alguna de las
+  versiones nuevas trae cambios para su sistema: en las notas (el CHANGELOG), una novedad que empieza
+  por «[Windows]» o «[Linux]» es solo de ese sistema; sin marca, de los dos. Se actualiza siempre a la
+  última, y las novedades que se muestran son las de su sistema en todas las versiones que se salta.
 - Lo que llega de GitHub se trata como datos: solo se aceptan descargas de las Releases de este
   repositorio, con el nombre exacto que genera el workflow, y las notas se muestran como texto plano.
 - El instalador solo se ejecuta si su SHA-256 coincide con la huella que publica GitHub (el campo
@@ -28,18 +32,20 @@ from subtitulos.idioma import tr
 from subtitulos.texto import CONTROL
 
 from . import __version__
+from .plataforma import SISTEMA, WINDOWS
 
 REPO = 'subtitulos-castellano/bajar-subtitulos-esp-app'
-URL_API = f'https://api.github.com/repos/{REPO}/releases/latest'
+URL_API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'   # las más recientes primero
 PREFIJO_PAGINA = f'https://github.com/{REPO}/releases/'
 PREFIJO_DESCARGA = f'https://github.com/{REPO}/releases/download/'
-APP_ID = '{6F0C2D8E-3B7A-4E51-9C2F-8A1D5E7B4C93}'     # AppId de packaging/instalador.iss
+APP_ID = '{6F0C2D8E-3B7A-4E51-9C2F-8A1D5E7B4C93}'     # AppId de packaging/windows/instalador.iss
 MUTEX_INSTALADOR = 'BajarSubtitulosESP'              # AppMutex del instalador: "la app está abierta"
 MUTEX_PROCESO = 'BajarSubtitulosESP-proceso'         # el instalador espera a que desaparezca (actualizar)
 
 INTERVALO = 20 * 3600              # comprobación automática: como mucho una vez al día (con margen)
 TIEMPO_CONSULTA = 15               # segundos
 TAMANO_MAX = 400 * 1024 * 1024     # ningún instalador se acerca a esto (el de la 1.0 ocupa ~30 MB)
+MAX_RESPUESTA = 4 * 1024 * 1024    # la lista de Releases (30 Releases ocupan unos 500 KB)
 MAX_NOTAS = 3000                   # caracteres de las notas que se muestran
 
 _HEX64 = re.compile(r'[0-9a-f]{64}')
@@ -125,40 +131,94 @@ def notas_del_idioma(texto, codigo=None):
     return re.sub(r'\A\s*#+[^\n]*\n', '', ingles.lstrip('\r\n'), count=1)
 
 
+# Novedades solo para un sistema: «- [Windows] …» o «- [Linux] …» (sin marca: para los dos).
+_VINETA = re.compile(r'[-*]\s')
+_MARCA = re.compile(r'([-*]\s+)\[(windows|linux)\]\s*', re.IGNORECASE)
+
+
+def notas_del_sistema(texto, sistema=SISTEMA):
+    """(notas sin las novedades de otros sistemas ni la marca de las del propio, True si alguna novedad
+    es para `sistema`). Una novedad de otro sistema se quita con sus líneas sangradas (sus detalles).
+    Unas notas sin lista de novedades cuentan para todos."""
+    salida, saltar, hay_lista, propia = [], False, False, False
+    for linea in str(texto or '').replace('\r\n', '\n').split('\n'):
+        if _VINETA.match(linea):
+            hay_lista = True
+            m = _MARCA.match(linea)
+            saltar = bool(m) and m.group(2).lower() != sistema
+            if saltar:
+                continue
+            propia = True
+            if m:
+                linea = m.group(1) + linea[m.end():]
+        elif saltar:
+            if not linea.strip() or linea[0].isspace():
+                continue
+            saltar = False
+        salida.append(linea)
+    return '\n'.join(salida), propia or not hay_lista
+
+
 def limpiar_notas(texto):
     """Notas de la Release (Markdown) como texto plano breve para la ventana."""
-    texto = CONTROL.sub('', notas_del_idioma(texto)).replace('\r\n', '\n').strip()
-    texto = re.sub(r'\*\*(.+?)\*\*', r'\1', texto)         # negrita
-    texto = re.sub(r'`([^`\n]+)`', r'\1', texto)           # código
-    texto = re.sub(r'\[([^\[\]\n]+)\]\([^)\n]*\)', r'\1', texto)  # enlaces: solo el texto
-    texto = re.sub(r'^(\s*)[-*] ', r'\1• ', texto, flags=re.MULTILINE)
-    texto = re.sub(r'\n{3,}', '\n\n', texto)
+    return _recortar(_texto_plano(notas_del_idioma(texto)))
+
+
+def _recortar(texto):
     if len(texto) > MAX_NOTAS:
         texto = texto[:MAX_NOTAS].rsplit('\n', 1)[0] + '\n…'
     return texto
 
 
-def nombre_instalador(v):
-    return f'BajarSubtitulosESP-{v}-instalador.exe'
+def _texto_plano(texto):
+    texto = CONTROL.sub('', texto).replace('\r\n', '\n').strip()
+    texto = re.sub(r'\*\*(.+?)\*\*', r'\1', texto)         # negrita
+    texto = re.sub(r'`([^`\n]+)`', r'\1', texto)           # código
+    texto = re.sub(r'\[([^\[\]\n]+)\]\([^)\n]*\)', r'\1', texto)  # enlaces: solo el texto
+    texto = re.sub(r'^(\s*)[-*] ', r'\1• ', texto, flags=re.MULTILINE)
+    return re.sub(r'\n{3,}', '\n\n', texto)
 
 
-def interpretar(datos, actual=__version__):
-    """Respuesta de /releases/latest -> (Novedad o None si no hay nada más nuevo, url de SHA256SUMS.txt)."""
-    if not isinstance(datos, dict):
+def nombre_instalador(v, sistema=SISTEMA):
+    """El archivo de la Release con el que se actualiza la app en este sistema, o None si aquí la app
+    no se actualiza sola (solo avisa y abre la página de descarga)."""
+    if sistema == 'windows':
+        return f'BajarSubtitulosESP-{v}-instalador.exe'
+    return None
+
+
+def interpretar(datos, actual=__version__, sistema=SISTEMA):
+    """Respuesta de /releases (la lista) -> (Novedad o None si no hay nada nuevo para `sistema`, url de
+    SHA256SUMS.txt de la última versión)."""
+    if not isinstance(datos, list):
         raise ErrorActualizacion(tr('GitHub ha devuelto una respuesta inesperada.'))
-    if datos.get('draft') or datos.get('prerelease'):
+    nuevas = []
+    for d in datos:
+        if not isinstance(d, dict) or d.get('draft') or d.get('prerelease'):
+            continue
+        v = version(d.get('tag_name'))
+        if v is not None and v > version(actual):
+            nuevas.append((v, d))
+    nuevas.sort(key=lambda x: x[0], reverse=True)
+    para_este = []                      # (versión, notas) de las que traen cambios para este sistema
+    for v, d in nuevas:
+        notas, propia = notas_del_sistema(notas_del_idioma(d.get('body')), sistema)
+        if propia:
+            para_este.append((v, _texto_plano(notas)))
+    if not para_este:
         return None, None
-    v = version(datos.get('tag_name'))
-    if v is None:
-        raise ErrorActualizacion(tr('La última versión publicada no tiene un número de versión válido.'))
-    if v <= version(actual):
-        return None, None
+    v, ultima = nuevas[0]               # se actualiza siempre a la última
     texto_v = '.'.join(map(str, v))
-    pagina = datos.get('html_url')
+    if len(para_este) == 1:
+        notas = para_este[0][1]
+    else:
+        notas = '\n\n'.join(tr('Versión {version}', version=version_corta('.'.join(map(str, x)))) + '\n' + n
+                            for x, n in para_este)
+    pagina = ultima.get('html_url')
     if not (isinstance(pagina, str) and pagina.startswith(PREFIJO_PAGINA)):
         pagina = PREFIJO_PAGINA + 'latest'
     instalador, sumas = None, None
-    for a in datos.get('assets') or []:
+    for a in ultima.get('assets') or []:
         if not isinstance(a, dict):
             continue
         nombre, url = a.get('name'), a.get('browser_download_url')
@@ -166,12 +226,12 @@ def interpretar(datos, actual=__version__):
             continue                                     # solo archivos de las Releases de este repositorio
         if nombre == 'SHA256SUMS.txt':
             sumas = url
-        elif nombre == nombre_instalador(texto_v):
+        elif nombre == nombre_instalador(texto_v, sistema):
             digest = a.get('digest')
             sha = digest[7:].lower() if isinstance(digest, str) and digest.lower().startswith('sha256:') else ''
             tamano = a.get('size') if isinstance(a.get('size'), int) and not isinstance(a.get('size'), bool) else 0
             instalador = Archivo(nombre, url, sha if _HEX64.fullmatch(sha) else '', tamano)
-    return Novedad(texto_v, pagina, limpiar_notas(datos.get('body')), instalador), sumas
+    return Novedad(texto_v, pagina, _recortar(notas), instalador), sumas
 
 
 def leer_sumas(texto, nombre):
@@ -183,11 +243,12 @@ def leer_sumas(texto, nombre):
     return ''
 
 
-def consultar(actual=__version__):
-    """La versión nueva publicada en GitHub, o None si la app está al día. Lanza ErrorActualizacion."""
+def consultar(actual=__version__, sistema=SISTEMA):
+    """La versión nueva publicada en GitHub con cambios para `sistema`, o None si no hay. Lanza
+    ErrorActualizacion."""
     try:
-        datos = json.loads(_leer(URL_API, 1024 * 1024, 'application/vnd.github+json'))
-        novedad, sumas = interpretar(datos, actual)
+        datos = json.loads(_leer(URL_API, MAX_RESPUESTA, 'application/vnd.github+json'))
+        novedad, sumas = interpretar(datos, actual, sistema)
         if novedad and novedad.instalador and not novedad.instalador.sha256 and sumas:
             sha = leer_sumas(_leer(sumas, 64 * 1024).decode('utf-8', 'replace'), novedad.instalador.nombre)
             novedad = Novedad(novedad.version, novedad.pagina, novedad.notas,
@@ -280,17 +341,10 @@ def instalada(exe=None):
 
 def modo_instalacion():
     """'usuario' o 'todos': dónde registró el instalador la desinstalación."""
-    if sys.platform != 'win32':
+    if not WINDOWS:
         return 'usuario'
-    import winreg
-    clave = rf'Software\Microsoft\Windows\CurrentVersion\Uninstall\{APP_ID}_is1'
-    for raiz, modo in ((winreg.HKEY_CURRENT_USER, 'usuario'), (winreg.HKEY_LOCAL_MACHINE, 'todos')):
-        try:
-            winreg.OpenKey(raiz, clave).Close()
-            return modo
-        except OSError:
-            pass
-    return 'usuario'
+    from .plataforma import windows
+    return windows.desinstalacion_registrada(APP_ID) or 'usuario'
 
 
 _mutex = {}
@@ -299,25 +353,19 @@ _mutex = {}
 def crear_mutex():
     """Al arrancar: uno para que el instalador sepa que la app está abierta (AppMutex) y otro que dura
     hasta que el proceso termina (el instalador lo espera al actualizar)."""
-    if sys.platform != 'win32':
+    if not WINDOWS:
         return
-    import ctypes
-    from ctypes import wintypes
-    k32 = ctypes.windll.kernel32
-    k32.CreateMutexW.restype = wintypes.HANDLE
-    k32.CreateMutexW.argtypes = (wintypes.LPVOID, wintypes.BOOL, wintypes.LPCWSTR)
+    from .plataforma import windows
     for nombre in (MUTEX_INSTALADOR, MUTEX_PROCESO):
-        _mutex[nombre] = k32.CreateMutexW(None, False, nombre)
+        _mutex[nombre] = windows.crear_mutex(nombre)[0]
 
 
 def _soltar_mutex_instalador():
     """Para que el instalador no se pare con "la app está abierta": se cierra justo después."""
     h = _mutex.pop(MUTEX_INSTALADOR, None)
-    if h and sys.platform == 'win32':
-        import ctypes
-        from ctypes import wintypes
-        ctypes.windll.kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
-        ctypes.windll.kernel32.CloseHandle(h)
+    if h and WINDOWS:
+        from .plataforma import windows
+        windows.cerrar(h)
 
 
 def argumentos_instalador(ruta, modo, registro):
@@ -334,7 +382,8 @@ def lanzar_instalador(ruta, modo=None):
     registro = ruta.parent / 'instalacion.log'
     _soltar_mutex_instalador()
     flags = 0
-    if sys.platform == 'win32':
-        flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    if WINDOWS:
+        from .plataforma import windows
+        flags = windows.INDEPENDIENTE
     subprocess.Popen(argumentos_instalador(ruta, modo or modo_instalacion(), registro), close_fds=True,
                      creationflags=flags, cwd=str(ruta.parent))

@@ -32,6 +32,7 @@ from subtitulos.opciones import Opciones  # noqa: E402
 APP = QApplication.instance() or QApplication([])
 
 from app import instancia, main, menu_contextual as mc, tema  # noqa: E402
+from app.plataforma import menu_windows as mw  # noqa: E402
 from app.bandeja import Bandeja, resumen  # noqa: E402
 from app.config import Config  # noqa: E402
 from app.ventana import Ventana, icono_app  # noqa: E402
@@ -106,7 +107,7 @@ class EntradasDelRegistro(unittest.TestCase):
     PROG = [r'C:\Program Files\Bajar Subtítulos ESP\BajarSubtitulosESP.exe']
 
     def test_carpetas_con_submenu(self):
-        e = mc.entradas(self.PROG)
+        e = mw.entradas(self.PROG)
         for base in (r'Directory\shell', r'Directory\Background\shell', r'Drive\shell'):
             k = rf'{base}\BajarSubtitulosESP'
             self.assertEqual(e[k]['MUIVerb'], 'Bajar subtítulos aquí')
@@ -118,7 +119,7 @@ class EntradasDelRegistro(unittest.TestCase):
             self.assertEqual(e[rf'{k}\shell\2todo\command'][''], f'"{self.PROG[0]}" --menu-subcarpetas "%V"')
 
     def test_videos(self):
-        e = mc.entradas(self.PROG)
+        e = mw.entradas(self.PROG)
         for ext in ('.mkv', '.mp4', '.avi'):
             k = rf'SystemFileAssociations\{ext}\shell\BajarSubtitulosESP'
             self.assertEqual(e[k]['MUIVerb'], 'Bajar subtítulos')
@@ -127,13 +128,13 @@ class EntradasDelRegistro(unittest.TestCase):
 
     def test_sin_menu_en_ts(self):
         # .ts es también TypeScript: sin menú en esos archivos.
-        self.assertFalse(any('.ts' in k for k in mc.entradas(self.PROG)))
+        self.assertFalse(any('.ts' in k for k in mw.entradas(self.PROG)))
 
     def test_desde_el_codigo_fuente(self):
         prog = [r'C:\venv\Scripts\pythonw.exe', '-I', r'C:\app\main.py']
-        self.assertEqual(mc.comando(mc.ARG_CARPETA, '%V', prog),
+        self.assertEqual(mw.comando(prog, mc.ARG_CARPETA, '%V'),
                          r'"C:\venv\Scripts\pythonw.exe" -I "C:\app\main.py" --menu-carpeta "%V"')
-        self.assertNotIn('Icon', mc.entradas(prog)[r'Directory\shell\BajarSubtitulosESP'])
+        self.assertNotIn('Icon', mw.entradas(prog)[r'Directory\shell\BajarSubtitulosESP'])
 
 
 @unittest.skipUnless(WINDOWS, 'el registro es de Windows')
@@ -144,10 +145,10 @@ class Registro(unittest.TestCase):
         import winreg
         self.winreg = winreg
         self.raiz = rf'Software\BajarSubtitulosESP-pruebas-{uuid.uuid4().hex[:8]}'
-        parche = mock.patch.object(mc, 'RAIZ', self.raiz)
+        parche = mock.patch.object(mw, 'RAIZ', self.raiz)
         parche.start()
         self.addCleanup(parche.stop)
-        self.addCleanup(lambda: mc._borrar_arbol(winreg.HKEY_CURRENT_USER, self.raiz))
+        self.addCleanup(lambda: mw._borrar_arbol(winreg.HKEY_CURRENT_USER, self.raiz))
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.exe = Path(self._tmp.name) / 'BajarSubtitulosESP.exe'
@@ -183,7 +184,7 @@ class Registro(unittest.TestCase):
         self.assertTrue(mc.es_de(prog))
         self.assertEqual(mc.programa_registrado(), self.exe)
         escritas = {c.removeprefix(self.raiz + '\\') for c in self.claves()}
-        self.assertTrue(set(mc.entradas(prog)) <= escritas)
+        self.assertTrue(set(mw.entradas(prog)) <= escritas)
         with self.winreg.OpenKey(self.winreg.HKEY_CURRENT_USER,
                                  rf'{self.raiz}\SystemFileAssociations\.mkv\shell\BajarSubtitulosESP') as k:
             self.assertEqual(self.winreg.QueryValueEx(k, 'MultiSelectModel')[0], 'Player')

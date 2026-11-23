@@ -289,9 +289,9 @@ class App(unittest.TestCase):
         self.assertEqual(llamadas, ['Get subtitles', 'Bajar subtítulos'])   # el menú, en el idioma de la app
 
     def test_menu_contextual_en_ingles(self):
-        from app import menu_contextual as mc
+        from app.plataforma import menu_windows as mw
         idioma.poner('en')
-        claves = mc.entradas([r'C:\app\BajarSubtitulosESP.exe'])
+        claves = mw.entradas([r'C:\app\BajarSubtitulosESP.exe'])
         self.assertEqual(claves[r'Directory\shell\BajarSubtitulosESP']['MUIVerb'], 'Get subtitles here')
         self.assertEqual(claves[r'Directory\shell\BajarSubtitulosESP\shell\1solo']['MUIVerb'], 'This folder only')
         self.assertEqual(claves[r'SystemFileAssociations\.mkv\shell\BajarSubtitulosESP']['MUIVerb'], 'Get subtitles')
@@ -315,11 +315,12 @@ class MenuQueCambiaDeIdioma(unittest.TestCase):
         import winreg
         from app import menu_contextual as mc
         from app.config import Config
+        from app.plataforma import menu_windows as mw
         raiz = rf'Software\BajarSubtitulosESP-pruebas-{uuid.uuid4().hex[:8]}'
-        parche = mock.patch.object(mc, 'RAIZ', raiz)
+        parche = mock.patch.object(mw, 'RAIZ', raiz)
         parche.start()
         self.addCleanup(parche.stop)
-        self.addCleanup(lambda: mc._borrar_arbol(winreg.HKEY_CURRENT_USER, raiz))
+        self.addCleanup(lambda: mw._borrar_arbol(winreg.HKEY_CURRENT_USER, raiz))
         self.addCleanup(idioma.poner, 'es')
         with tempfile.TemporaryDirectory() as d:
             otro = Path(d) / 'portable' / 'BajarSubtitulosESP.exe'      # el menú es de otra copia
