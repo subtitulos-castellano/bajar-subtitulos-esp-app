@@ -124,7 +124,7 @@ def usar_token_activacion(token):
 def entorno_para_otros_programas():
     """El programa compilado (PyInstaller) arranca con LD_LIBRARY_PATH apuntando a sus propias librerías. Los
     programas que abra (xdg-open, el gestor de paquetes…) deben usar las del sistema: se deja como estaba
-    antes de arrancar. A la app no le afecta, porque el sistema ya lo leyó al cargarla."""
+    antes de arrancar. Y si abre otra vez la app, que arranque como nueva (PYINSTALLER_RESET_ENVIRONMENT). A la app no le afecta, porque el sistema ya lo leyó al cargarla."""
     if not getattr(sys, 'frozen', False):
         return
     antes = os.environ.pop('LD_LIBRARY_PATH_ORIG', None)
@@ -132,6 +132,11 @@ def entorno_para_otros_programas():
         os.environ.pop('LD_LIBRARY_PATH', None)
     else:
         os.environ['LD_LIBRARY_PATH'] = antes
+    # El cargador de PyInstaller deja variables (_PYI_…) para reconocer a sus propios subprocesos, que
+    # heredan su entorno. La app no los usa; sí vuelve a abrirse a sí misma (al cambiar de idioma o tras
+    # actualizarse), y esa apertura nueva debe prepararlo todo desde cero: si no, no encuentra sus
+    # librerías (p. ej. libssl) y cargaría las del sistema.
+    os.environ['PYINSTALLER_RESET_ENVIRONMENT'] = '1'
 
 
 # Certificados de confianza de cada familia de distribuciones (los mismos que usan su navegador y sus

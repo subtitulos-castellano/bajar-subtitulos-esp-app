@@ -26,6 +26,7 @@ class EntornoParaOtrosProgramas(unittest.TestCase):
         with mock.patch.dict(os.environ, {'LD_LIBRARY_PATH': '/x', 'LD_LIBRARY_PATH_ORIG': '/y'}):
             linux.entorno_para_otros_programas()
             self.assertEqual(os.environ['LD_LIBRARY_PATH'], '/x')
+            self.assertNotIn('PYINSTALLER_RESET_ENVIRONMENT', os.environ)
 
     def test_compilado_vuelve_al_de_antes(self):
         with mock.patch.object(sys, 'frozen', True, create=True):
@@ -33,6 +34,7 @@ class EntornoParaOtrosProgramas(unittest.TestCase):
                 linux.entorno_para_otros_programas()
                 self.assertEqual(os.environ['LD_LIBRARY_PATH'], '/y')
                 self.assertNotIn('LD_LIBRARY_PATH_ORIG', os.environ)
+                self.assertEqual(os.environ['PYINSTALLER_RESET_ENVIRONMENT'], '1')   # al volver a abrirse
             with mock.patch.dict(os.environ, {'LD_LIBRARY_PATH': '/app/_internal'}):
                 os.environ.pop('LD_LIBRARY_PATH_ORIG', None)
                 linux.entorno_para_otros_programas()
