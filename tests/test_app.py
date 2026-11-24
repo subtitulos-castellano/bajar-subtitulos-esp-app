@@ -527,7 +527,18 @@ class TamanoDelTexto(unittest.TestCase):
 
     def test_como_windows_por_defecto(self):
         tema.aplicar(APP, 'claro', 0)
-        self.assertAlmostEqual(tema.escala(), tema.escala_windows() / 100)
+        self.assertAlmostEqual(tema.escala(), tema.factor(0))
+
+    def test_linux_cuenta_sobre_el_escalado_de_la_pantalla(self):
+        # Pantalla al 115 % (lo aplica Qt): «Normal (115 %)» no agranda nada más, y un 230 % propio es el doble.
+        with mock.patch.object(tema, 'WINDOWS', False), mock.patch.object(tema, 'escala_sistema', return_value=115):
+            self.assertEqual(tema.porcentaje(0), 115)
+            self.assertAlmostEqual(tema.factor(0), 1)
+            self.assertAlmostEqual(tema.factor(115), 1)
+            self.assertAlmostEqual(tema.factor(230), 2)
+        with mock.patch.object(tema, 'WINDOWS', True), mock.patch.object(tema, 'escala_sistema', return_value=125):
+            self.assertAlmostEqual(tema.factor(0), 1.25)
+            self.assertAlmostEqual(tema.factor(150), 1.5)
 
     def test_configuracion(self):
         with tempfile.TemporaryDirectory() as d:

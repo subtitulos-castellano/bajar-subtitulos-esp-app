@@ -4,9 +4,10 @@ Los colores de estado son fijos y siempre van con icono y texto, nunca solos:
 castellano = bien (verde), latino = aviso (ámbar), inglés = serio (naranja),
 no encontrado = crítico (rojo); pendiente (violeta) y sin cambios (gris) son informativos.
 
-Tamaño del texto: por defecto sigue a Windows (Configuración › Accesibilidad › Tamaño del
-texto, que guarda TextScaleFactor en el registro), igual que el Explorador. Todo lo que tiene
-que ver con texto (letra, márgenes, alturas de filas y tarjetas) se multiplica por esa escala.
+Tamaño del texto: por defecto sigue al sistema. En Windows, a Configuración › Accesibilidad ›
+Tamaño del texto (TextScaleFactor en el registro), igual que el Explorador; en Linux, al escalado
+de la pantalla (p. ej. 115 % en KDE), que Qt ya aplica por su cuenta. Todo lo que tiene que ver con
+texto (letra, márgenes, alturas de filas y tarjetas) se multiplica por factor().
 """
 
 from PySide6.QtCore import Qt
@@ -102,17 +103,29 @@ def explicacion_estado(categoria):
 
 # ---------- Tamaño del texto ----------
 
-def escala_windows():
-    """Porcentaje de 'Tamaño del texto' de Windows (100-225). 100 si no se puede leer."""
-    if not WINDOWS:
-        return 100
-    from .plataforma import windows
-    return windows.escala_texto()
+def escala_sistema():
+    """Porcentaje al que el sistema agranda el texto; 100 si no se puede saber.
+    Windows: 'Tamaño del texto' de Accesibilidad (100-225), aparte del escalado de la pantalla.
+    Linux: el escalado de la pantalla tal como lo aplica Qt (devicePixelRatio de la pantalla en la que está
+    la ventana activa, o de la principal)."""
+    if WINDOWS:
+        from .plataforma import windows
+        return windows.escala_texto()
+    ventana = QGuiApplication.focusWindow()
+    pantalla = ventana.screen() if ventana else QGuiApplication.primaryScreen()
+    return round(pantalla.devicePixelRatio() * 100) if pantalla else 100
 
 
 def porcentaje(tamano_texto):
-    """tamano_texto: 0 = como Windows; si no, el porcentaje elegido."""
-    return escala_windows() if not tamano_texto else tamano_texto
+    """tamano_texto: 0 = como el sistema; si no, el porcentaje elegido."""
+    return escala_sistema() if not tamano_texto else tamano_texto
+
+
+def factor(tamano_texto):
+    """Lo que la app multiplica por su cuenta. En Linux el escalado de la pantalla ya lo pone Qt, así que
+    'Normal' es 1 y un porcentaje propio se cuenta sobre ese escalado (115 % en una pantalla al 115 % = 1)."""
+    base = 100 if WINDOWS else escala_sistema()
+    return porcentaje(tamano_texto) / (base or 100)
 
 
 def escala():
@@ -150,7 +163,7 @@ def aplicar(app, preferencia='sistema', tamano_texto=0):
     global _actual, _escala
     es_oscuro = sistema_oscuro() if preferencia == 'sistema' else preferencia == 'oscuro'
     _actual = OSCURO if es_oscuro else CLARO
-    _escala = porcentaje(tamano_texto) / 100
+    _escala = factor(tamano_texto)
     hints = QGuiApplication.styleHints()
     if hasattr(hints, 'setColorScheme'):          # Qt >= 6.8: también la barra de título de Windows
         hints.setColorScheme(Qt.ColorScheme.Unknown if preferencia == 'sistema'

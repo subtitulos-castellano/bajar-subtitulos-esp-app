@@ -250,9 +250,9 @@ TEXTOS = {
     'Claro, oscuro o el mismo que el sistema.': 'Light, dark or the same as the system.',
     'Normal': 'Normal',
     'Normal ({n} %)': 'Normal ({n} %)',
-    'Normal: el tamaño de siempre, que ya se adapta al escalado de la pantalla del sistema. Personalizado: más '
-    'grande o más pequeño.':
-        'Normal: the usual size, which already follows the system display scaling. Custom: bigger or smaller.',
+    'Normal: el del escalado de la pantalla en la configuración del sistema. Personalizado: más grande o más '
+    'pequeño.':
+        'Normal: the display scaling set in the system settings. Custom: bigger or smaller.',
     'Opcionales, pero dan más resultados. opensubtitles.org y opensubtitles.com son cuentas distintas. Las '
     'contraseñas se guardan en el llavero del sistema (KWallet o GNOME Keyring), nunca en un archivo.':
         'Optional, but they give more results. opensubtitles.org and opensubtitles.com are separate accounts. '
@@ -276,6 +276,9 @@ TEXTOS = {
     'Copia de cada subtítulo sustituido, en {carpeta} (la misma carpeta que usa la skill).':
         'A copy of each replaced subtitle, in {carpeta} (the same folder the skill uses).',
     'Menú contextual del Explorador': 'File Explorer context menu',
+    'Menú contextual del gestor de archivos': 'File manager context menu',
+    'Busca subtítulos con el botón derecho del ratón, sin abrir antes la app.':
+        'Search for subtitles with the right mouse button, without opening the app first.',
     'Busca subtítulos con el botón derecho del ratón, sin abrir antes la app. En Windows 11 está dentro de '
     '«Mostrar más opciones».':
         'Search for subtitles with the right mouse button, without opening the app first. In Windows 11 it is '
@@ -295,6 +298,8 @@ TEXTOS = {
         'Show the window: as when dragging onto the app. In the background: no window; just an icon next to the '
         'clock while searching (to see the progress or cancel) and a notification with the summary at the end.',
     'Solo en Windows.': 'Windows only.',
+    'Todavía no está disponible en Linux: llegará en una próxima versión.':
+        'Not available on Linux yet: it will come in a future version.',
     'No se ha podido cambiar el menú contextual ({error}).': 'The context menu could not be changed ({error}).',
     'Actualizaciones': 'Updates',
     'Buscar actualizaciones automáticamente': 'Check for updates automatically',

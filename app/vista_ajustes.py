@@ -14,7 +14,7 @@ from subtitulos.opciones import MAX_DESCARGAS, MAX_VIDEOS, Opciones
 from . import __version__, actualizar, credenciales, iconos, menu_contextual, tema
 from .config import TAMANO_MAX, TAMANO_MIN
 from .componentes import FilaOpcion, IconoLabel
-from .plataforma import WINDOWS
+from .plataforma import LINUX, WINDOWS
 from .vista_inicio import MARGEN, boton, etiqueta
 
 
@@ -473,7 +473,7 @@ class VistaAjustes(QWidget):
         cl.addWidget(self.tamano)
         propio = self.config.tamano_texto
         (self.b_tamano_propio if propio else self.b_tamano_windows).setChecked(True)
-        self.tamano.setValue(propio or tema.escala_windows())
+        self.tamano.setValue(propio or tema.escala_sistema())
         self.tamano.setEnabled(bool(propio))
         # Se aplica un instante después de dejar de teclear o girar la rueda (rehacer estilos cuesta algo).
         self._espera_tamano = QTimer(self)
@@ -486,8 +486,8 @@ class VistaAjustes(QWidget):
                                       tr('Como Windows: el de Configuración de Windows › Accesibilidad › Tamaño '
                                          'del texto. Si lo cambias allí, la app se ajusta al volver a ella.')
                                       if WINDOWS else
-                                      tr('Normal: el tamaño de siempre, que ya se adapta al escalado de la pantalla '
-                                         'del sistema. Personalizado: más grande o más pequeño.'),
+                                      tr('Normal: el del escalado de la pantalla en la configuración del sistema. '
+                                         'Personalizado: más grande o más pequeño.'),
                                       control)
         return self.fila_tamano
 
@@ -496,7 +496,7 @@ class VistaAjustes(QWidget):
         self.tamano.setEnabled(propio)
         if not propio:
             self.tamano.blockSignals(True)
-            self.tamano.setValue(tema.escala_windows())
+            self.tamano.setValue(tema.escala_sistema())
             self.tamano.blockSignals(False)
         self._aplicar_tamano()
 
@@ -508,12 +508,12 @@ class VistaAjustes(QWidget):
             self.tamano_elegido.emit()
 
     def _texto_tamano(self):
-        windows = tema.escala_windows()
-        self.b_tamano_windows.setText(tr('Como Windows ({n} %)', n=windows) if WINDOWS
-                                      else tr('Normal ({n} %)', n=windows))
+        sistema = tema.escala_sistema()
+        self.b_tamano_windows.setText(tr('Como Windows ({n} %)', n=sistema) if WINDOWS
+                                      else tr('Normal ({n} %)', n=sistema))
         if not self.b_tamano_propio.isChecked():
             self.tamano.blockSignals(True)
-            self.tamano.setValue(windows)
+            self.tamano.setValue(sistema)
             self.tamano.blockSignals(False)
         self.tamano.setFixedWidth(tema.px(84))
 
@@ -527,7 +527,9 @@ class VistaAjustes(QWidget):
     def _menu_contextual(self):
         t = Tarjeta('menu', tr('Menú contextual del Explorador'),
                     tr('Busca subtítulos con el botón derecho del ratón, sin abrir antes la app. En Windows 11 '
-                       'está dentro de «Mostrar más opciones».'))
+                       'está dentro de «Mostrar más opciones».')) if WINDOWS else \
+            Tarjeta('menu', tr('Menú contextual del gestor de archivos'),
+                    tr('Busca subtítulos con el botón derecho del ratón, sin abrir antes la app.'))
         fila = t.fila(FilaOpcion(tr('Mostrar «Bajar subtítulos» en el menú contextual'),
                                  tr('En una carpeta: «Bajar subtítulos aquí», solo en esa carpeta o también en '
                                     'sus subcarpetas. En uno o varios vídeos: «Bajar subtítulos».')))
@@ -562,7 +564,9 @@ class VistaAjustes(QWidget):
             self.menu.setChecked(menu_contextual.registrado())
         else:
             self.menu.setEnabled(False)
-            self.estado_menu.setText(tr('Solo en Windows.'))
+            self.fila_modo_menu.setVisible(False)
+            self.estado_menu.setText(tr('Todavía no está disponible en Linux: llegará en una próxima versión.')
+                                     if LINUX else tr('Solo en Windows.'))
         self.menu.toggled.connect(self._menu)
         return t
 
