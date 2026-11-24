@@ -110,8 +110,10 @@ jobs:
             wayland: true
           - imagen: almalinux:9
             tipo: rpm
-          - imagen: almalinux:10
+          - imagen: almalinux:10       # sin Xorg (RHEL 10 lo quitó): la ventana, en Wayland
             tipo: rpm
+            wayland: true
+            sin_x11: true
           - imagen: fedora:latest
             tipo: rpm
             wayland: true
@@ -157,12 +159,16 @@ jobs:
           case "${{ matrix.imagen }}" in
             ubuntu*|debian*) apt-get install -y -q --no-install-recommends xvfb ${{ matrix.wayland && 'weston' || '' }} ;;
             opensuse*) zypper -n -q install -y xorg-x11-server-Xvfb ;;
+            almalinux:10) dnf install -y -q epel-release && dnf install -y -q weston ;;
             *) dnf install -y -q xorg-x11-server-Xvfb ${{ matrix.wayland && 'weston' || '' }} ;;
           esac
-          packaging/linux/probar.sh x11 bajar-subtitulos-esp
-          packaging/linux/probar.sh x11 dist/*.AppImage --appimage-extract-and-run
+          if [ "${{ matrix.sin_x11 }}" != true ]; then
+            packaging/linux/probar.sh x11 bajar-subtitulos-esp
+            packaging/linux/probar.sh x11 dist/*.AppImage --appimage-extract-and-run
+          fi
           if [ "${{ matrix.wayland }}" = true ]; then
             packaging/linux/probar.sh wayland bajar-subtitulos-esp
+            packaging/linux/probar.sh wayland dist/*.AppImage --appimage-extract-and-run
           fi
 
       - name: Desinstalar
