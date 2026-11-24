@@ -48,7 +48,7 @@ jobs:
         id: python
         with:
           path: /opt/python
-          key: python-${{ env.PYTHON_VERSION }}-almalinux9-v1
+          key: python-${{ env.PYTHON_VERSION }}-almalinux9-v2
 
       - name: Python ${{ env.PYTHON_VERSION }} con su biblioteca compartida (la que mete PyInstaller)
         if: steps.python.outputs.cache-hit != 'true'
@@ -61,6 +61,8 @@ jobs:
           ./configure -q --prefix=/opt/python --enable-shared LDFLAGS='-Wl,-rpath,/opt/python/lib'
           make -s -j"$(nproc)"
           make -s install > /dev/null
+          # Sin los símbolos de depuración: libpython y sus módulos ocupan 50 MB menos dentro del programa.
+          strip --strip-unneeded /opt/python/lib/libpython3.14.so.1.0 /opt/python/lib/python3.14/lib-dynload/*.so
 
       - name: Dependencias
         run: |
