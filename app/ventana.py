@@ -300,8 +300,7 @@ class Ventana(QMainWindow):
 
     def changeEvent(self, e):
         super().changeEvent(e)
-        # Al volver a la app, por si se ha cambiado el tamaño del texto en Windows (como el Explorador)
-        # o el escalado de la pantalla en Linux.
+        # Al volver a la app, por si se ha cambiado el tamaño del texto en Windows (como el Explorador).
         if e.type() == QEvent.ActivationChange and self.isActiveWindow():
             if abs(tema.factor(self.config.tamano_texto) - tema.escala()) > 0.001:
                 self.cambiar_tema(self.preferencia_tema)

@@ -454,7 +454,7 @@ class VistaAjustes(QWidget):
         sl.setContentsMargins(0, 0, 0, 0)
         sl.setSpacing(0)
         self.grupo_tamano = QButtonGroup(self)
-        self.b_tamano_windows = QPushButton(tr('Como Windows') if WINDOWS else tr('Normal'))
+        self.b_tamano_windows = QPushButton(tr('Como Windows'))
         self.b_tamano_propio = QPushButton(tr('Personalizado'))
         for i, b in enumerate((self.b_tamano_windows, self.b_tamano_propio)):
             b.setCheckable(True)
@@ -471,7 +471,9 @@ class VistaAjustes(QWidget):
         self.tamano.setAlignment(Qt.AlignRight)
         self.tamano.setFixedWidth(tema.px(84))
         cl.addWidget(self.tamano)
-        propio = self.config.tamano_texto
+        # En Linux no hay «como el sistema»: solo el porcentaje, y el 100 % es el tamaño normal (se guarda como 0).
+        propio = self.config.tamano_texto or (0 if WINDOWS else 100)
+        segmentos.setVisible(WINDOWS)
         (self.b_tamano_propio if propio else self.b_tamano_windows).setChecked(True)
         self.tamano.setValue(propio or tema.escala_sistema())
         self.tamano.setEnabled(bool(propio))
@@ -486,8 +488,8 @@ class VistaAjustes(QWidget):
                                       tr('Como Windows: el de Configuración de Windows › Accesibilidad › Tamaño '
                                          'del texto. Si lo cambias allí, la app se ajusta al volver a ella.')
                                       if WINDOWS else
-                                      tr('Normal: el del escalado de la pantalla en la configuración del sistema. '
-                                         'Personalizado: más grande o más pequeño.'),
+                                      tr('100 % es el tamaño normal, el mismo que en el resto de programas. Súbelo '
+                                         'para agrandar el texto o bájalo para reducirlo.'),
                                       control)
         return self.fila_tamano
 
@@ -502,18 +504,19 @@ class VistaAjustes(QWidget):
 
     def _aplicar_tamano(self):
         nuevo = self.tamano.value() if self.b_tamano_propio.isChecked() else 0
+        if not WINDOWS and nuevo == 100:
+            nuevo = 0
         if nuevo != self.config.tamano_texto:
             self.config.tamano_texto = nuevo
             self.config.guardar()
             self.tamano_elegido.emit()
 
     def _texto_tamano(self):
-        sistema = tema.escala_sistema()
-        self.b_tamano_windows.setText(tr('Como Windows ({n} %)', n=sistema) if WINDOWS
-                                      else tr('Normal ({n} %)', n=sistema))
+        windows = tema.escala_sistema()
+        self.b_tamano_windows.setText(tr('Como Windows ({n} %)', n=windows))
         if not self.b_tamano_propio.isChecked():
             self.tamano.blockSignals(True)
-            self.tamano.setValue(sistema)
+            self.tamano.setValue(windows)
             self.tamano.blockSignals(False)
         self.tamano.setFixedWidth(tema.px(84))
 

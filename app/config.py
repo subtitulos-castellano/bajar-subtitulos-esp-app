@@ -34,7 +34,7 @@ class Config:
         self.tema = 'sistema'
         self.usuario_opensubtitles = ''      # cuenta de opensubtitles.org
         self.usuario_opensubtitlescom = ''   # cuenta de opensubtitles.com (último recurso)
-        self.tamano_texto = 0         # 0 = como Windows; si no, porcentaje (80-225)
+        self.tamano_texto = 0         # 0 = como Windows (en Linux, 100 %); si no, porcentaje (80-225)
         self.ventana = {}             # {'x', 'y', 'ancho', 'alto', 'maximizada'}
         self.actualizaciones = True   # buscar versiones nuevas al abrir la app (como mucho una vez al día)
         self.ultima_comprobacion = 0.0

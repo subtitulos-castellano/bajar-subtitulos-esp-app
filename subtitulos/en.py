@@ -248,11 +248,10 @@ TEXTOS = {
     'Oscuro': 'Dark',
     'Claro, oscuro o el mismo que Windows.': 'Light, dark or the same as Windows.',
     'Claro, oscuro o el mismo que el sistema.': 'Light, dark or the same as the system.',
-    'Normal': 'Normal',
-    'Normal ({n} %)': 'Normal ({n} %)',
-    'Normal: el del escalado de la pantalla en la configuración del sistema. Personalizado: más grande o más '
-    'pequeño.':
-        'Normal: the display scaling set in the system settings. Custom: bigger or smaller.',
+    '100 % es el tamaño normal, el mismo que en el resto de programas. Súbelo para agrandar el texto o bájalo '
+    'para reducirlo.':
+        '100 % is the normal size, the same as in other programs. Raise it to make the text bigger or lower it to '
+        'make it smaller.',
     'Opcionales, pero dan más resultados. opensubtitles.org y opensubtitles.com son cuentas distintas. Las '
     'contraseñas se guardan en el llavero del sistema (KWallet o GNOME Keyring), nunca en un archivo.':
         'Optional, but they give more results. opensubtitles.org and opensubtitles.com are separate accounts. '

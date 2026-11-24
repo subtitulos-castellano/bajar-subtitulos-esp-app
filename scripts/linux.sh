@@ -67,7 +67,7 @@ print(f'App:        {__version__} · Python {sys.version.split()[0]} · PySide6 
 print(f'Llavero:    {type(keyring.get_keyring()).__module__}')
 from PySide6.QtGui import QGuiApplication
 qt = QGuiApplication([])
-pantallas = ', '.join(f'{p.name()} {p.size().width()}x{p.size().height()} al {round(p.devicePixelRatio() * 100)} %'
+pantallas = ', '.join(f'{p.name()} {p.size().width()}x{p.size().height()} devicePixelRatio {p.devicePixelRatio():g}'
                       for p in qt.screens())
 print(f'Pantalla:   Qt {qt.platformName()} · {pantallas}')
 " ;;

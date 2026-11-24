@@ -26,6 +26,7 @@ except ImportError:  # pragma: no cover - sin PySide6 (p. ej. el venv de la skil
 import test_nucleo  # noqa: E402
 from subtitulos import eventos as ev  # noqa: E402
 from subtitulos.opciones import Opciones  # noqa: E402
+from app.plataforma import WINDOWS  # noqa: E402
 
 APP = QApplication.instance() or QApplication([])
 
@@ -529,16 +530,27 @@ class TamanoDelTexto(unittest.TestCase):
         tema.aplicar(APP, 'claro', 0)
         self.assertAlmostEqual(tema.escala(), tema.factor(0))
 
-    def test_linux_cuenta_sobre_el_escalado_de_la_pantalla(self):
-        # Pantalla al 115 % (lo aplica Qt): «Normal (115 %)» no agranda nada más, y un 230 % propio es el doble.
-        with mock.patch.object(tema, 'WINDOWS', False), mock.patch.object(tema, 'escala_sistema', return_value=115):
-            self.assertEqual(tema.porcentaje(0), 115)
-            self.assertAlmostEqual(tema.factor(0), 1)
-            self.assertAlmostEqual(tema.factor(115), 1)
-            self.assertAlmostEqual(tema.factor(230), 2)
-        with mock.patch.object(tema, 'WINDOWS', True), mock.patch.object(tema, 'escala_sistema', return_value=125):
-            self.assertAlmostEqual(tema.factor(0), 1.25)
-            self.assertAlmostEqual(tema.factor(150), 1.5)
+    @unittest.skipIf(WINDOWS, 'en Windows se usa el tamaño del texto del sistema')
+    def test_linux_solo_porcentaje(self):
+        # Sin «como el sistema»: se carga al 100 % (como cualquier programa) y se sube o baja a mano.
+        self.assertEqual(tema.escala_sistema(), 100)
+        self.assertAlmostEqual(tema.factor(0), 1)
+        with tempfile.TemporaryDirectory() as d:
+            ruta = Path(d) / 'config.json'
+            v = Ventana(Config(ruta))
+            a = v.ajustes
+            self.assertFalse(a.b_tamano_windows.isVisibleTo(v))
+            self.assertTrue(a.tamano.isEnabled())
+            self.assertEqual(a.tamano.value(), 100)
+            a.tamano.setValue(a.tamano.maximum())
+            a._aplicar_tamano()
+            self.assertEqual(Config(ruta).tamano_texto, 225)
+            self.assertAlmostEqual(tema.escala(), 2.25)
+            a.tamano.setValue(100)
+            a._aplicar_tamano()
+            self.assertEqual(Config(ruta).tamano_texto, 0)
+            self.assertAlmostEqual(tema.escala(), 1)
+            v.close()
 
     def test_configuracion(self):
         with tempfile.TemporaryDirectory() as d:
