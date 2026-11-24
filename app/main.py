@@ -111,7 +111,14 @@ def autoprueba(salida, con_red=False):
         return f'{len(TEXTOS)} textos traducidos'
     paso('idioma inglés', ingles)
     paso('guessit', lambda: dict(__import__('guessit').guessit('Serie.S01E02.720p.WEB-DL.mkv')))
-    paso('keyring', lambda: type(__import__('keyring').get_keyring()).__name__)
+    def llavero():
+        import keyring
+        k = keyring.get_keyring()
+        if LINUX:     # el del escritorio (KWallet o GNOME Keyring) tiene que ir dentro, aunque aquí no lo haya
+            import keyring.backends.SecretService  # noqa: F401
+            import secretstorage  # noqa: F401 - sin él, keyring no puede usar el llavero del escritorio
+        return f'{type(k).__module__}.{type(k).__name__}'
+    paso('keyring', llavero)
     paso('certificados', lambda: __import__('certifi').where())
 
     def actualizaciones():
@@ -328,6 +335,9 @@ def main(argv=None):
     ap.add_argument('--idioma-inicial', choices=('es', 'en'), help=argparse.SUPPRESS)
     ap.add_argument('--pagina', choices=('ajustes',), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
+    if LINUX:
+        from app.plataforma import linux
+        linux.entorno_para_otros_programas()
     if args.autoprueba:
         return autoprueba(args.autoprueba, args.con_red)
     if args.menu_contextual_instalar or args.menu_contextual_quitar:

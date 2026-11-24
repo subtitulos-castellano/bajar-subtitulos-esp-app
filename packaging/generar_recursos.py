@@ -1,6 +1,8 @@
-"""Genera los recursos del empaquetado (se ejecuta antes de PyInstaller, con el Python de Windows):
+"""Genera los recursos del empaquetado (se ejecuta antes de PyInstaller, en Windows o en Linux):
 
 - packaging/build/icono.ico: el icono de la app (16-256 px, PNG dentro del .ico), desde iconos.ICONO_APP.
+- packaging/build/hicolor/: el mismo icono para Linux (PNG de 16 a 512 px y SVG), con la estructura de
+  /usr/share/icons/hicolor.
 - packaging/build/version.txt: datos de versión del .exe (Propiedades › Detalles en Windows).
 - packaging/build/AVISOS_TERCEROS.txt: licencias de las librerías incluidas.
 
@@ -41,6 +43,19 @@ def icono():
         desplazamiento += len(png)
         datos += png
     (SALIDA / 'icono.ico').write_bytes(cabecera + entradas + datos)
+
+
+def iconos_linux():
+    from app import iconos
+    from app.plataforma.linux import ID_ESCRITORIO
+    for lado in (16, 22, 24, 32, 48, 64, 128, 256, 512):
+        carpeta = SALIDA / 'hicolor' / f'{lado}x{lado}' / 'apps'
+        carpeta.mkdir(parents=True, exist_ok=True)
+        if not iconos.pixmap_app(lado).save(str(carpeta / f'{ID_ESCRITORIO}.png'), 'PNG'):
+            raise SystemExit(f'No se ha podido guardar el icono de {lado} px')
+    carpeta = SALIDA / 'hicolor' / 'scalable' / 'apps'
+    carpeta.mkdir(parents=True, exist_ok=True)
+    (carpeta / f'{ID_ESCRITORIO}.svg').write_text(iconos.ICONO_APP, encoding='utf-8')
 
 
 def version():
@@ -101,6 +116,7 @@ if __name__ == '__main__':
     SALIDA.mkdir(parents=True, exist_ok=True)
     app = QApplication([])
     icono()
+    iconos_linux()
     version()
     avisos()
     print(f'Recursos generados en {SALIDA} (versión {__version__})')

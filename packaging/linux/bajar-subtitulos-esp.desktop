@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Bajar Subtítulos ESP
+GenericName=Subtitle downloader
+GenericName[es]=Descarga de subtítulos
+Comment=Spain Spanish subtitles for your series and films
+Comment[es]=Subtítulos en castellano de España para tus series y películas
+Exec=bajar-subtitulos-esp %F
+Icon=bajar-subtitulos-esp
+Terminal=false
+Categories=AudioVideo;Video;
+Keywords=subtitles;srt;Spanish;castellano;español;subtítulos;
+StartupWMClass=bajar-subtitulos-esp
+SingleMainWindow=true

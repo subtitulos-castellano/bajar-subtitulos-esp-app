@@ -1,0 +1,199 @@
+# Bajar Subtítulos ESP para Linux: compila en AlmaLinux 9 (glibc 2.34, la mínima admitida) el programa, el
+# .deb, el .rpm, el AppImage y el .tar.gz, y los prueba en contenedores de las distribuciones admitidas:
+# instalar, autoprueba, que no falte ninguna librería, abrir la ventana en X11 (y en Wayland donde se puede)
+# y desinstalar sin dejar nada. Los archivos quedan como artefacto; aún no se publican.
+# - Se ejecuta al subir una rama linux-*, o a mano (Actions › Linux › Run workflow).
+name: Linux
+
+on:
+  push:
+    branches: ['linux-**']
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.14.10'
+  PYTHON_SHA256: de414a57119abef52784d8993e341d53aed635fc2b05c2607d9f98a2c5b72032
+
+jobs:
+  compilar:
+    runs-on: ubuntu-24.04
+    container: almalinux:9
+    timeout-minutes: 60
+    steps:
+      - name: Herramientas y librerías del sistema
+        run: |
+          dnf install -y -q epel-release
+          # Las librerías, por su nombre (lo que piden Qt y Python): así no dependen del nombre del paquete.
+          dnf install -y -q --setopt=install_weak_deps=False \
+            gcc make tar xz git findutils binutils file squashfs-tools desktop-file-utils \
+            openssl-devel bzip2-devel libffi-devel zlib-devel xz-devel sqlite-devel libuuid-devel \
+            ncurses-devel readline-devel gdbm-devel \
+            'libfontconfig.so.1()(64bit)' 'libfreetype.so.6()(64bit)' 'libdbus-1.so.3()(64bit)' \
+            'libglib-2.0.so.0()(64bit)' 'libGL.so.1()(64bit)' 'libEGL.so.1()(64bit)' \
+            'libxkbcommon.so.0()(64bit)' 'libxkbcommon-x11.so.0()(64bit)' 'libX11-xcb.so.1()(64bit)' \
+            'libxcb-cursor.so.0()(64bit)' 'libxcb-icccm.so.4()(64bit)' 'libxcb-image.so.0()(64bit)' \
+            'libxcb-keysyms.so.1()(64bit)' 'libxcb-render-util.so.0()(64bit)' 'libxcb-util.so.1()(64bit)' \
+            'libwayland-client.so.0()(64bit)' 'libwayland-cursor.so.0()(64bit)' 'libwayland-egl.so.1()(64bit)' \
+            'libgssapi_krb5.so.2()(64bit)' 'libzstd.so.1()(64bit)' 'libbrotlidec.so.1()(64bit)' \
+            'libgbm.so.1()(64bit)' 'libdrm.so.2()(64bit)'
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/cache@v6
+        id: python
+        with:
+          path: /opt/python
+          key: python-${{ env.PYTHON_VERSION }}-almalinux9-v1
+
+      - name: Python ${{ env.PYTHON_VERSION }} con su biblioteca compartida (la que mete PyInstaller)
+        if: steps.python.outputs.cache-hit != 'true'
+        run: |
+          cd /tmp
+          curl -fsSLO "https://www.python.org/ftp/python/$PYTHON_VERSION/Python-$PYTHON_VERSION.tar.xz"
+          echo "$PYTHON_SHA256  Python-$PYTHON_VERSION.tar.xz" | sha256sum -c
+          tar xf "Python-$PYTHON_VERSION.tar.xz"
+          cd "Python-$PYTHON_VERSION"
+          ./configure -q --prefix=/opt/python --enable-shared LDFLAGS='-Wl,-rpath,/opt/python/lib'
+          make -s -j"$(nproc)"
+          make -s install > /dev/null
+
+      - name: Dependencias
+        run: |
+          /opt/python/bin/python3.14 -m venv /opt/venv
+          /opt/venv/bin/python -m pip install -q --upgrade pip
+          /opt/venv/bin/python -m pip install -q -r requirements-build.txt
+
+      - name: Pruebas
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: /opt/venv/bin/python -I -m unittest discover -s tests
+
+      - name: Compilar (con la autoprueba del programa)
+        run: |
+          desktop-file-validate packaging/linux/bajar-subtitulos-esp.desktop
+          /opt/venv/bin/python -I packaging/linux/compilar.py
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: BajarSubtitulosESP-linux
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
+            dist/*-linux-x86_64.tar.gz
+          if-no-files-found: error
+
+  # .deb y .rpm: instalar (el gestor de paquetes pone las dependencias), probar el paquete y el AppImage,
+  # abrir la ventana y desinstalar. Las librerías se comprueban antes de instalar nada más (Xvfb, weston…).
+  paquetes:
+    needs: compilar
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - imagen: ubuntu:22.04
+            tipo: deb
+          - imagen: ubuntu:24.04
+            tipo: deb
+            wayland: true
+          - imagen: ubuntu:26.04
+            tipo: deb
+          - imagen: debian:12
+            tipo: deb
+          - imagen: debian:13
+            tipo: deb
+            wayland: true
+          - imagen: almalinux:9
+            tipo: rpm
+          - imagen: almalinux:10
+            tipo: rpm
+          - imagen: fedora:latest
+            tipo: rpm
+            wayland: true
+          - imagen: opensuse/tumbleweed
+            tipo: rpm
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.imagen }}
+    timeout-minutes: 25
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Lo mínimo para las pruebas
+        run: |
+          case "${{ matrix.imagen }}" in
+            ubuntu*|debian*) apt-get update -q && apt-get install -y -q --no-install-recommends bash ;;
+            opensuse*) zypper -n -q install -y bash findutils gzip tar ;;
+            *) dnf install -y -q bash findutils ;;
+          esac
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: BajarSubtitulosESP-linux
+          path: dist
+
+      - name: Instalar el paquete
+        run: |
+          case "${{ matrix.imagen }}" in
+            ubuntu*|debian*) apt-get install -y -q --no-install-recommends ./dist/*.deb ;;
+            opensuse*) zypper -n install -y --allow-unsigned-rpm ./dist/*.rpm ;;
+            *) dnf install -y -q ./dist/*.rpm ;;
+          esac
+
+      - name: Probar lo instalado
+        run: packaging/linux/probar.sh programa /opt/bajar-subtitulos-esp bajar-subtitulos-esp
+
+      - name: Probar el AppImage
+        run: packaging/linux/probar.sh appimage dist/*.AppImage
+
+      - name: Abrir la ventana
+        run: |
+          case "${{ matrix.imagen }}" in
+            ubuntu*|debian*) apt-get install -y -q --no-install-recommends xvfb ${{ matrix.wayland && 'weston' || '' }} ;;
+            opensuse*) zypper -n -q install -y xorg-x11-server-Xvfb ;;
+            *) dnf install -y -q xorg-x11-server-Xvfb ${{ matrix.wayland && 'weston' || '' }} ;;
+          esac
+          packaging/linux/probar.sh x11 bajar-subtitulos-esp
+          packaging/linux/probar.sh x11 dist/*.AppImage --appimage-extract-and-run
+          if [ "${{ matrix.wayland }}" = true ]; then
+            packaging/linux/probar.sh wayland bajar-subtitulos-esp
+          fi
+
+      - name: Desinstalar
+        run: |
+          case "${{ matrix.imagen }}" in
+            ubuntu*|debian*) apt-get purge -y -q bajar-subtitulos-esp ;;
+            opensuse*) zypper -n remove -y bajar-subtitulos-esp ;;
+            *) dnf remove -y -q bajar-subtitulos-esp ;;
+          esac
+          packaging/linux/probar.sh desinstalado
+
+  # El AppImage en una distribución sin .deb ni .rpm, con las librerías que trae cualquier escritorio.
+  appimage-arch:
+    needs: compilar
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    timeout-minutes: 20
+    steps:
+      - name: Librerías de un escritorio
+        run: |
+          pacman -Syu --noconfirm --needed -q bash findutils libglvnd mesa libx11 libxcb libxkbcommon \
+            libxkbcommon-x11 wayland fontconfig freetype2 glib2 dbus krb5 zstd zlib gcc-libs > /dev/null
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: BajarSubtitulosESP-linux
+          path: dist
+
+      - name: Probar el AppImage
+        run: |
+          packaging/linux/probar.sh appimage dist/*.AppImage
+          pacman -S --noconfirm --needed -q xorg-server-xvfb > /dev/null
+          packaging/linux/probar.sh x11 dist/*.AppImage --appimage-extract-and-run

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Punto de entrada del AppImage: abre el programa que va dentro (usr/lib/bajar-subtitulos-esp).
+AQUI="$(dirname "$(readlink -f "$0")")"
+exec "$AQUI/usr/lib/bajar-subtitulos-esp/bajar-subtitulos-esp" "$@"

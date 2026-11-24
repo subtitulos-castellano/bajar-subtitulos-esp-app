@@ -6,6 +6,8 @@
 #   scripts/linux.sh pruebas            pasa las pruebas automáticas (sin ventanas)
 #   scripts/linux.sh python [args...]   ejecuta el Python de .venv
 #   scripts/linux.sh info               sistema, escritorio, Python, Qt y llavero (para informar de fallos)
+#   scripts/linux.sh compilar           programa compilado, .deb, .rpm, AppImage y .tar.gz en dist/
+#                                       (hacen falta readelf y mksquashfs: binutils y squashfs-tools)
 #
 # Variable: PYTHON (el Python con el que crear .venv; por defecto, el más nuevo entre 3.10 y 3.14).
 set -euo pipefail
@@ -52,6 +54,10 @@ case "$orden" in
     pruebas)
         comprobar_entorno
         cd "$RAIZ" && QT_QPA_PLATFORM=offscreen exec "$PY_VENV" -I -m unittest discover -s tests ;;
+    compilar)
+        comprobar_entorno
+        "$PY_VENV" -m pip install -r "$RAIZ/requirements-build.txt" -q
+        cd "$RAIZ" && exec "$PY_VENV" -I packaging/linux/compilar.py ;;
     python)
         comprobar_entorno
         cd "$RAIZ" && exec "$PY_VENV" "$@" ;;
@@ -72,5 +78,5 @@ pantallas = ', '.join(f'{p.name()} {p.size().width()}x{p.size().height()} device
 print(f'Pantalla:   Qt {qt.platformName()} · {pantallas}')
 " ;;
     *)
-        sed -n '2,10p' "$0"; exit 1 ;;
+        sed -n '2,12p' "$0"; exit 1 ;;
 esac

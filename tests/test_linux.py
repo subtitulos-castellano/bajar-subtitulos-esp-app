@@ -21,6 +21,25 @@ if LINUX:
 
 
 @unittest.skipUnless(LINUX, 'solo en Linux')
+class EntornoParaOtrosProgramas(unittest.TestCase):
+    def test_desde_el_codigo_no_cambia(self):
+        with mock.patch.dict(os.environ, {'LD_LIBRARY_PATH': '/x', 'LD_LIBRARY_PATH_ORIG': '/y'}):
+            linux.entorno_para_otros_programas()
+            self.assertEqual(os.environ['LD_LIBRARY_PATH'], '/x')
+
+    def test_compilado_vuelve_al_de_antes(self):
+        with mock.patch.object(sys, 'frozen', True, create=True):
+            with mock.patch.dict(os.environ, {'LD_LIBRARY_PATH': '/app/_internal', 'LD_LIBRARY_PATH_ORIG': '/y'}):
+                linux.entorno_para_otros_programas()
+                self.assertEqual(os.environ['LD_LIBRARY_PATH'], '/y')
+                self.assertNotIn('LD_LIBRARY_PATH_ORIG', os.environ)
+            with mock.patch.dict(os.environ, {'LD_LIBRARY_PATH': '/app/_internal'}):
+                os.environ.pop('LD_LIBRARY_PATH_ORIG', None)
+                linux.entorno_para_otros_programas()
+                self.assertNotIn('LD_LIBRARY_PATH', os.environ)
+
+
+@unittest.skipUnless(LINUX, 'solo en Linux')
 class Carpetas(unittest.TestCase):
     def test_config_xdg(self):
         with mock.patch.dict(os.environ, {'XDG_CONFIG_HOME': '/tmp/xdg-prueba'}):

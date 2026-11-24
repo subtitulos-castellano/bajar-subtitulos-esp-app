@@ -1,6 +1,7 @@
 """Lo propio de Linux (escritorios freedesktop: KDE, GNOME, Cinnamon, XFCE…, con Wayland o X11)."""
 import os
 import re
+import sys
 import tempfile
 from pathlib import Path
 
@@ -66,3 +67,16 @@ def token_activacion():
 def usar_token_activacion(token):
     if isinstance(token, str) and _TOKEN.fullmatch(token):
         os.environ['XDG_ACTIVATION_TOKEN'] = token
+
+
+def entorno_para_otros_programas():
+    """El programa compilado (PyInstaller) arranca con LD_LIBRARY_PATH apuntando a sus propias librerías. Los
+    programas que abra (xdg-open, el gestor de paquetes…) deben usar las del sistema: se deja como estaba
+    antes de arrancar. A la app no le afecta, porque el sistema ya lo leyó al cargarla."""
+    if not getattr(sys, 'frozen', False):
+        return
+    antes = os.environ.pop('LD_LIBRARY_PATH_ORIG', None)
+    if antes is None:
+        os.environ.pop('LD_LIBRARY_PATH', None)
+    else:
+        os.environ['LD_LIBRARY_PATH'] = antes
