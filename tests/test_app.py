@@ -607,7 +607,12 @@ NOVEDAD = actualizar.Novedad(
 
 
 class Actualizaciones(unittest.TestCase):
+    """Como en Windows: el instalador se lanza y la app se cierra (Linux: ActualizacionesLinux)."""
+
     def setUp(self):
+        parche = mock.patch('app.ventana.LINUX', False)
+        parche.start()
+        self.addCleanup(parche.stop)
         self._d = tempfile.TemporaryDirectory()
         self.addCleanup(self._d.cleanup)
         self.ruta = Path(self._d.name) / 'config.json'
@@ -652,7 +657,7 @@ class Actualizaciones(unittest.TestCase):
     def test_aviso_de_version_nueva(self):
         v = self.v
         with mock.patch.object(actualizar, 'consultar', return_value=NOVEDAD), \
-                mock.patch.object(actualizar, 'instalada', return_value=True):
+                mock.patch.object(actualizar, 'puede_instalarse', return_value=True):
             v.actualizador.comprobar()
             esperar(lambda: v.marco_aviso.isVisible())
         aviso = v.aviso
@@ -697,7 +702,7 @@ class Actualizaciones(unittest.TestCase):
 
     def test_version_portable_solo_ofrece_la_descarga(self):
         v = self.v
-        with mock.patch.object(actualizar, 'instalada', return_value=False):
+        with mock.patch.object(actualizar, 'puede_instalarse', return_value=False):
             v._novedad(NOVEDAD, False)
         self.assertEqual(v.aviso.estado, 'portable')
         self.assertEqual(v.aviso.b_accion.text(), 'Descargar')
@@ -709,7 +714,7 @@ class Actualizaciones(unittest.TestCase):
 
     def test_no_se_actualiza_durante_una_busqueda(self):
         v = self.v
-        with mock.patch.object(actualizar, 'instalada', return_value=True):
+        with mock.patch.object(actualizar, 'puede_instalarse', return_value=True):
             v._novedad(NOVEDAD, False)
         v.trabajador = object()
         v._actualizar_nav()
@@ -720,7 +725,7 @@ class Actualizaciones(unittest.TestCase):
 
     def test_actualizar_descarga_instala_y_cierra(self):
         v = self.v
-        with mock.patch.object(actualizar, 'instalada', return_value=True):
+        with mock.patch.object(actualizar, 'puede_instalarse', return_value=True):
             v._novedad(NOVEDAD, False)
         ruta = Path(self._d.name) / NOVEDAD.instalador.nombre
 
@@ -739,7 +744,7 @@ class Actualizaciones(unittest.TestCase):
 
     def test_fallo_al_descargar(self):
         v = self.v
-        with mock.patch.object(actualizar, 'instalada', return_value=True):
+        with mock.patch.object(actualizar, 'puede_instalarse', return_value=True):
             v._novedad(NOVEDAD, False)
         with mock.patch.object(actualizar, 'descargar',
                                side_effect=actualizar.ErrorActualizacion('No coincide la huella.')), \
@@ -761,6 +766,73 @@ class Actualizaciones(unittest.TestCase):
                 self.assertEqual(v.aviso.estado == 'actualizada', aviso)
                 self.assertEqual(Config(self.ruta).version, __version__)    # solo se avisa una vez
                 v.close()
+
+
+
+@unittest.skipUnless(sys.platform.startswith('linux'), 'solo en Linux')
+class ActualizacionesLinux(unittest.TestCase):
+    """.deb y .rpm: lo instala el gestor de paquetes (con la contraseña) y la app se vuelve a abrir."""
+    NOVEDAD = actualizar.Novedad('99.0.0', NOVEDAD.pagina, NOVEDAD.notas,
+                                 actualizar.Archivo('BajarSubtitulosESP-99.0.0-x86_64.rpm', 'https://github.com/x',
+                                                    'ab' * 32, 10))
+
+    def setUp(self):
+        self._d = tempfile.TemporaryDirectory()
+        self.addCleanup(self._d.cleanup)
+        c = Config(Path(self._d.name) / 'config.json')
+        c.version = __version__
+        c.guardar()
+        for parche in (mock.patch.object(actualizar, 'tipo_linux', return_value='rpm'),
+                       mock.patch.object(actualizar, 'puede_instalarse', return_value=True)):
+            parche.start()
+            self.addCleanup(parche.stop)
+        self.v = Ventana(Config(c.ruta))
+        self.v.setAttribute(Qt.WA_DontShowOnScreen)
+        self.v.show()
+        self.addCleanup(self.v.close)
+        self.reabrir = mock.Mock(return_value=True)
+        self.v.al_reiniciar = self.reabrir
+        self.ruta = Path(self._d.name) / self.NOVEDAD.instalador.nombre
+
+    def actualizar(self, instalar):
+        self.v._novedad(self.NOVEDAD, False)
+        self.assertIn('contraseña', self.v.aviso.detalle.text())
+        with mock.patch.object(actualizar, 'descargar', return_value=self.ruta), \
+                mock.patch.object(actualizar, 'instalar_linux', side_effect=instalar) as inst:
+            self.v.aviso.b_accion.click()
+            esperar(lambda: self.reabrir.called or self.v.aviso.estado == 'error')
+            APP.processEvents()
+        return inst
+
+    def test_instala_y_vuelve_a_abrir_la_nueva(self):
+        inst = self.actualizar(lambda ruta, version: ['/opt/bajar-subtitulos-esp/bajar-subtitulos-esp'])
+        inst.assert_called_once_with(self.ruta, '99.0.0')
+        self.reabrir.assert_called_once_with(programa=['/opt/bajar-subtitulos-esp/bajar-subtitulos-esp'],
+                                             pagina=False)
+
+    def test_contrasena_cancelada(self):
+        def cancelar(ruta, version):
+            raise actualizar.Cancelada()
+        self.actualizar(cancelar)
+        self.assertEqual(self.v.aviso.estado, 'error')
+        self.assertIn('se ha cancelado la contraseña', self.v.aviso.detalle.text())
+        self.assertEqual(self.v.aviso.b_accion.text(), 'Reintentar')
+        self.reabrir.assert_not_called()
+        self.assertTrue(self.v.isVisible())
+
+    def test_fallo_del_gestor_de_paquetes(self):
+        def fallo(ruta, version):
+            raise actualizar.ErrorActualizacion('El gestor de paquetes no ha podido instalarla (código 1): x')
+        self.actualizar(fallo)
+        self.assertIn('código 1', self.v.aviso.detalle.text())
+        self.reabrir.assert_not_called()
+
+    def test_sin_poder_instalar_solo_avisa_con_el_motivo(self):
+        with mock.patch.object(actualizar, 'puede_instalarse', return_value=False), \
+                mock.patch.object(actualizar, 'motivo_sin_instalar', return_value='Falta pkexec.'):
+            self.v._novedad(self.NOVEDAD, False)
+        self.assertEqual(self.v.aviso.estado, 'portable')
+        self.assertEqual(self.v.aviso.detalle.text(), 'Falta pkexec.')
 
 
 if __name__ == '__main__':

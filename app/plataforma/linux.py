@@ -45,6 +45,23 @@ def instalacion():
     return 'carpeta'
 
 
+def formato_paquete():
+    """'deb' o 'rpm': con qué gestor de paquetes se instaló la app (en /opt); None si no se sabe."""
+    if Path('/var/lib/dpkg/info', f'{ID_ESCRITORIO}.list').exists():
+        return 'deb'
+    import shutil
+    import subprocess
+    rpm = shutil.which('rpm')
+    if rpm:
+        try:
+            if subprocess.run([rpm, '-q', '--quiet', ID_ESCRITORIO], timeout=20, stdin=subprocess.DEVNULL,
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+                return 'rpm'
+        except (OSError, subprocess.SubprocessError):
+            pass
+    return None
+
+
 def carpeta_config():
     """$XDG_CONFIG_HOME o ~/.config (la especificación solo admite una ruta absoluta)."""
     base = os.environ.get('XDG_CONFIG_HOME', '')

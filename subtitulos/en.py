@@ -302,6 +302,27 @@ TEXTOS = {
         'Show the window: as when dragging onto the app. In the background: no window; just an icon next to the '
         'clock while searching (to see the progress or cancel) and a notification with the summary at the end.',
     'Solo en Windows y Linux.': 'Windows and Linux only.',
+    'Esta copia no se actualiza sola: descarga la nueva desde su página en GitHub.':
+        'This copy does not update itself: download the new one from its GitHub page.',
+    'No se puede escribir en la carpeta del AppImage: descarga la nueva desde su página en GitHub.':
+        'The AppImage folder is not writable: download the new one from its GitHub page.',
+    'No se encuentra cómo instalar el paquete (apt, dnf o zypper, y pkexec): descarga la nueva desde su '
+    'página en GitHub.':
+        'No way to install the package was found (apt, dnf or zypper, and pkexec): download the new one from '
+        'its GitHub page.',
+    'No se ha podido sustituir el AppImage ({error}).': 'The AppImage could not be replaced ({error}).',
+    'No se ha podido abrir el gestor de paquetes ({error}).': 'The package manager could not be opened ({error}).',
+    'El gestor de paquetes no ha podido instalarla (código {codigo}): {detalle}':
+        'The package manager could not install it (code {codigo}): {detalle}',
+    'Error inesperado al instalar ({error}).': 'Unexpected error while installing ({error}).',
+    'Se descarga, se comprueba que es la publicada en GitHub y la instala el gestor de paquetes, que te '
+    'pedirá tu contraseña. La app se volverá a abrir sola.':
+        'It is downloaded, checked against the one published on GitHub and installed by the package manager, '
+        'which will ask for your password. The app will reopen by itself.',
+    'Escribe tu contraseña en la ventana del sistema. Después, la app se volverá a abrir sola.':
+        'Type your password in the system window. Then the app will reopen by itself.',
+    'No se ha instalado porque se ha cancelado la contraseña. La app sigue como estaba.':
+        'It was not installed because the password was cancelled. The app is as it was.',
     'Mostrar en el menú de aplicaciones': 'Show in the applications menu',
     'Para abrir la app desde el menú, como cualquier programa. Si mueves el AppImage a otra carpeta, ábrelo '
     'una vez desde allí y se corrige solo.':

@@ -7,6 +7,9 @@
 #   probar.sh wayland ORDEN...            abre la ventana en Wayland (weston sin pantalla) y se cierra sola
 #   probar.sh menu ORDEN...               pone el menú contextual (en MENU_DATOS) y lo usa
 #   probar.sh menu-appimage ARCHIVO       lo mismo con una copia del AppImage; al borrarla, el menú se limpia
+#   probar.sh actualizar-paquete DEB|RPM  actualiza el paquete instalado a la revisión 2 (dist/prueba) como la
+#                                         app: la vuelve a abrir y conserva la configuración
+#   probar.sh actualizar-appimage ARCHIVO lo mismo con una copia del AppImage, que se sustituye por la «nueva»
 #   probar.sh desinstalado                no queda nada del .deb o del .rpm (y el menú se ha limpiado)
 set -euo pipefail
 
@@ -74,6 +77,20 @@ menu_limpio() {
     echo "Menú contextual limpio sin el programa"
 }
 
+# Configuración en inglés: la actualización no debe cambiarla.
+config_ingles() { printf '{"idioma": "en", "version": "0.0.1"}\n' > "$TMP/config-act.json"; }
+config_intacta() {
+    grep -q '"idioma": "en"' "$TMP/config-act.json" || { cat "$TMP/config-act.json"; fallo "la actualización ha cambiado el idioma"; }
+    echo "Configuración conservada"
+}
+
+# La app, tras instalar, se vuelve a abrir (con --medir-arranque: dice «ventana visible» y se cierra).
+reabierta() {
+    echo "$1"
+    grep -q 'ventana visible' <<< "$1" || fallo "la app no se ha vuelto a abrir tras actualizarse"
+    echo "La app se ha vuelto a abrir tras actualizarse"
+}
+
 orden="$1"; shift
 case "$orden" in
     programa)
@@ -112,6 +129,34 @@ case "$orden" in
         grep -qF "'$copia'" "$TMP/datos-appimage/$ID/menu-contextual" || fallo "el menú no apunta al AppImage"
         rm "$copia"
         menu_limpio "$TMP/datos-appimage" ;;
+    actualizar-paquete)
+        tipo="$1"
+        if [ "$tipo" = deb ]; then nuevo="$(readlink -f dist/prueba/*.deb)"; else nuevo="$(readlink -f dist/prueba/*.rpm)"; fi
+        config_ingles
+        salida="$(QT_QPA_PLATFORM=offscreen timeout 600 $ID --probar-actualizacion "$nuevo" \
+                  --config "$TMP/config-act.json" 2>&1)" || { echo "$salida"; fallo "no se ha podido actualizar"; }
+        reabierta "$salida"
+        if [ "$tipo" = deb ]; then revision="$(dpkg-query -W -f='${Version}' $ID)"; revision="${revision##*-}"
+        else revision="$(rpm -q --qf '%{RELEASE}' $ID)"; fi
+        [ "$revision" = 2 ] || fallo "sigue instalada la revisión $revision"
+        echo "Paquete actualizado a la revisión 2"
+        config_intacta ;;
+    actualizar-appimage)
+        version="$(basename "$1" | sed -E 's/^BajarSubtitulosESP-([0-9.]+)-x86_64\.AppImage$/\1/')"
+        mkdir -p "$TMP/apps"
+        viejo="$TMP/apps/BajarSubtitulosESP-$version-x86_64.AppImage"
+        nuevo="$TMP/apps/BajarSubtitulosESP-99.0.0-x86_64.AppImage"    # como lo deja la descarga, al lado
+        cp "$1" "$viejo"; cp "$1" "$nuevo"
+        chmod +x "$viejo"; chmod -x "$nuevo"
+        config_ingles
+        salida="$(APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=offscreen timeout 600 "$viejo" \
+                  --probar-actualizacion "$nuevo" --config "$TMP/config-act.json" 2>&1)" \
+            || { echo "$salida"; fallo "no se ha podido actualizar el AppImage"; }
+        reabierta "$salida"
+        [ ! -e "$viejo" ] || fallo "queda el AppImage viejo"
+        [ -x "$nuevo" ] || fallo "el AppImage nuevo no es ejecutable"
+        echo "AppImage sustituido por el nuevo"
+        config_intacta ;;
     desinstalado)
         if [ -d "$MENU_DATOS" ]; then menu_limpio "$MENU_DATOS"; fi
         quedan=""
@@ -122,5 +167,5 @@ case "$orden" in
         [ -z "$quedan" ] || fallo "la desinstalación ha dejado:$quedan"
         echo "Desinstalación limpia" ;;
     *)
-        sed -n '2,11p' "$0"; exit 1 ;;
+        sed -n '2,14p' "$0"; exit 1 ;;
 esac

@@ -138,6 +138,9 @@ def autoprueba(salida, con_red=False):
         if actualizar.version(__version__) is None:
             raise RuntimeError(f'versión no válida: {__version__}')
         actualizar._contexto_ssl()
+        if LINUX:
+            return (f'se actualiza como: {actualizar.tipo_linux()} · se instala sola: '
+                    f'{actualizar.puede_instalarse()} · descargas en {actualizar.carpeta_descargas()}')
         return (f'instalada con el instalador: {actualizar.instalada()} · '
                 f'modo: {actualizar.modo_instalacion()} · descargas en {actualizar.carpeta_descargas()}')
     paso('actualizaciones', actualizaciones)
@@ -367,6 +370,22 @@ def main(argv=None):
     _identificarse()
     if args.probar_actualizacion:
         from app import actualizar
+        if LINUX:
+            # Lo mismo que la app tras descargar: instala, la vuelve a abrir (que diga «ventana visible»
+            # y se cierre) y termina.
+            import re
+
+            from app import __version__
+            version = re.search(r'-(\d+\.\d+\.\d+)-', Path(args.probar_actualizacion).name)
+            try:
+                orden = actualizar.instalar_linux(Path(args.probar_actualizacion).resolve(),
+                                                  version.group(1) if version else __version__)
+            except (actualizar.ErrorActualizacion, actualizar.Cancelada) as e:
+                print(f'actualización fallida: {e!r}', file=sys.stderr)
+                return 1
+            print('actualización instalada; se vuelve a abrir:', orden)
+            return 0 if _reiniciar(args, lambda: None, programa=orden, pagina=False,
+                                   extra=['--medir-arranque']) else 1
         actualizar.lanzar_instalador(args.probar_actualizacion)
         time.sleep(3)          # como la app al cerrarse: el instalador tiene que esperar a que termine
         return 0
@@ -395,7 +414,7 @@ def main(argv=None):
         menu_contextual.asegurar(config, actualizar.instalada() or menu_contextual.instalada_con_paquete())
         _atender_pedidos(app, ventana, config, args)
     else:
-        ventana.al_reiniciar = lambda: _reiniciar(args, ventana.salir)
+        ventana.al_reiniciar = lambda **kw: _reiniciar(args, ventana.salir, **kw)
     if not (pedido and pedido['menu'] and config.menu_segundo_plano and unica and ventana.puede_ir_a_bandeja):
         ventana.mostrar()
         if unica and LINUX and not args.medir_arranque:
@@ -451,13 +470,14 @@ def _menu_aplicaciones(ventana, config):
     QTimer.singleShot(600, preguntar)
 
 
-def _reiniciar(args, salir, antes=None):
-    """Vuelve a abrir la app (en Configuración) para aplicar el idioma nuevo: lanza otra igual y cierra
-    esta. `antes` suelta lo que impediría a la nueva ser «la primera» (ver instancia.py)."""
+def _reiniciar(args, salir, antes=None, programa=None, pagina=True, extra=()):
+    """Vuelve a abrir la app (en Configuración, para aplicar el idioma nuevo; o ya actualizada, con
+    `programa`, en Linux): lanza otra y cierra esta. `antes` suelta lo que impediría a la nueva ser «la
+    primera» (ver instancia.py)."""
     import subprocess
 
     from app import menu_contextual
-    orden = menu_contextual.programa() + ['--pagina', 'ajustes']
+    orden = list(programa or menu_contextual.programa()) + (['--pagina', 'ajustes'] if pagina else []) + list(extra)
     if args.config:
         orden += ['--config', str(Path(args.config).resolve())]
     if args.demo:
@@ -495,7 +515,7 @@ def _atender_pedidos(app, ventana, config, args):
     def soltar_instancia():
         app.servidor.cerrar()
         instancia.soltar()
-    ventana.al_reiniciar = lambda: _reiniciar(args, salir, soltar_instancia)
+    ventana.al_reiniciar = lambda **kw: _reiniciar(args, salir, soltar_instancia, **kw)
     app.agrupador = instancia.Agrupador(parent=app)
     app.bandeja = Bandeja(ventana, icono_app(), salir, lambda: config.cerrar_a_bandeja, app)
     ventana.puede_ir_a_bandeja = QSystemTrayIcon.isSystemTrayAvailable()

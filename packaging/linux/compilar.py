@@ -10,7 +10,8 @@
 5. dist/BajarSubtitulosESP-<versión>-linux-x86_64.tar.gz: la carpeta tal cual.
 6. dist/BajarSubtitulosESP-<versión>-x86_64.AppImage: con el runtime nuevo de AppImage (no necesita
    libfuse2) y squashfs (mksquashfs, del paquete squashfs-tools).
-7. dist/BajarSubtitulosESP-<versión>-amd64.deb y -x86_64.rpm, con nfpm.
+7. dist/BajarSubtitulosESP-<versión>-amd64.deb y -x86_64.rpm, con nfpm (y en dist/prueba, los mismos como
+   revisión 2, para probar la actualización).
 
 El runtime de AppImage y nfpm se descargan (en packaging/build/herramientas) solo si coinciden con su
 SHA-256. Para que lo compilado valga en todos los Linux con glibc 2.34 o posterior, GitHub Actions compila
@@ -217,15 +218,20 @@ def paquetes(sistema):
         'deb': {'compression': 'xz'},
         'rpm': {'compression': 'zstd', 'summary': 'Subtítulos en castellano de España para series y películas'},
     }
-    archivo = BUILD / 'nfpm.yaml'
-    archivo.write_text(json.dumps(config, ensure_ascii=False, indent=1), encoding='utf-8')   # JSON es YAML
     binario = nfpm()
-    for formato, nombre in (('deb', f'{NOMBRE}-amd64.deb'), ('rpm', f'{NOMBRE}-x86_64.rpm')):
-        salida = DIST / nombre
-        salida.unlink(missing_ok=True)
-        ejecutar(binario, 'package', '--config', archivo, '--packager', formato, '--target', salida,
-                 stdout=subprocess.DEVNULL)
-        print(f'{salida.name}: {mb(tamano(salida))}')
+    # Además, para las pruebas de la actualización (no se publican): los mismos paquetes como revisión 2,
+    # que apt y dnf instalan encima de la 1 igual que harían con una versión nueva.
+    for carpeta, revision in ((DIST, '1'), (DIST / 'prueba', '2')):
+        carpeta.mkdir(parents=True, exist_ok=True)
+        archivo = BUILD / f'nfpm-{revision}.yaml'
+        archivo.write_text(json.dumps(dict(config, release=revision), ensure_ascii=False, indent=1),
+                           encoding='utf-8')                                  # JSON es YAML
+        for formato, nombre in (('deb', f'{NOMBRE}-amd64.deb'), ('rpm', f'{NOMBRE}-x86_64.rpm')):
+            salida = carpeta / nombre
+            salida.unlink(missing_ok=True)
+            ejecutar(binario, 'package', '--config', archivo, '--packager', formato, '--target', salida,
+                     stdout=subprocess.DEVNULL)
+            print(f'{salida.relative_to(DIST)}: {mb(tamano(salida))}')
 
 
 def main():

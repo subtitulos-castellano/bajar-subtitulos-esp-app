@@ -13,11 +13,15 @@ y lo ejecuta en silencio. Sin Qt: la ventana lo usa desde hilos aparte (ver vist
   `digest` de cada archivo de la Release o, si faltara, SHA256SUMS.txt de la misma Release).
 - La actualización solo se instala sola si la app se instaló con el instalador. La versión portable
   solo avisa y abre la página de descarga.
+- En Linux: el .deb y el .rpm se instalan con el gestor de paquetes (apt, dnf o zypper) a través de pkexec,
+  que pide la contraseña en una ventana del sistema; el AppImage se sustituye a sí mismo (se escribe al
+  lado y luego se renombra). El .tar.gz y el código fuente solo avisan.
 """
 import hashlib
 import json
 import os
 import re
+import shutil
 import ssl
 import subprocess
 import sys
@@ -32,7 +36,7 @@ from subtitulos.idioma import tr
 from subtitulos.texto import CONTROL
 
 from . import __version__
-from .plataforma import SISTEMA, WINDOWS
+from .plataforma import LINUX, SISTEMA, WINDOWS
 
 REPO = 'subtitulos-castellano/bajar-subtitulos-esp-app'
 URL_API = f'https://api.github.com/repos/{REPO}/releases?per_page=30'   # las más recientes primero
@@ -179,15 +183,25 @@ def _texto_plano(texto):
     return re.sub(r'\n{3,}', '\n\n', texto)
 
 
-def nombre_instalador(v, sistema=SISTEMA):
+# Linux: el archivo de la Release para cada forma de instalar la app.
+SUFIJOS_LINUX = {'deb': 'amd64.deb', 'rpm': 'x86_64.rpm', 'appimage': 'x86_64.AppImage'}
+_DESCARGABLE = re.compile(r'BajarSubtitulosESP-[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}-'
+                          r'(instalador\.exe|amd64\.deb|x86_64\.rpm|x86_64\.AppImage)')
+
+
+def nombre_instalador(v, sistema=SISTEMA, tipo=None):
     """El archivo de la Release con el que se actualiza la app en este sistema, o None si aquí la app
-    no se actualiza sola (solo avisa y abre la página de descarga)."""
+    no se actualiza sola (solo avisa y abre la página de descarga). En Linux depende de cómo se instaló
+    (`tipo`; por defecto, el de esta copia: ver tipo_linux)."""
     if sistema == 'windows':
         return f'BajarSubtitulosESP-{v}-instalador.exe'
+    if sistema == 'linux':
+        sufijo = SUFIJOS_LINUX.get(tipo or tipo_linux())
+        return f'BajarSubtitulosESP-{v}-{sufijo}' if sufijo else None
     return None
 
 
-def interpretar(datos, actual=__version__, sistema=SISTEMA):
+def interpretar(datos, actual=__version__, sistema=SISTEMA, tipo=None):
     """Respuesta de /releases (la lista) -> (Novedad o None si no hay nada nuevo para `sistema`, url de
     SHA256SUMS.txt de la última versión)."""
     if not isinstance(datos, list):
@@ -226,7 +240,7 @@ def interpretar(datos, actual=__version__, sistema=SISTEMA):
             continue                                     # solo archivos de las Releases de este repositorio
         if nombre == 'SHA256SUMS.txt':
             sumas = url
-        elif nombre == nombre_instalador(texto_v, sistema):
+        elif nombre == nombre_instalador(texto_v, sistema, tipo):
             digest = a.get('digest')
             sha = digest[7:].lower() if isinstance(digest, str) and digest.lower().startswith('sha256:') else ''
             tamano = a.get('size') if isinstance(a.get('size'), int) and not isinstance(a.get('size'), bool) else 0
@@ -270,6 +284,13 @@ def consultar(actual=__version__, sistema=SISTEMA):
 # ---------- Descarga ----------
 
 def carpeta_descargas():
+    """Windows: en la carpeta temporal del usuario. Linux: en su caché (~/.cache), y no en /tmp, que
+    comparten todos los usuarios: el paquete ya comprobado no debe poder cambiarlo nadie antes de que lo
+    instale el gestor de paquetes como administrador."""
+    if LINUX:
+        base = os.environ.get('XDG_CACHE_HOME', '')
+        base = Path(base) if os.path.isabs(base) else Path.home() / '.cache'
+        return base / 'bajar-subtitulos-esp' / 'actualizacion'
     return Path(tempfile.gettempdir()) / 'BajarSubtitulosESP-actualizacion'
 
 
@@ -277,22 +298,40 @@ def limpiar_descargas(carpeta=None):
     """Borra los instaladores de actualizaciones anteriores (el registro de la última se conserva)."""
     carpeta = Path(carpeta or carpeta_descargas())
     for f in carpeta.glob('*'):
-        if f.suffix.lower() in ('.exe', '.part'):
+        if f.suffix.lower() in ('.exe', '.deb', '.rpm', '.part'):
             try:
                 f.unlink()
             except OSError:
                 pass             # en uso (el instalador aún termina): la próxima vez
 
 
+def _sha256(ruta):
+    h = hashlib.sha256()
+    with open(ruta, 'rb') as f:
+        for bloque in iter(lambda: f.read(1024 * 1024), b''):
+            h.update(bloque)
+    return h.hexdigest()
+
+
 def descargar(archivo, carpeta=None, progreso=None, cancelada=None):
     """Descarga `archivo` comprobando su SHA-256 mientras llega. Devuelve la ruta del archivo ya
-    verificado; si no coincide, lo borra y lanza ErrorActualizacion."""
-    if not (archivo.sha256 and re.fullmatch(r'BajarSubtitulosESP-[0-9.]+-instalador\.exe', archivo.nombre)):
+    verificado; si no coincide, lo borra y lanza ErrorActualizacion. Si ya estaba descargado y comprobado
+    (se reintenta tras cancelar la contraseña, por ejemplo), no se vuelve a descargar."""
+    if not (archivo.sha256 and _DESCARGABLE.fullmatch(archivo.nombre)):
         raise ErrorActualizacion(tr('La actualización no tiene una huella SHA-256 con la que comprobarla.'))
+    if carpeta is None and LINUX and archivo.nombre.endswith('.AppImage'):
+        carpeta = _carpeta_appimage()       # junto al AppImage: luego se cambia por él de una vez (os.replace)
     carpeta = Path(carpeta or carpeta_descargas())
     carpeta.mkdir(parents=True, exist_ok=True)
+    if LINUX and carpeta == carpeta_descargas():
+        os.chmod(carpeta, 0o700)
     destino = carpeta / archivo.nombre
-    parcial = destino.with_name(destino.name + '.part')
+    try:
+        if destino.is_file() and _sha256(destino) == archivo.sha256:
+            return destino
+    except OSError:
+        pass
+    parcial = destino.with_name('.' + destino.name + '.part')
     h, hecho = hashlib.sha256(), 0
     try:
         try:
@@ -337,6 +376,122 @@ def instalada(exe=None):
     if exe is None and not getattr(sys, 'frozen', False):
         return False
     return (Path(exe or sys.executable).parent / 'unins000.exe').is_file()
+
+
+def puede_instalarse():
+    """True si esta copia se actualiza sola; si no, solo avisa y abre la página de descarga."""
+    if WINDOWS:
+        return instalada()
+    return LINUX and not motivo_sin_instalar()
+
+
+def motivo_sin_instalar():
+    """Linux: por qué esta copia no puede actualizarse sola ('' si puede)."""
+    tipo = tipo_linux()
+    if tipo is None:
+        return tr('Esta copia no se actualiza sola: descarga la nueva desde su página en GitHub.')
+    if tipo == 'appimage':
+        from .plataforma import linux
+        carpeta = linux.appimage().parent
+        if not os.access(carpeta, os.W_OK | os.X_OK):
+            return tr('No se puede escribir en la carpeta del AppImage: descarga la nueva desde su página en '
+                      'GitHub.')
+        return ''
+    if _orden_gestor(Path('paquete'), tipo) is None:
+        return tr('No se encuentra cómo instalar el paquete (apt, dnf o zypper, y pkexec): descarga la nueva '
+                  'desde su página en GitHub.')
+    return ''
+
+
+# ---------- Linux: instalar la actualización ----------
+
+def tipo_linux():
+    """Cómo se actualiza esta copia en Linux: 'deb', 'rpm', 'appimage', o None (el .tar.gz y el código
+    fuente solo avisan)."""
+    if not LINUX:
+        return None
+    from .plataforma import linux
+    instalacion = linux.instalacion()
+    if instalacion == 'appimage':
+        return 'appimage'
+    if instalacion == 'paquete':
+        return linux.formato_paquete()
+    return None
+
+
+# pkexec termina con 126 si se cierra la ventana de la contraseña y con 127 si no se autoriza.
+PKEXEC_CANCELADO = (126, 127)
+
+
+def _orden_gestor(ruta, tipo):
+    """La orden que instala el paquete `ruta` (con pkexec si no somos administrador), o None si falta algo.
+    apt y dnf instalan encima de la versión anterior; zypper necesita que acepte un paquete sin firmar."""
+    if tipo == 'deb':
+        apt = shutil.which('apt-get')
+        orden = [apt, 'install', '-y', str(ruta)] if apt else None
+    elif tipo == 'rpm':
+        dnf, zypper = shutil.which('dnf'), shutil.which('zypper')
+        if dnf:
+            orden = [dnf, 'install', '-y', str(ruta)]
+        elif zypper:
+            orden = [zypper, '--non-interactive', 'install', '--allow-unsigned-rpm', str(ruta)]
+        else:
+            orden = None
+    else:
+        orden = None
+    if orden is None or os.geteuid() == 0:
+        return orden
+    pkexec = shutil.which('pkexec')
+    return [pkexec] + orden if pkexec else None
+
+
+def _carpeta_appimage():
+    from .plataforma import linux
+    appimage = linux.appimage()
+    return appimage.parent if appimage else None
+
+
+def nombre_appimage_nuevo(actual, version_nueva, version_actual=__version__):
+    """El AppImage nuevo se llama como el que había, con la versión nueva si el nombre llevaba la suya."""
+    actual = Path(actual)
+    if version_actual in actual.name:
+        return actual.with_name(actual.name.replace(version_actual, version_nueva))
+    return actual
+
+
+def instalar_linux(ruta, version_nueva, tipo=None):
+    """Instala la actualización ya descargada y comprobada. Devuelve la orden con la que volver a abrir la
+    app. Lanza Cancelada si se cierra la ventana de la contraseña y ErrorActualizacion si falla."""
+    from . import menu_contextual
+    tipo = tipo or tipo_linux()
+    if tipo == 'appimage':
+        from .plataforma import linux
+        actual = linux.appimage()
+        nuevo = nombre_appimage_nuevo(actual, version_nueva)
+        try:
+            os.chmod(ruta, 0o755)
+            os.replace(ruta, nuevo)
+            if nuevo != actual:
+                actual.unlink(missing_ok=True)
+        except OSError as e:
+            raise ErrorActualizacion(tr('No se ha podido sustituir el AppImage ({error}).',
+                                        error=e.strerror or e)) from e
+        return [str(nuevo)]
+    orden = _orden_gestor(ruta, tipo)
+    if orden is None:
+        raise ErrorActualizacion(motivo_sin_instalar())
+    try:
+        r = subprocess.run(orden, capture_output=True, text=True, errors='replace', timeout=1800,
+                           stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise ErrorActualizacion(tr('No se ha podido abrir el gestor de paquetes ({error}).', error=e)) from e
+    if r.returncode in PKEXEC_CANCELADO and Path(orden[0]).name == 'pkexec':
+        raise Cancelada()
+    if r.returncode != 0:
+        detalle = [l.strip() for l in (r.stderr or r.stdout or '').splitlines() if l.strip()]
+        raise ErrorActualizacion(tr('El gestor de paquetes no ha podido instalarla (código {codigo}): {detalle}',
+                                    codigo=r.returncode, detalle=(detalle[-1] if detalle else '')[:300]))
+    return menu_contextual.programa()
 
 
 def modo_instalacion():

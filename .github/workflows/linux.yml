@@ -90,6 +90,12 @@ jobs:
             dist/*-linux-x86_64.tar.gz
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@v7
+        with:
+          name: BajarSubtitulosESP-linux-prueba
+          path: dist/prueba/
+          if-no-files-found: error
+
   # .deb y .rpm: instalar (el gestor de paquetes pone las dependencias), probar el paquete y el AppImage,
   # abrir la ventana y desinstalar. Las librerías se comprueban antes de instalar nada más (Xvfb, weston…).
   paquetes:
@@ -142,6 +148,11 @@ jobs:
           name: BajarSubtitulosESP-linux
           path: dist
 
+      - uses: actions/download-artifact@v7
+        with:
+          name: BajarSubtitulosESP-linux-prueba
+          path: dist/prueba
+
       - name: Instalar el paquete
         run: |
           case "${{ matrix.imagen }}" in
@@ -160,6 +171,11 @@ jobs:
         run: |
           packaging/linux/probar.sh menu bajar-subtitulos-esp
           packaging/linux/probar.sh menu-appimage dist/*.AppImage
+
+      - name: Actualizar como la app (el paquete, a la revisión 2; el AppImage, sustituyéndose)
+        run: |
+          packaging/linux/probar.sh actualizar-paquete ${{ matrix.tipo }}
+          packaging/linux/probar.sh actualizar-appimage dist/*.AppImage
 
       - name: Abrir la ventana
         run: |
@@ -210,5 +226,6 @@ jobs:
         run: |
           packaging/linux/probar.sh appimage dist/*.AppImage
           packaging/linux/probar.sh menu-appimage dist/*.AppImage
+          packaging/linux/probar.sh actualizar-appimage dist/*.AppImage
           pacman -S --noconfirm --needed -q xorg-server-xvfb > /dev/null
           packaging/linux/probar.sh x11 dist/*.AppImage --appimage-extract-and-run

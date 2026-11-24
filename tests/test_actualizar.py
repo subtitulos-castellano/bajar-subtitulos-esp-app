@@ -119,8 +119,17 @@ class Interpretar(unittest.TestCase):
         self.assertLessEqual(len(n.notas), act.MAX_NOTAS + 2)
         self.assertTrue(n.notas.endswith('…'))
 
-    def test_en_linux_aun_no_se_instala_sola(self):
-        n, _ = interpretar(release(), sistema='linux')
+    def test_en_linux_segun_como_se_instalo(self):
+        d = release()
+        for sufijo in ('amd64.deb', 'x86_64.rpm', 'x86_64.AppImage', 'linux-x86_64.tar.gz'):
+            d['assets'].append({'name': f'BajarSubtitulosESP-1.0.2-{sufijo}', 'size': 5, 'digest': f'sha256:{SHA}',
+                                'browser_download_url': f'{REPO}/releases/download/v1.0.2/BajarSubtitulosESP-1.0.2-{sufijo}'})
+        for tipo, nombre in (('deb', 'BajarSubtitulosESP-1.0.2-amd64.deb'), ('rpm', 'BajarSubtitulosESP-1.0.2-x86_64.rpm'),
+                             ('appimage', 'BajarSubtitulosESP-1.0.2-x86_64.AppImage')):
+            n, _ = act.interpretar([d], actual='1.0.0', sistema='linux', tipo=tipo)
+            self.assertEqual(n.instalador.nombre, nombre)
+        with mock.patch.object(act, 'tipo_linux', return_value=None):      # .tar.gz o desde el código
+            n, _ = interpretar(d, sistema='linux')
         self.assertEqual(n.version, '1.0.2')
         self.assertIsNone(n.instalador)                     # solo se ofrece abrir la página
 
@@ -304,6 +313,22 @@ class Descargar(unittest.TestCase):
             act.descargar(a, self.carpeta)
         self.assertEqual(list(self.carpeta.iterdir()), [])
 
+    def test_ya_descargada_y_comprobada_no_se_repite(self):
+        ruta = act.descargar(self.archivo(), self.carpeta)
+        with mock.patch.object(act, '_abrir', side_effect=AssertionError('no debería descargar')):
+            self.assertEqual(act.descargar(self.archivo(), self.carpeta), ruta)
+        ruta.write_bytes(b'cambiado')                                      # ya no coincide: se descarga
+        self.assertEqual(act.descargar(self.archivo(), self.carpeta).read_bytes(), _Servidor.contenido)
+
+    def test_nombres_de_linux(self):
+        for sufijo in ('amd64.deb', 'x86_64.rpm', 'x86_64.AppImage'):
+            self.assertTrue(act.descargar(self.archivo(nombre=f'BajarSubtitulosESP-1.0.2-{sufijo}'), self.carpeta)
+                            .is_file())
+        for malo in ('BajarSubtitulosESP-1.0.2-amd64.deb.sh', 'BajarSubtitulosESP-1.0.2-x86_64.AppImage/../x',
+                     'otro-1.0.2-amd64.deb'):
+            with self.assertRaises(act.ErrorActualizacion):
+                act.descargar(self.archivo(nombre=malo), self.carpeta)
+
     def test_limpiar_descargas(self):
         for nombre in ('BajarSubtitulosESP-1.0.1-instalador.exe', 'x.exe.part', 'instalacion.log'):
             (self.carpeta / nombre).write_text('x')
@@ -315,7 +340,12 @@ class Descargar(unittest.TestCase):
 class Instalar(unittest.TestCase):
     def test_nombre_del_instalador(self):
         self.assertEqual(act.nombre_instalador('1.4.0', 'windows'), 'BajarSubtitulosESP-1.4.0-instalador.exe')
-        self.assertIsNone(act.nombre_instalador('1.4.0', 'linux'))
+        self.assertEqual(act.nombre_instalador('1.4.0', 'linux', 'deb'), 'BajarSubtitulosESP-1.4.0-amd64.deb')
+        self.assertEqual(act.nombre_instalador('1.4.0', 'linux', 'rpm'), 'BajarSubtitulosESP-1.4.0-x86_64.rpm')
+        self.assertEqual(act.nombre_instalador('1.4.0', 'linux', 'appimage'),
+                         'BajarSubtitulosESP-1.4.0-x86_64.AppImage')
+        with mock.patch.object(act, 'tipo_linux', return_value=None):
+            self.assertIsNone(act.nombre_instalador('1.4.0', 'linux'))
 
     def test_argumentos(self):
         args = act.argumentos_instalador(Path('C:/t/inst.exe'), 'usuario', Path('C:/t/instalacion.log'))
@@ -344,3 +374,93 @@ class Instalar(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
+
+
+@unittest.skipUnless(sys.platform.startswith('linux'), 'solo en Linux')
+class InstalarEnLinux(unittest.TestCase):
+    def setUp(self):
+        self._d = tempfile.TemporaryDirectory()
+        self.addCleanup(self._d.cleanup)
+        self.d = Path(self._d.name)
+
+    def which(self, *programas):
+        return mock.patch.object(act.shutil, 'which', lambda p: f'/usr/bin/{p}' if p in programas else None)
+
+    def test_orden_del_gestor_de_paquetes(self):
+        deb, rpm = Path('/c/a.deb'), Path('/c/a.rpm')
+        with mock.patch.object(act.os, 'geteuid', return_value=1000):
+            with self.which('apt-get', 'pkexec'):
+                self.assertEqual(act._orden_gestor(deb, 'deb'),
+                                 ['/usr/bin/pkexec', '/usr/bin/apt-get', 'install', '-y', '/c/a.deb'])
+            with self.which('dnf', 'zypper', 'pkexec'):                   # dnf antes que zypper
+                self.assertEqual(act._orden_gestor(rpm, 'rpm')[1:], ['/usr/bin/dnf', 'install', '-y', '/c/a.rpm'])
+            with self.which('zypper', 'pkexec'):
+                self.assertIn('--allow-unsigned-rpm', act._orden_gestor(rpm, 'rpm'))
+            with self.which('apt-get'):                                   # sin pkexec no se puede
+                self.assertIsNone(act._orden_gestor(deb, 'deb'))
+            with self.which('pkexec'):
+                self.assertIsNone(act._orden_gestor(rpm, 'rpm'))
+        with mock.patch.object(act.os, 'geteuid', return_value=0), self.which('apt-get'):
+            self.assertEqual(act._orden_gestor(deb, 'deb')[0], '/usr/bin/apt-get')    # ya es administrador
+
+    def resultado(self, codigo, stderr=''):
+        return mock.Mock(returncode=codigo, stdout='', stderr=stderr)
+
+    def test_paquete(self):
+        paquete = self.d / 'BajarSubtitulosESP-1.5.0-x86_64.rpm'
+        with mock.patch.object(act.os, 'geteuid', return_value=1000), self.which('dnf', 'pkexec'):
+            with mock.patch.object(act.subprocess, 'run', return_value=self.resultado(0)) as run, \
+                    mock.patch('app.menu_contextual.programa', return_value=['/opt/bajar-subtitulos-esp/x']):
+                self.assertEqual(act.instalar_linux(paquete, '1.5.0', 'rpm'), ['/opt/bajar-subtitulos-esp/x'])
+            self.assertEqual(run.call_args.args[0][:3], ['/usr/bin/pkexec', '/usr/bin/dnf', 'install'])
+            for codigo in act.PKEXEC_CANCELADO:                             # cerrada la ventana de la contraseña
+                with mock.patch.object(act.subprocess, 'run', return_value=self.resultado(codigo)), \
+                        self.assertRaises(act.Cancelada):
+                    act.instalar_linux(paquete, '1.5.0', 'rpm')
+            with mock.patch.object(act.subprocess, 'run',
+                                   return_value=self.resultado(1, 'Error: transacción\nNo hay sitio en disco\n')), \
+                    self.assertRaisesRegex(act.ErrorActualizacion, r'código 1\): No hay sitio en disco'):
+                act.instalar_linux(paquete, '1.5.0', 'rpm')
+
+    def test_appimage(self):
+        """Se escribe al lado, se renombra encima y, si el nombre llevaba la versión, se borra el viejo."""
+        from app.plataforma import linux
+        viejo = self.d / f'BajarSubtitulosESP-{act.__version__}-x86_64.AppImage'
+        viejo.write_text('viejo')
+        nuevo = self.d / 'BajarSubtitulosESP-99.0.0-x86_64.AppImage'
+        nuevo.write_text('nuevo')
+        with mock.patch.object(linux, 'appimage', return_value=viejo):
+            self.assertEqual(act.instalar_linux(nuevo, '99.0.0', 'appimage'), [str(nuevo)])
+        self.assertFalse(viejo.exists())
+        self.assertEqual(nuevo.read_text(), 'nuevo')
+        self.assertTrue(nuevo.stat().st_mode & 0o100)
+        # Con otro nombre (sin la versión), se queda con ese nombre.
+        propio = self.d / 'Subtitulos.AppImage'
+        propio.write_text('viejo')
+        otro = self.d / 'BajarSubtitulosESP-99.0.1-x86_64.AppImage'
+        otro.write_text('nuevo')
+        with mock.patch.object(linux, 'appimage', return_value=propio):
+            self.assertEqual(act.instalar_linux(otro, '99.0.1', 'appimage'), [str(propio)])
+        self.assertEqual(propio.read_text(), 'nuevo')
+        self.assertFalse(otro.exists())
+
+    def test_motivos_para_solo_avisar(self):
+        from app.plataforma import linux
+        with mock.patch.object(act, 'tipo_linux', return_value=None):
+            self.assertIn('no se actualiza sola', act.motivo_sin_instalar())
+            self.assertFalse(act.puede_instalarse())
+        with mock.patch.object(act, 'tipo_linux', return_value='appimage'), \
+                mock.patch.object(linux, 'appimage', return_value=self.d / 'B.AppImage'):
+            self.assertEqual(act.motivo_sin_instalar(), '')
+            self.assertTrue(act.puede_instalarse())
+            with mock.patch.object(act.os, 'access', return_value=False):
+                self.assertIn('No se puede escribir', act.motivo_sin_instalar())
+        with mock.patch.object(act, 'tipo_linux', return_value='deb'), mock.patch.object(act.os, 'geteuid', return_value=1000):
+            with self.which('apt-get', 'pkexec'):
+                self.assertTrue(act.puede_instalarse())
+            with self.which('apt-get'):
+                self.assertIn('pkexec', act.motivo_sin_instalar())
+
+    def test_descargas_en_la_cache_del_usuario(self):
+        with mock.patch.dict(act.os.environ, {'XDG_CACHE_HOME': str(self.d)}):
+            self.assertEqual(act.carpeta_descargas(), self.d / 'bajar-subtitulos-esp' / 'actualizacion')

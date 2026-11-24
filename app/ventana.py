@@ -13,6 +13,7 @@ from . import actualizar, iconos, tema
 from .componentes import IconoLabel, color
 from .credenciales import credenciales_proveedores
 from .demo import TrabajadorDemo
+from .plataforma import LINUX
 from .trabajador import Trabajador
 from .vista_actualizacion import Actualizador, AvisoActualizacion
 from .vista_ajustes import VistaAjustes, resumen_preferencias
@@ -151,6 +152,9 @@ class Ventana(QMainWindow):
         self.actualizador.progreso.connect(self.aviso.poner_progreso)
         self.actualizador.descargado.connect(self._instalar)
         self.actualizador.fallo_descarga.connect(self._fallo_descarga)
+        self.actualizador.instalado.connect(self._reabrir_actualizada)
+        self.actualizador.instalacion_cancelada.connect(self._instalacion_cancelada)
+        self.actualizador.fallo_instalacion.connect(self._fallo_descarga)
         self.aviso.actualizar.connect(self._actualizar)
         self.aviso.descargar_pagina.connect(self._abrir_pagina_novedad)
         self.aviso.novedades.connect(self._abrir_pagina_version)
@@ -469,13 +473,23 @@ class Ventana(QMainWindow):
         self.ajustes.poner_estado_version(tr('Hay una versión nueva: {version}.', version=v))
         if self.actualizador.descargando or self.aviso.estado == 'instalando':
             return
-        if novedad.instalador and actualizar.instalada():
-            self._mostrar_aviso('disponible', novedad)
+        if novedad.instalador and actualizar.puede_instalarse():
+            self._mostrar_aviso('disponible', novedad, self._como_se_instala())
+        elif novedad.instalador and LINUX:
+            self._mostrar_aviso('portable', novedad, actualizar.motivo_sin_instalar())
         elif novedad.instalador:
             self._mostrar_aviso('portable', novedad, tr('Estás usando la versión portable: descarga la nueva '
                                                         'desde su página en GitHub.'))
         else:
             self._mostrar_aviso('portable', novedad)
+
+    @staticmethod
+    def _como_se_instala():
+        """Linux, .deb y .rpm: lo instala el gestor de paquetes, que pide la contraseña ('' si no)."""
+        if actualizar.tipo_linux() in ('deb', 'rpm'):
+            return tr('Se descarga, se comprueba que es la publicada en GitHub y la instala el gestor de '
+                      'paquetes, que te pedirá tu contraseña. La app se volverá a abrir sola.')
+        return ''
 
     def _al_dia(self, manual):
         self.ajustes.poner_estado_version(tr('Tienes la última versión ({version}).', version=VERSION))
@@ -503,6 +517,13 @@ class Ventana(QMainWindow):
         if self.trabajador is not None:        # no debería pasar: durante una búsqueda no se puede pulsar
             self._mostrar_aviso('disponible', self.novedad)
             return
+        if LINUX:
+            paquete = actualizar.tipo_linux() in ('deb', 'rpm')
+            self._mostrar_aviso('instalando', self.novedad, tr(
+                'Escribe tu contraseña en la ventana del sistema. Después, la app se volverá a abrir sola.')
+                if paquete else '')
+            self.actualizador.instalar_linux(ruta, self.novedad.version)
+            return
         self._mostrar_aviso('instalando', self.novedad)
         try:
             actualizar.lanzar_instalador(ruta)
@@ -511,6 +532,15 @@ class Ventana(QMainWindow):
                                 tr('No se ha podido abrir el instalador ({error}).', error=e.strerror or e))
             return
         self.salir()                            # guarda la configuración; el instalador espera a que termine
+
+    def _reabrir_actualizada(self, orden):
+        """Linux: ya instalada; se abre la versión nueva y se cierra esta."""
+        if self.al_reiniciar is None or not self.al_reiniciar(programa=orden, pagina=False):
+            self.salir()
+
+    def _instalacion_cancelada(self):
+        self._mostrar_aviso('error', self.novedad, tr('No se ha instalado porque se ha cancelado la contraseña. '
+                                                      'La app sigue como estaba.'))
 
     def _abrir_pagina_novedad(self):
         if self.novedad:

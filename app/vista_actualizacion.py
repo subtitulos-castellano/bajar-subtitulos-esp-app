@@ -23,6 +23,9 @@ class Actualizador(QObject):
     progreso = Signal(int, int)        # bytes descargados, total
     descargado = Signal(object)        # Path del instalador ya verificado
     fallo_descarga = Signal(str)
+    instalado = Signal(object)         # Linux: la orden con la que volver a abrir la app ya actualizada
+    instalacion_cancelada = Signal()   # Linux: se ha cerrado la ventana de la contraseña
+    fallo_instalacion = Signal(str)
 
     def __init__(self, config, parent=None):
         super().__init__(parent)
@@ -92,6 +95,24 @@ class Actualizador(QObject):
                 self.descargado.emit(ruta)
 
         threading.Thread(target=hilo, name='descargar-actualizacion', daemon=True).start()
+
+    def instalar_linux(self, ruta, version):
+        """Linux: instala en un hilo (el gestor de paquetes espera a la contraseña y tarda un poco)."""
+        def hilo():
+            try:
+                orden = actualizar.instalar_linux(ruta, version)
+            except actualizar.Cancelada:
+                self.instalacion_cancelada.emit()
+                return
+            except actualizar.ErrorActualizacion as e:
+                self.fallo_instalacion.emit(str(e))
+                return
+            except Exception as e:  # noqa: BLE001
+                self.fallo_instalacion.emit(tr('Error inesperado al instalar ({error}).', error=type(e).__name__))
+                return
+            self.instalado.emit(orden)
+
+        threading.Thread(target=hilo, name='instalar-actualizacion', daemon=True).start()
 
     def cancelar(self):
         self._cancelar.set()
@@ -186,8 +207,8 @@ class AvisoActualizacion(QFrame):
         self.icono.poner('aviso' if estado == 'error' else 'actualizar')
         if estado == 'disponible':
             self.titulo.setText(tr('Hay una versión nueva: {version}', version=v))
-            self.detalle.setText(tr('Se descarga, se comprueba que es la publicada en GitHub y se instala sola. '
-                                    'La app se cerrará y se volverá a abrir.'))
+            self.detalle.setText(mensaje or tr('Se descarga, se comprueba que es la publicada en GitHub y se '
+                                               'instala sola. La app se cerrará y se volverá a abrir.'))
             self.b_accion.setText(tr('Actualizar'))
         elif estado == 'portable':
             self.titulo.setText(tr('Hay una versión nueva: {version}', version=v))
@@ -198,7 +219,7 @@ class AvisoActualizacion(QFrame):
             self.detalle.setText(mensaje or tr('Comprobando la huella SHA-256 mientras se descarga.'))
         elif estado == 'instalando':
             self.titulo.setText(tr('Instalando la versión {version}…', version=v))
-            self.detalle.setText(tr('La app se cierra ahora y se volverá a abrir sola en unos segundos.'))
+            self.detalle.setText(mensaje or tr('La app se cierra ahora y se volverá a abrir sola en unos segundos.'))
         elif estado == 'error':
             self.titulo.setText(tr('No se ha podido actualizar'))
             self.detalle.setText(mensaje)
