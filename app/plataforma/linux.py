@@ -1,5 +1,6 @@
 """Lo propio de Linux (escritorios freedesktop: KDE, GNOME, Cinnamon, XFCE…, con Wayland o X11)."""
 import os
+import platform
 import re
 import sys
 import tempfile
@@ -8,6 +9,12 @@ from pathlib import Path
 # Nombre del archivo .desktop de la app (sin «.desktop»): con él, el escritorio le pone su icono en la
 # barra de tareas (en Wayland, es el app_id de la ventana).
 ID_ESCRITORIO = 'bajar-subtitulos-esp'
+
+
+def en_wsl():
+    """True en WSL (Linux dentro de Windows, con las ventanas en WSLg). Ahí no se puede arrastrar desde el
+    Explorador de Windows a la app."""
+    return bool(os.environ.get('WSL_DISTRO_NAME')) or 'microsoft' in platform.release().lower()
 
 
 def carpeta_config():

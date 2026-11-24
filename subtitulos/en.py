@@ -99,6 +99,11 @@ TEXTOS = {
     'Modo simulación activado: se mostrará qué se haría, pero no se escribirá ningún archivo.':
         'Simulation mode on: it will show what would be done, but no file will be written.',
     'Arrastra aquí un vídeo o una carpeta': 'Drag a video or a folder here',
+    'Elige un vídeo o una carpeta': 'Choose a video or a folder',
+    'Desde WSL no se puede arrastrar desde Windows. Se buscan los subtítulos nada más elegirlos, sin '
+    'preguntas. Las carpetas se revisan con todas sus subcarpetas.':
+        'In WSL you cannot drag from Windows. Subtitles are searched for as soon as you choose them, no '
+        'questions asked. Folders are checked with all their subfolders.',
     'Se buscan los subtítulos nada más soltarlo, sin preguntas. Las carpetas se revisan con todas sus subcarpetas.':
         'Subtitles are searched for as soon as you drop it, no questions asked. Folders are checked with all '
         'their subfolders.',

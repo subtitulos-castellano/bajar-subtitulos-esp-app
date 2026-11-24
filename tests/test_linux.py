@@ -94,6 +94,18 @@ class Certificados(unittest.TestCase):
 
 
 @unittest.skipUnless(LINUX, 'solo en Linux')
+class WSL(unittest.TestCase):
+    def test_deteccion(self):
+        with mock.patch.dict(os.environ, {'WSL_DISTRO_NAME': 'Ubuntu'}):
+            self.assertTrue(linux.en_wsl())
+        with mock.patch.dict(os.environ, {'WSL_DISTRO_NAME': ''}):
+            with mock.patch('platform.release', return_value='6.18.58.1-microsoft-standard-WSL2'):
+                self.assertTrue(linux.en_wsl())
+            with mock.patch('platform.release', return_value='6.12.0-264.17.1.el10_3.x86_64'):
+                self.assertFalse(linux.en_wsl())
+
+
+@unittest.skipUnless(LINUX, 'solo en Linux')
 class Carpetas(unittest.TestCase):
     def test_config_xdg(self):
         with mock.patch.dict(os.environ, {'XDG_CONFIG_HOME': '/tmp/xdg-prueba'}):

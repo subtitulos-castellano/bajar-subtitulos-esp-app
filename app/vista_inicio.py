@@ -13,6 +13,7 @@ from subtitulos.idioma import tr
 from subtitulos.texto import visible
 
 from . import iconos, tema
+from .plataforma import LINUX
 from .componentes import (BarraProgreso, BarraSegmentada, DelegadoEstado, FiltroCategorias, IconoLabel,
                           ModeloResultados, TarjetaContador)
 
@@ -35,6 +36,13 @@ def boton(texto, icono=None, nombre=None):
     b._icono = icono
     return b
 
+
+
+def en_wsl():
+    if not LINUX:
+        return False
+    from .plataforma import linux
+    return linux.en_wsl()
 
 class Banner(QFrame):
     """Aviso discreto (simulación, prototipo)."""
@@ -181,11 +189,18 @@ class VistaInicio(QWidget):
         cl.addWidget(self.zona_icono, 0, Qt.AlignCenter)
         z.addWidget(circulo, 0, Qt.AlignHCenter)
         z.addSpacing(18)
-        self.zona_titulo = etiqueta(tr('Arrastra aquí un vídeo o una carpeta'), 'zonaTitulo')
+        if en_wsl():     # WSLg no pasa lo que se arrastra desde Windows: se invita a usar los botones
+            self._titulo_zona = tr('Elige un vídeo o una carpeta')
+            texto = tr('Desde WSL no se puede arrastrar desde Windows. Se buscan los subtítulos nada más '
+                       'elegirlos, sin preguntas. Las carpetas se revisan con todas sus subcarpetas.')
+        else:
+            self._titulo_zona = tr('Arrastra aquí un vídeo o una carpeta')
+            texto = tr('Se buscan los subtítulos nada más soltarlo, sin preguntas. '
+                       'Las carpetas se revisan con todas sus subcarpetas.')
+        self.zona_titulo = etiqueta(self._titulo_zona, 'zonaTitulo')
         z.addWidget(self.zona_titulo, 0, Qt.AlignHCenter)
         z.addSpacing(6)
-        self.zona_texto = etiqueta(tr('Se buscan los subtítulos nada más soltarlo, sin preguntas. '
-                                      'Las carpetas se revisan con todas sus subcarpetas.'), 'zonaTexto')
+        self.zona_texto = etiqueta(texto, 'zonaTexto')
         self.zona_texto.setAlignment(Qt.AlignCenter)
         z.addWidget(self.zona_texto, 0, Qt.AlignHCenter)
         z.addSpacing(20)
@@ -218,8 +233,7 @@ class VistaInicio(QWidget):
         self.zona.setProperty('activa', activo)
         self.zona.style().unpolish(self.zona)
         self.zona.style().polish(self.zona)
-        self.zona_titulo.setText(tr('Suelta para buscar subtítulos') if activo
-                                 else tr('Arrastra aquí un vídeo o una carpeta'))
+        self.zona_titulo.setText(tr('Suelta para buscar subtítulos') if activo else self._titulo_zona)
 
     def poner_preferencias(self, texto, simulacion):
         self.resumen_opciones.setText(texto)

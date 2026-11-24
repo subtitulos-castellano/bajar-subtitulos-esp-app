@@ -290,6 +290,34 @@ class TrabajadorReal(test_nucleo.ConSimulacion):
         self.assertEqual(s['errores'], ['PermissionError: acceso denegado'])
 
 
+class ZonaDeSoltar(unittest.TestCase):
+    """En WSL (WSLg) no se puede arrastrar desde Windows: la pantalla principal invita a usar los botones."""
+    def _inicio(self, wsl):
+        from app import vista_inicio
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        with mock.patch.object(vista_inicio, 'en_wsl', return_value=wsl):
+            v = Ventana(Config(Path(d.name) / 'config.json'))
+        self.addCleanup(v.close)
+        return v.inicio
+
+    def test_normal(self):
+        inicio = self._inicio(False)
+        self.assertEqual(inicio.zona_titulo.text(), 'Arrastra aquí un vídeo o una carpeta')
+        inicio.poner_arrastrando(True)
+        self.assertEqual(inicio.zona_titulo.text(), 'Suelta para buscar subtítulos')
+        inicio.poner_arrastrando(False)
+        self.assertEqual(inicio.zona_titulo.text(), 'Arrastra aquí un vídeo o una carpeta')
+
+    def test_wsl(self):
+        inicio = self._inicio(True)
+        self.assertEqual(inicio.zona_titulo.text(), 'Elige un vídeo o una carpeta')
+        self.assertIn('WSL', inicio.zona_texto.text())
+        inicio.poner_arrastrando(True)              # entre programas de Linux sí se puede
+        inicio.poner_arrastrando(False)
+        self.assertEqual(inicio.zona_titulo.text(), 'Elige un vídeo o una carpeta')
+
+
 class VentanaCompleta(test_nucleo.ConSimulacion):
     def test_soltar_procesa_y_muestra_el_resumen(self):
         with tempfile.TemporaryDirectory() as d:
