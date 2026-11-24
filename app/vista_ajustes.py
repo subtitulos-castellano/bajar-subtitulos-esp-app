@@ -309,6 +309,21 @@ class VistaAjustes(QWidget):
         self.bandeja.toggled.connect(self._bandeja)
         self.ayuda_bandeja = fila.findChild(QLabel, 'ayuda')
         self._texto_bandeja = self.ayuda_bandeja.text()
+        # Solo en el AppImage (los .deb y .rpm ya la ponen al instalarse).
+        self.appimage = None
+        if LINUX:
+            from .plataforma import linux
+            self.appimage = linux.appimage()
+        if self.appimage:
+            fila = t.fila(FilaOpcion(tr('Mostrar en el menú de aplicaciones'),
+                                     tr('Para abrir la app desde el menú, como cualquier programa. Si mueves el '
+                                        'AppImage a otra carpeta, ábrelo una vez desde allí y se corrige solo.')))
+            self.menu_apps = fila.control
+            self.ayuda_menu_apps = fila.findChild(QLabel, 'ayuda')
+            self._texto_menu_apps = self.ayuda_menu_apps.text()
+            from .plataforma import menu_aplicaciones
+            self.menu_apps.setChecked(menu_aplicaciones.anadida())
+            self.menu_apps.toggled.connect(self._menu_apps)
         temas = QWidget()
         tl = QHBoxLayout(temas)
         tl.setContentsMargins(0, 0, 0, 0)
@@ -540,7 +555,10 @@ class VistaAjustes(QWidget):
                                     'sus subcarpetas. En uno o varios vídeos: «Bajar subtítulos».')))
         self.menu = fila.control
         self.estado_menu = fila.findChild(QLabel, 'ayuda')
-        if menu_contextual.disponible() and not actualizar.instalada():
+        if LINUX:
+            self.estado_menu.setText(self.estado_menu.text() + ' ' + tr('En Nautilus (GNOME) está dentro de '
+                                                                         '«Scripts».'))
+        if WINDOWS and not actualizar.instalada():
             self.estado_menu.setText(self.estado_menu.text() + ' ' + tr('Versión portable: antes de borrar o '
                                                                          'mover su carpeta, desactívalo aquí.'))
         self._texto_menu = self.estado_menu.text()
@@ -570,8 +588,7 @@ class VistaAjustes(QWidget):
         else:
             self.menu.setEnabled(False)
             self.fila_modo_menu.setVisible(False)
-            self.estado_menu.setText(tr('Todavía no está disponible en Linux: llegará en una próxima versión.')
-                                     if LINUX else tr('Solo en Windows.'))
+            self.estado_menu.setText(tr('Solo en Windows y Linux.'))
         self.menu.toggled.connect(self._menu)
         return t
 
@@ -596,9 +613,26 @@ class VistaAjustes(QWidget):
         self.bandeja.setChecked(self.config.cerrar_a_bandeja and disponible)
         self.bandeja.blockSignals(False)
         self.bandeja.setEnabled(disponible)
+        # «En segundo plano» deja la app solo con el icono junto al reloj: sin él, siempre con ventana.
+        self.fila_modo_menu.setVisible(disponible and menu_contextual.disponible())
         self.ayuda_bandeja.setText(self._texto_bandeja if disponible else tr(
             'No disponible: este escritorio no muestra iconos junto al reloj. En GNOME se activan con la '
             'extensión «AppIndicator and KStatusNotifierItem Support».'))
+
+    def _menu_apps(self, activo):
+        from .plataforma import menu_aplicaciones
+        try:
+            menu_aplicaciones.anadir(self.appimage) if activo else menu_aplicaciones.quitar()
+        except OSError as e:
+            self.menu_apps.blockSignals(True)
+            self.menu_apps.setChecked(not activo)
+            self.menu_apps.blockSignals(False)
+            self.ayuda_menu_apps.setText(tr('No se ha podido cambiar el menú de aplicaciones ({error}).',
+                                            error=e.strerror or e))
+            return
+        self.ayuda_menu_apps.setText(self._texto_menu_apps)
+        self.config.menu_aplicaciones = activo
+        self.config.guardar()
 
     def _bandeja(self, activo):
         self.config.cerrar_a_bandeja = activo

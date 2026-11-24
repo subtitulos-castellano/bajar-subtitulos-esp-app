@@ -301,13 +301,25 @@ TEXTOS = {
     'mientras busca (para ver el progreso o cancelar) y un aviso con el resumen al terminar.':
         'Show the window: as when dragging onto the app. In the background: no window; just an icon next to the '
         'clock while searching (to see the progress or cancel) and a notification with the summary at the end.',
-    'Solo en Windows.': 'Windows only.',
+    'Solo en Windows y Linux.': 'Windows and Linux only.',
+    'Mostrar en el menú de aplicaciones': 'Show in the applications menu',
+    'Para abrir la app desde el menú, como cualquier programa. Si mueves el AppImage a otra carpeta, ábrelo '
+    'una vez desde allí y se corrige solo.':
+        'To open the app from the menu, like any other program. If you move the AppImage to another folder, '
+        'open it once from there and it fixes itself.',
+    'No se ha podido cambiar el menú de aplicaciones ({error}).':
+        'The applications menu could not be changed ({error}).',
+    'Menú de aplicaciones': 'Applications menu',
+    '¿Añadir Bajar Subtítulos ESP al menú de aplicaciones? Así podrás abrirla desde allí, como cualquier '
+    'programa. Se puede cambiar después en Configuración.':
+        'Add Bajar Subtítulos ESP to the applications menu? You will be able to open it from there, like any '
+        'other program. You can change this later in Settings.',
+    'En Nautilus (GNOME) está dentro de «Scripts».': 'In Nautilus (GNOME) it is inside "Scripts".',
+    'Bajar subtítulos (solo esta carpeta)': 'Get subtitles (this folder only)',
     'No disponible: este escritorio no muestra iconos junto al reloj. En GNOME se activan con la '
     'extensión «AppIndicator and KStatusNotifierItem Support».':
         'Not available: this desktop does not show icons next to the clock. In GNOME, they are enabled with '
         'the "AppIndicator and KStatusNotifierItem Support" extension.',
-    'Todavía no está disponible en Linux: llegará en una próxima versión.':
-        'Not available on Linux yet: it will come in a future version.',
     'No se ha podido cambiar el menú contextual ({error}).': 'The context menu could not be changed ({error}).',
     'Actualizaciones': 'Updates',
     'Buscar actualizaciones automáticamente': 'Check for updates automatically',

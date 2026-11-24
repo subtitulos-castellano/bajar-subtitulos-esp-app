@@ -73,6 +73,11 @@ class SinSubcarpetas(test_nucleo.ConSimulacion):
 
 
 class ArgumentosDelExplorador(unittest.TestCase):
+    def setUp(self):
+        parche = mock.patch.object(mc, 'WINDOWS', True)       # las rutas que pasa el Explorador de Windows
+        parche.start()
+        self.addCleanup(parche.stop)
+
     def test_raiz_de_una_unidad(self):
         """"%V" en la raíz de una unidad llega como D:" (la barra escapa la comilla)."""
         self.assertEqual(str(mc.ruta_de_argumento('D:"')), str(Path('D:\\')))
@@ -90,6 +95,18 @@ class ArgumentosDelExplorador(unittest.TestCase):
         self.assertEqual(main._pedido(ap)['recursivo'], True)
         ap.menu_archivos, ap.rutas = None, ['a.mkv']
         self.assertFalse(main._pedido(ap)['menu'])
+
+    def test_linux_varias_rutas_y_relativas(self):
+        """Los gestores de archivos de Linux pasan todo lo seleccionado junto; los scripts de Nautilus, con
+        rutas relativas a la carpeta abierta."""
+        with mock.patch.object(mc, 'WINDOWS', False), tempfile.TemporaryDirectory() as d:
+            antes = os.getcwd()
+            os.chdir(d)
+            self.addCleanup(os.chdir, antes)
+            ap = mock.Mock(menu_carpeta=None, menu_subcarpetas=None, menu_archivos=['a.mkv', '/x/b.mkv'], rutas=[])
+            real = os.path.realpath(d)
+            self.assertIn(main._pedido(ap)['rutas'][0], (os.path.join(d, 'a.mkv'), os.path.join(real, 'a.mkv')))
+            self.assertEqual(main._pedido(ap)['rutas'][1], '/x/b.mkv')
 
     def test_solo_rutas_validas(self):
         """Lo que llega por el canal local también se comprueba: carpetas y vídeos que existen."""

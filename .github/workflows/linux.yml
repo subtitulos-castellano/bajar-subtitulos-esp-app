@@ -156,6 +156,11 @@ jobs:
       - name: Probar el AppImage
         run: packaging/linux/probar.sh appimage dist/*.AppImage
 
+      - name: Menú contextual (del paquete y del AppImage; sin ellos, se limpia solo)
+        run: |
+          packaging/linux/probar.sh menu bajar-subtitulos-esp
+          packaging/linux/probar.sh menu-appimage dist/*.AppImage
+
       - name: Abrir la ventana
         run: |
           case "${{ matrix.imagen }}" in
@@ -204,5 +209,6 @@ jobs:
       - name: Probar el AppImage
         run: |
           packaging/linux/probar.sh appimage dist/*.AppImage
+          packaging/linux/probar.sh menu-appimage dist/*.AppImage
           pacman -S --noconfirm --needed -q xorg-server-xvfb > /dev/null
           packaging/linux/probar.sh x11 dist/*.AppImage --appimage-extract-and-run

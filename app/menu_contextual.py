@@ -1,31 +1,35 @@
 """Menú contextual «Bajar subtítulos» del explorador de archivos: qué hay que hacer y cuándo.
 
-Cómo se pone en cada sistema está en app/plataforma (en Windows, menu_windows.py: el registro).
+Cómo se pone en cada sistema está en app/plataforma (en Windows, menu_windows.py: el registro; en Linux,
+menu_linux.py: Dolphin, Nautilus y Nemo).
 
 - En una carpeta: «Bajar subtítulos aquí», con un submenú «Solo esta carpeta» / «Esta carpeta y sus
   subcarpetas».
 - En uno o varios vídeos: «Bajar subtítulos».
 
-Con varios vídeos seleccionados, el explorador abre la app una vez por vídeo: la primera recoge los de
-las demás y lo busca todo junto (ver instancia.py).
+Con varios vídeos seleccionados, el Explorador de Windows abre la app una vez por vídeo: la primera recoge
+los de las demás y lo busca todo junto (ver instancia.py). Los gestores de archivos de Linux los pasan
+todos a una sola apertura.
 """
+import os
 import sys
 from pathlib import Path
 
 from subtitulos.idioma import N_, tr
 
-from .plataforma import WINDOWS
+from .plataforma import LINUX, WINDOWS
 
 # Argumentos que reciben la app desde el menú.
 ARG_CARPETA = '--menu-carpeta'              # solo los vídeos de la propia carpeta
 ARG_SUBCARPETAS = '--menu-subcarpetas'      # la carpeta y sus subcarpetas
-ARG_ARCHIVOS = '--menu-archivos'            # un vídeo (uno por proceso si se seleccionan varios)
+ARG_ARCHIVOS = '--menu-archivos'            # vídeos (en Windows, uno por proceso si se seleccionan varios)
 
 # Textos del menú, en el idioma de la app (si cambia, asegurar() los rehace al abrirla).
 TEXTO_CARPETA = N_('Bajar subtítulos aquí')
 TEXTO_ARCHIVOS = N_('Bajar subtítulos')
 SUBMENU = ((N_('Solo esta carpeta'), ARG_CARPETA),
            (N_('Esta carpeta y sus subcarpetas'), ARG_SUBCARPETAS))
+TEXTO_SOLO_CARPETA = N_('Bajar subtítulos (solo esta carpeta)')     # Nautilus (sin submenús)
 
 
 def _sistema():
@@ -33,6 +37,9 @@ def _sistema():
     if WINDOWS:
         from .plataforma import menu_windows
         return menu_windows
+    if LINUX:
+        from .plataforma import menu_linux
+        return menu_linux
     return None
 
 
@@ -41,14 +48,27 @@ def disponible():
 
 
 def programa():
-    """Lo que hay que ejecutar: el programa empaquetado; desde el código fuente, Python (pythonw.exe en
-    Windows: sin consola) con app/main.py."""
+    """Lo que hay que ejecutar: el programa empaquetado (el AppImage, no lo que tiene dentro, que solo
+    existe mientras está abierto); desde el código fuente, Python (pythonw.exe en Windows: sin consola) con
+    app/main.py."""
+    if LINUX:
+        from .plataforma import linux
+        if linux.appimage():
+            return [str(linux.appimage())]
     if getattr(sys, 'frozen', False):
         return [str(Path(sys.executable))]
     python = Path(sys.executable)
     pythonw = python.with_name('pythonw.exe')
     return [str(pythonw if pythonw.is_file() else python), '-I',
             str(Path(__file__).resolve().parent / 'main.py')]
+
+
+def instalada_con_paquete():
+    """Linux: True si es la del .deb o el .rpm (como la instalada en Windows, pone el menú sin preguntar)."""
+    if not LINUX:
+        return False
+    from .plataforma import linux
+    return linux.instalacion() == 'paquete'
 
 
 def registrar(prog=None):
@@ -164,7 +184,10 @@ def al_desinstalar(config):
 
 def ruta_de_argumento(texto):
     """La ruta que pasa el explorador. En Windows, en la raíz de una unidad llega «D:"» en vez de «D:\\»:
-    la barra final de "%V" escapa la comilla de cierre."""
+    la barra final de "%V" escapa la comilla de cierre. En Linux, los scripts de Nautilus reciben las rutas
+    relativas a la carpeta abierta (que es la carpeta de trabajo)."""
+    if not WINDOWS:
+        return Path(os.path.abspath(texto)) if texto else Path(texto)
     texto = texto.strip().strip('"')
     if len(texto) == 2 and texto[1] == ':':
         texto += '\\'

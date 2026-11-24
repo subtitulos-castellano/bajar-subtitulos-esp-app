@@ -17,6 +17,34 @@ def en_wsl():
     return bool(os.environ.get('WSL_DISTRO_NAME')) or 'microsoft' in platform.release().lower()
 
 
+CARPETA_PAQUETE = Path('/opt') / ID_ESCRITORIO      # donde la ponen el .deb y el .rpm
+
+
+def appimage():
+    """Ruta del AppImage si la app se ejecuta desde uno (su runtime pone APPIMAGE y APPDIR, la carpeta
+    donde lo monta); si no, None. Se comprueba que el programa esté dentro de APPDIR: esas variables pasan
+    también a los programas que se abran desde un AppImage."""
+    ruta, montado = os.environ.get('APPIMAGE', ''), os.environ.get('APPDIR', '')
+    if not (getattr(sys, 'frozen', False) and os.path.isabs(ruta) and os.path.isabs(montado)):
+        return None
+    try:
+        Path(sys.executable).resolve().relative_to(Path(montado).resolve())
+    except ValueError:
+        return None
+    return Path(ruta)
+
+
+def instalacion():
+    """'paquete' (.deb o .rpm), 'appimage', 'carpeta' (el .tar.gz descomprimido) o 'codigo' (desde el código)."""
+    if not getattr(sys, 'frozen', False):
+        return 'codigo'
+    if appimage():
+        return 'appimage'
+    if Path(sys.executable).resolve().parent == CARPETA_PAQUETE:
+        return 'paquete'
+    return 'carpeta'
+
+
 def carpeta_config():
     """$XDG_CONFIG_HOME o ~/.config (la especificación solo admite una ruta absoluta)."""
     base = os.environ.get('XDG_CONFIG_HOME', '')

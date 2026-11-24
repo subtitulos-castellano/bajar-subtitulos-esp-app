@@ -9,6 +9,7 @@ Exec=bajar-subtitulos-esp %F
 Icon=bajar-subtitulos-esp
 Terminal=false
 Categories=AudioVideo;Video;
+MimeType=video/x-matroska;video/mp4;video/x-msvideo;video/avi;video/x-m4v;video/quicktime;video/x-ms-wmv;
 Keywords=subtitles;srt;Spanish;castellano;español;subtítulos;
 StartupWMClass=bajar-subtitulos-esp
 SingleMainWindow=true

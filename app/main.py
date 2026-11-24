@@ -277,7 +277,9 @@ def _pedido(args):
     for opcion, recursivo in ((args.menu_carpeta, False), (args.menu_subcarpetas, True),
                               (args.menu_archivos, True)):
         if opcion:
-            return {'rutas': [str(mc.ruta_de_argumento(opcion))], 'recursivo': recursivo, 'menu': True}
+            opciones = [opcion] if isinstance(opcion, str) else opcion     # Linux: todos los seleccionados
+            return {'rutas': [str(mc.ruta_de_argumento(o)) for o in opciones], 'recursivo': recursivo,
+                    'menu': True}
     if args.rutas:
         return {'rutas': [str(Path(r).resolve()) for r in args.rutas], 'recursivo': True, 'menu': False}
     return None
@@ -339,9 +341,9 @@ def main(argv=None):
     ap.add_argument('--con-red', action='store_true', help=argparse.SUPPRESS)
     # Pruebas de GitHub Actions: lo mismo que pulsar Actualizar con un instalador ya descargado.
     ap.add_argument('--probar-actualizacion', metavar='INSTALADOR', help=argparse.SUPPRESS)
-    ap.add_argument('--menu-carpeta', metavar='CARPETA', help=argparse.SUPPRESS)
-    ap.add_argument('--menu-subcarpetas', metavar='CARPETA', help=argparse.SUPPRESS)
-    ap.add_argument('--menu-archivos', metavar='VÍDEO', help=argparse.SUPPRESS)
+    ap.add_argument('--menu-carpeta', nargs='+', metavar='CARPETA', help=argparse.SUPPRESS)
+    ap.add_argument('--menu-subcarpetas', nargs='+', metavar='CARPETA', help=argparse.SUPPRESS)
+    ap.add_argument('--menu-archivos', nargs='+', metavar='VÍDEO', help=argparse.SUPPRESS)
     ap.add_argument('--menu-contextual-instalar', action='store_true', help=argparse.SUPPRESS)
     ap.add_argument('--menu-contextual-quitar', action='store_true', help=argparse.SUPPRESS)
     ap.add_argument('--idioma-inicial', choices=('es', 'en'), help=argparse.SUPPRESS)
@@ -390,12 +392,14 @@ def main(argv=None):
         ventana.ir(AJUSTES)
     if unica:
         from app import actualizar, menu_contextual
-        menu_contextual.asegurar(config, actualizar.instalada())
+        menu_contextual.asegurar(config, actualizar.instalada() or menu_contextual.instalada_con_paquete())
         _atender_pedidos(app, ventana, config, args)
     else:
         ventana.al_reiniciar = lambda: _reiniciar(args, ventana.salir)
-    if not (pedido and pedido['menu'] and config.menu_segundo_plano and unica):
+    if not (pedido and pedido['menu'] and config.menu_segundo_plano and unica and ventana.puede_ir_a_bandeja):
         ventana.mostrar()
+        if unica and LINUX and not args.medir_arranque:
+            _menu_aplicaciones(ventana, config)
     if pedido and unica:
         app.agrupador.agregar(rutas_del_pedido(pedido), pedido['recursivo'], pedido['menu'])
     elif pedido and rutas_del_pedido(pedido):
@@ -410,6 +414,41 @@ def main(argv=None):
               f'(subliminal cargado: {"subliminal" in sys.modules})')
         QTimer.singleShot(0, app.quit)
     return app.exec()
+
+
+def _menu_aplicaciones(ventana, config):
+    """AppImage: la entrada en el menú de aplicaciones. Si ya se decidió, se corrige (se ha movido el
+    AppImage); si no, se pregunta una vez, con la ventana ya a la vista."""
+    from app.plataforma import linux, menu_aplicaciones
+    from subtitulos.idioma import tr
+    appimage = linux.appimage()
+    if not appimage:
+        return
+    if config.menu_aplicaciones is not None:
+        menu_aplicaciones.asegurar(config, appimage)
+        return
+
+    def preguntar():
+        from PySide6.QtWidgets import QMessageBox
+        si = QMessageBox.question(
+            ventana, tr('Menú de aplicaciones'),
+            tr('¿Añadir Bajar Subtítulos ESP al menú de aplicaciones? Así podrás abrirla desde allí, como '
+               'cualquier programa. Se puede cambiar después en Configuración.')) == QMessageBox.Yes
+        try:
+            if si:
+                menu_aplicaciones.anadir(appimage)
+        except OSError as e:
+            QMessageBox.warning(ventana, tr('Menú de aplicaciones'),
+                                tr('No se ha podido cambiar el menú de aplicaciones ({error}).',
+                                   error=e.strerror or e))
+            return
+        config.menu_aplicaciones = si
+        config.guardar()
+        if hasattr(ventana.ajustes, 'menu_apps'):
+            ventana.ajustes.menu_apps.blockSignals(True)
+            ventana.ajustes.menu_apps.setChecked(si)
+            ventana.ajustes.menu_apps.blockSignals(False)
+    QTimer.singleShot(600, preguntar)
 
 
 def _reiniciar(args, salir, antes=None):

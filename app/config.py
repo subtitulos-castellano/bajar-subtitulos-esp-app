@@ -42,6 +42,8 @@ class Config:
         self.menu_contextual = None   # «Bajar subtítulos» en el Explorador; None = aún sin decidir (ver
                                       # menu_contextual.asegurar)
         self.menu_segundo_plano = False   # desde el menú: buscar sin abrir la ventana
+        self.menu_aplicaciones = None     # Linux, AppImage: su entrada en el menú de aplicaciones; None = sin
+                                          # preguntar aún (ver plataforma/menu_aplicaciones.py)
         self.cerrar_a_bandeja = False     # al cerrar la ventana, la app sigue junto al reloj
         self.idioma = None            # 'es' | 'en'; None = aún sin elegir (castellano). Lo elige el
                                       # instalador la primera vez o Configuración
@@ -84,6 +86,8 @@ class Config:
             self.version = datos['version']
         if isinstance(datos.get('menu_contextual'), bool):
             self.menu_contextual = datos['menu_contextual']
+        if isinstance(datos.get('menu_aplicaciones'), bool):
+            self.menu_aplicaciones = datos['menu_aplicaciones']
         if isinstance(datos.get('menu_segundo_plano'), bool):
             self.menu_segundo_plano = datos['menu_segundo_plano']
         if isinstance(datos.get('cerrar_a_bandeja'), bool):
@@ -100,6 +104,8 @@ class Config:
                  'menu_segundo_plano': self.menu_segundo_plano, 'cerrar_a_bandeja': self.cerrar_a_bandeja}
         if self.menu_contextual is not None:
             datos['menu_contextual'] = self.menu_contextual
+        if self.menu_aplicaciones is not None:
+            datos['menu_aplicaciones'] = self.menu_aplicaciones
         if self.idioma is not None:
             datos['idioma'] = self.idioma
         try:
