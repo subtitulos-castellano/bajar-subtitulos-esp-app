@@ -1,6 +1,6 @@
-# Bajar Subtítulos ESP: compila en Windows, prueba lo compilado en Windows 10 y 11, pasa las pruebas
-# también en Linux y, con una etiqueta vX.Y.Z, publica la Release con SHA256SUMS.txt y la atestación de
-# procedencia de cada archivo.
+# Bajar Subtítulos ESP: compila y prueba en Windows (Windows 10 y 11) y en Linux (linux.yml: .deb, .rpm,
+# AppImage y .tar.gz, probados en varias distribuciones) y, con una etiqueta vX.Y.Z, publica una sola
+# Release con todo, SHA256SUMS.txt y la atestación de procedencia de cada archivo.
 # - A mano (Actions › Compilar › Run workflow): compila y prueba; los archivos quedan como artefacto.
 #
 # Windows Server 2022 comparte base con Windows 10 (21H2) y Windows Server 2025 con Windows 11 (24H2).
@@ -208,33 +208,12 @@ jobs:
           Get-Content $informe
           if ($p.ExitCode -ne 0) { throw "Autoprueba de la versión portable fallida: código $($p.ExitCode)" }
 
-  # La app aún no se compila para Linux (llegará en la 1.5.0), pero el código ya se prueba en Linux.
-  pruebas-linux:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: '3.14'
-          cache: pip
-          cache-dependency-path: requirements-app.txt
-
-      - name: Bibliotecas que Qt necesita
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
-
-      - name: Pruebas
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: |
-          python -m pip install -r requirements-app.txt
-          python -I -m unittest discover -s tests
+  # Linux: compilar en AlmaLinux 9 y probar en cada distribución (el mismo workflow que las ramas linux-*).
+  linux:
+    uses: ./.github/workflows/linux.yml
 
   publicar:
-    needs: [probar, pruebas-linux]
+    needs: [probar, linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -249,10 +228,25 @@ jobs:
           name: BajarSubtitulosESP-${{ github.ref_name }}
           path: dist
 
+      - uses: actions/download-artifact@v7
+        with:
+          name: BajarSubtitulosESP-linux
+          path: dist
+
+      - name: Están todos los archivos, con la versión de la etiqueta
+        working-directory: dist
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          for f in "BajarSubtitulosESP-$v-instalador.exe" "BajarSubtitulosESP-$v-portable.zip" \
+                   "BajarSubtitulosESP-$v-amd64.deb" "BajarSubtitulosESP-$v-x86_64.rpm" \
+                   "BajarSubtitulosESP-$v-x86_64.AppImage" "BajarSubtitulosESP-$v-linux-x86_64.tar.gz"; do
+            [ -f "$f" ] || { echo "Falta $f"; ls -l; exit 1; }
+          done
+
       - name: Sumas SHA-256
         working-directory: dist
         run: |
-          sha256sum *-instalador.exe *-portable.zip > SHA256SUMS.txt
+          sha256sum *-instalador.exe *-portable.zip *.deb *.rpm *.AppImage *-linux-x86_64.tar.gz > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Atestación de procedencia
@@ -261,6 +255,10 @@ jobs:
           subject-path: |
             dist/*-instalador.exe
             dist/*-portable.zip
+            dist/*.deb
+            dist/*.rpm
+            dist/*.AppImage
+            dist/*-linux-x86_64.tar.gz
 
       - name: Release
         env:
@@ -273,5 +271,6 @@ jobs:
           if [ -n "$notas_en" ]; then
             notas="${notas}"$'\n\n<!-- en -->\n\n### English\n\n'"${notas_en}"
           fi
-          gh release create "$GITHUB_REF_NAME" dist/*-instalador.exe dist/*-portable.zip dist/SHA256SUMS.txt \
+          gh release create "$GITHUB_REF_NAME" dist/*-instalador.exe dist/*-portable.zip dist/*.deb dist/*.rpm \
+            dist/*.AppImage dist/*-linux-x86_64.tar.gz dist/SHA256SUMS.txt \
             --title "Bajar Subtítulos ESP $GITHUB_REF_NAME" --notes "${notas:-Ver CHANGELOG.md}"

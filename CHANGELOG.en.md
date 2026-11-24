@@ -3,6 +3,30 @@
 English version of the release notes, shown by the app when it is in English. Earlier versions are
 only in Spanish: see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.5.0
+
+- **Now available for Linux**: the same app, with the same version number as the Windows one. There is a
+  `.deb` (Ubuntu, Debian, Linux Mint…), an `.rpm` (Fedora, AlmaLinux, Rocky Linux, openSUSE…), an
+  AppImage (any distribution, nothing to install) and a `.tar.gz`. How to choose and install, in the
+  README.
+- [Linux] It does the same as on Windows:
+  - drag videos and folders onto the window, in Spanish or English;
+  - OpenSubtitles accounts are stored in the desktop keyring (KWallet or GNOME Keyring);
+  - light or dark theme, and text size as a percentage (100 % is the system's normal size);
+  - an icon next to the clock to keep running when the window is closed. On GNOME it needs the
+    *AppIndicator* extension; without it, the option is disabled with an explanation.
+- [Linux] **Context menu** with the right mouse button:
+  - in Dolphin (KDE) and Nemo (Cinnamon): *Get subtitles here* on folders (only that folder or also
+    its subfolders) and *Get subtitles* on videos;
+  - in Nautilus (GNOME), inside *Scripts*;
+  - with the `.deb` and the `.rpm` it is added when the app opens; with the AppImage, from Settings. If
+    you uninstall the app or delete the AppImage, the menu removes itself the first time you use it.
+- [Linux] **Updates**: the `.deb` and the `.rpm` are installed by the system package manager, which asks
+  for your password; the AppImage is replaced by the new one. The SHA-256 fingerprint published on
+  GitHub is always checked first. The `.tar.gz` only notifies.
+- [Linux] The AppImage offers to add itself to the applications menu. If you move it to another folder,
+  it is fixed when you open it.
+
 ## 1.4.0
 
 - [Windows] **Update notices only when there is something for Windows.** This is the first step

@@ -3,6 +3,7 @@
 #
 #   probar.sh programa CARPETA ORDEN...   autoprueba sin pantalla y que no falte ninguna librería en CARPETA
 #   probar.sh appimage ARCHIVO            lo mismo con el AppImage (sin FUSE: se extrae y se ejecuta)
+#   probar.sh targz ARCHIVO               lo mismo con el .tar.gz descomprimido
 #   probar.sh x11 ORDEN...                abre la ventana en X11 (Xvfb) y se cierra sola
 #   probar.sh wayland ORDEN...            abre la ventana en Wayland (weston sin pantalla) y se cierra sola
 #   probar.sh menu ORDEN...               pone el menú contextual (en MENU_DATOS) y lo usa
@@ -118,6 +119,11 @@ case "$orden" in
         [ -S "$XDG_RUNTIME_DIR/wayland-prueba" ] || { cat "$TMP/weston.log"; fallo "weston no ha arrancado"; }
         WAYLAND_DISPLAY=wayland-prueba QT_QPA_PLATFORM=wayland ventana Wayland "$@"
         kill "$servidor" ;;
+    targz)
+        tar xzf "$1" -C "$TMP"
+        [ -x "$TMP/$ID/$ID" ] || fallo "el .tar.gz no trae $ID/$ID"
+        autoprueba "$TMP/$ID/$ID"
+        librerias "$TMP/$ID" ;;
     menu)
         menu "$MENU_DATOS" "$@" ;;
     menu-appimage)
@@ -167,5 +173,5 @@ case "$orden" in
         [ -z "$quedan" ] || fallo "la desinstalación ha dejado:$quedan"
         echo "Desinstalación limpia" ;;
     *)
-        sed -n '2,14p' "$0"; exit 1 ;;
+        sed -n '2,15p' "$0"; exit 1 ;;
 esac

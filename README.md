@@ -1,9 +1,10 @@
 # Bajar Subtítulos ESP
 
-Aplicación de escritorio para **Windows 10 y 11** que descarga subtítulos en **castellano
-(español de España)** para tus series y películas. Arrastras un vídeo o una carpeta a la ventana
-y se ocupa de todo, sin preguntas. También funciona con el botón derecho del ratón en el Explorador de
-Windows, sin abrir antes la app.
+Aplicación de escritorio para **Windows 10 y 11** y, desde la versión 1.5.0, para **Linux**, que
+descarga subtítulos en **castellano (español de España)** para tus series y películas. Arrastras un
+vídeo o una carpeta a la ventana y se ocupa de todo, sin preguntas. También funciona con el botón
+derecho del ratón en el Explorador de Windows o en el gestor de archivos de Linux, sin abrir antes la
+app.
 
 La app está en **castellano o en inglés** (*English*): se elige al instalarla y se cambia en
 Configuración.
@@ -37,7 +38,10 @@ segundos para extraer la pista de un vídeo en un disco lento.
 
 ## Instalar
 
-Descarga la última versión desde **Releases**:
+Descarga la última versión desde **Releases**. Windows y Linux tienen siempre el mismo número de
+versión.
+
+### Windows
 
 - **`BajarSubtitulosESP-<versión>-instalador.exe`**: lo instala para tu usuario (no pide permisos de
   administrador) y crea los accesos directos. Se desinstala desde *Configuración de Windows ›
@@ -52,16 +56,60 @@ versión portable empieza en castellano.
 El programa no está firmado digitalmente, así que la primera vez Windows puede mostrar
 **"Windows protegió su PC"**. Pulsa *Más información › Ejecutar de todas formas*.
 
+### Linux
+
+Para PC de 64 bits (x86_64) con una distribución de 2022 o posterior (glibc 2.34 o más nueva). Elige
+el archivo según tu distribución:
+
+| Distribución | Archivo | Cómo instalarlo |
+|---|---|---|
+| Ubuntu 22.04 o posterior, Debian 12 o posterior, Linux Mint 21 o posterior y derivadas | `BajarSubtitulosESP-<versión>-amd64.deb` | `sudo apt install ./BajarSubtitulosESP-<versión>-amd64.deb` |
+| Fedora, AlmaLinux, Rocky Linux o RHEL 9 o posterior | `BajarSubtitulosESP-<versión>-x86_64.rpm` | `sudo dnf install ./BajarSubtitulosESP-<versión>-x86_64.rpm` |
+| openSUSE Tumbleweed | `BajarSubtitulosESP-<versión>-x86_64.rpm` | `sudo zypper install --allow-unsigned-rpm ./BajarSubtitulosESP-<versión>-x86_64.rpm` |
+| Cualquier otra (Arch, Manjaro…), o si no quieres instalar nada | `BajarSubtitulosESP-<versión>-x86_64.AppImage` | `chmod +x` y ábrelo (abajo) |
+
+- **`.deb` y `.rpm`:** el gestor de paquetes instala también lo que haga falta del sistema. La app
+  queda en el menú de aplicaciones (*Bajar Subtítulos ESP*) y en la orden `bajar-subtitulos-esp`. Se
+  desinstala con `sudo apt remove bajar-subtitulos-esp`, `sudo dnf remove bajar-subtitulos-esp` o
+  `sudo zypper remove bajar-subtitulos-esp`.
+- **AppImage:** un solo archivo con todo dentro. Dale permiso de ejecución y ábrelo:
+
+  ```bash
+  chmod +x BajarSubtitulosESP-<versión>-x86_64.AppImage
+  ./BajarSubtitulosESP-<versión>-x86_64.AppImage
+  ```
+
+  No necesita `libfuse2`. La primera vez pregunta si lo añades al menú de aplicaciones. Para
+  desinstalarlo, bórralo (antes, si quieres, quítalo del menú en Configuración).
+- **`BajarSubtitulosESP-<versión>-linux-x86_64.tar.gz`:** la misma carpeta, comprimida. Descomprímela y
+  abre `bajar-subtitulos-esp/bajar-subtitulos-esp`. No se actualiza sola.
+
+Está probada en Ubuntu 22.04, 24.04 y 26.04, Debian 12 y 13, AlmaLinux 9 y 10, Fedora, openSUSE
+Tumbleweed y Arch (el AppImage), con X11 y con Wayland, y en los escritorios KDE Plasma, GNOME y
+Cinnamon.
+
+La app empieza en castellano; el idioma se cambia en Configuración.
+
+![Configuración en Linux](docs/capturas/linux_configuracion.png)
+
 ### Comprobar la descarga
 
-Cada Release incluye **`SHA256SUMS.txt`** con la huella SHA-256 de cada archivo. En PowerShell:
+Cada Release incluye **`SHA256SUMS.txt`** con la huella SHA-256 de cada archivo. En Windows, en
+PowerShell:
 
 ```powershell
 Get-FileHash .\BajarSubtitulosESP-<versión>-instalador.exe
 ```
 
-El resultado tiene que coincidir con la línea de ese archivo en `SHA256SUMS.txt`. Si no coincide, el
-archivo está dañado o no es el original: no lo abras.
+En Linux, en la carpeta de la descarga (con `SHA256SUMS.txt` al lado):
+
+```bash
+sha256sum -c --ignore-missing SHA256SUMS.txt
+```
+
+El resultado tiene que coincidir con la línea de ese archivo en `SHA256SUMS.txt` (en Linux, tiene que
+decir `La suma coincide` u `OK`). Si no coincide, el archivo está dañado o no es el original: no lo
+abras.
 
 Desde la versión 1.0.1, cada archivo tiene además una **atestación de procedencia** de GitHub. Esta
 atestación demuestra que el archivo lo compiló GitHub Actions a partir del código de este
@@ -69,6 +117,12 @@ repositorio, y no lo subió nadie a mano. Para comprobarla, con [GitHub CLI](htt
 
 ```powershell
 gh attestation verify .\BajarSubtitulosESP-<versión>-instalador.exe -R subtitulos-castellano/bajar-subtitulos-esp-app
+```
+
+En Linux, igual con el archivo que hayas descargado:
+
+```bash
+gh attestation verify BajarSubtitulosESP-<versión>-x86_64.rpm -R subtitulos-castellano/bajar-subtitulos-esp-app
 ```
 
 ## Usar
@@ -125,7 +179,7 @@ Según *Configuración › Menú contextual del Explorador*, la búsqueda:
 
 Si la app ya está abierta, lo que pides desde el menú va a su cola.
 
-**Versión instalada y portable.** El menú abre una sola de las dos, y manda la instalada:
+**Versión instalada y portable (Windows).** El menú abre una sola de las dos, y manda la instalada:
 
 - El instalador añade el menú, también al actualizar, aunque lo tuviera la portable. Solo lo deja
   sin añadir si lo has desactivado en Configuración.
@@ -135,13 +189,31 @@ Si la app ya está abierta, lo que pides desde el menú va a su cola.
   si no, se queda apuntando a un programa que ya no existe (hasta que abras la app otra vez, que lo
   arregla).
 
+### Desde el gestor de archivos de Linux
+
+También con el **botón derecho del ratón**:
+
+- **Dolphin** (KDE) y **Nemo** (Cinnamon): en una carpeta, o en el fondo de una carpeta abierta,
+  *Bajar subtítulos aquí › Solo esta carpeta* o *Esta carpeta y sus subcarpetas*; en uno o varios
+  vídeos, *Bajar subtítulos*.
+- **Nautilus** (GNOME) no deja añadir opciones propias al menú, solo *scripts*: están en *Scripts ›
+  Bajar subtítulos* (lo seleccionado, con sus subcarpetas, o la carpeta abierta si no hay nada
+  seleccionado) y *Bajar subtítulos (solo esta carpeta)*.
+
+Con el `.deb` y el `.rpm`, el menú se pone solo la primera vez que abres la app. Con el AppImage y el
+`.tar.gz`, actívalo en *Configuración › Menú contextual del gestor de archivos*. Funciona igual que en
+Windows: varios vídeos son una sola búsqueda, y puede mostrar la ventana o buscar en segundo plano.
+
+Si desinstalas la app o borras el AppImage, el menú se quita solo la primera vez que lo uses. Si mueves
+el AppImage, ábrelo una vez desde su nuevo sitio y el menú lo seguirá.
+
 ## Configuración
 
 Los cambios se guardan al momento y se usan en la siguiente búsqueda.
 
 | Opción | Por defecto |
 |---|---|
-| Idioma de la app: Español o English | El elegido al instalar (portable: Español) |
+| Idioma de la app: Español o English | El elegido al instalar (portable y Linux: Español) |
 | Si no hay castellano, guardar latino | Sí |
 | Si no hay nada en español, guardar inglés (primero la pista del vídeo, mejor si es SDH) | Sí |
 | Extraer también la pista inglesa incrustada como `<vídeo>.en.srt` | No |
@@ -153,8 +225,9 @@ Los cambios se guardan al momento y se usan en la siguiente búsqueda.
 | Cuenta de opensubtitles.com (opcional, solo como último recurso) | — |
 | Al cerrar la ventana, seguir junto al reloj | No |
 | Tema: Sistema, Claro u Oscuro | Sistema |
-| Tamaño del texto: como Windows o un porcentaje propio | Como Windows |
-| Mostrar «Bajar subtítulos» en el menú contextual del Explorador | Sí (instalador), No (portable) |
+| Tamaño del texto: como Windows o un porcentaje propio (en Linux, solo el porcentaje) | Como Windows (en Linux, 100 %) |
+| Mostrar «Bajar subtítulos» en el menú contextual | Sí (instalador, `.deb` y `.rpm`), No (portable, AppImage y `.tar.gz`) |
+| Mostrar en el menú de aplicaciones (solo el AppImage) | Lo pregunta la primera vez |
 | Al usar el menú contextual: mostrar la ventana o en segundo plano | Mostrar la ventana |
 | Buscar actualizaciones automáticamente | Sí |
 
@@ -167,7 +240,8 @@ durante una búsqueda. Es la única forma de cambiarlo en la versión portable.
 
 **Cuentas de OpenSubtitles:** opensubtitles.org y opensubtitles.com son cuentas distintas; puedes
 poner una, las dos o ninguna. Las contraseñas se guardan en el **Administrador de credenciales de
-Windows**, nunca en un archivo. Si usas la skill, *Usar la cuenta de la skill* importa cada una de su
+Windows** o, en Linux, en el **llavero del escritorio** (KWallet en KDE, GNOME Keyring en GNOME y
+otros), nunca en un archivo. Si usas la skill, *Usar la cuenta de la skill* importa cada una de su
 `credenciales.json` (`"opensubtitles"` y `"opensubtitlescom"`).
 
 opensubtitles.com solo se usa como **último recurso**, porque sus cuentas solo permiten unas pocas
@@ -179,8 +253,14 @@ descargas al día:
 - si se agota el cupo (o no acepta la cuenta), lo dice y no se le pide nada más en esa búsqueda;
 - se usa el nombre de usuario, no el email.
 
-**Tamaño del texto:** por defecto sigue a *Configuración de Windows › Accesibilidad › Tamaño del
-texto*, como el Explorador. Si lo cambias allí, la app se ajusta al volver a ella.
+**Tamaño del texto:** en Windows, por defecto sigue a *Configuración de Windows › Accesibilidad ›
+Tamaño del texto*, como el Explorador. Si lo cambias allí, la app se ajusta al volver a ella. En Linux
+la app se ve al tamaño normal del sistema (100 %) y puedes subirlo o bajarlo con un porcentaje.
+
+**Seguir junto al reloj en Linux:** KDE Plasma, Cinnamon y XFCE muestran el icono directamente. GNOME
+necesita la extensión *AppIndicator and KStatusNotifierItem Support* (Ubuntu ya la trae activada). Si
+el escritorio no muestra iconos junto al reloj, la opción sale desactivada con la explicación, y el
+menú contextual siempre abre la ventana.
 
 ### Actualizaciones
 
@@ -194,10 +274,21 @@ lo avisa arriba de la ventana, con sus novedades:
 - Durante una búsqueda no se puede actualizar: espera a que termine.
 - **Versión portable:** solo avisa y abre la página de descarga.
 
+En Linux, según cómo la instalaste:
+
+- **`.deb` y `.rpm`:** se descarga el paquete, se comprueba su huella y lo instala el gestor de
+  paquetes de tu sistema (`apt`, `dnf` o `zypper`). Una ventana del sistema te pide tu contraseña; si
+  la cancelas, la app sigue como estaba. Después, la app se vuelve a abrir.
+- **AppImage:** el nuevo se descarga junto al que tienes, se comprueba y lo sustituye. Si su nombre
+  llevaba la versión, pasa a llevar la nueva. Si no se puede escribir en su carpeta, solo avisa.
+- **`.tar.gz`:** solo avisa y abre la página de descarga.
+
 En *Configuración › Actualizaciones* puedes desactivar la comprobación automática o buscar ahora. La
 app solo pregunta a GitHub por la última versión publicada, sin enviar nada tuyo.
 
 ## Dónde guarda cada cosa
+
+**Windows:**
 
 | Qué | Dónde |
 |---|---|
@@ -207,6 +298,19 @@ app solo pregunta a GitHub por la última versión publicada, sin enviar nada tu
 | Contraseñas de OpenSubtitles | Administrador de credenciales de Windows (`BajarSubtitulosESP/opensubtitles` y `BajarSubtitulosESP/opensubtitlescom`) |
 | Menú contextual del Explorador | Registro de tu usuario (`HKCU\Software\Classes`): se quita al desinstalar |
 | Instalador de la última actualización y su registro | `%TEMP%\BajarSubtitulosESP-actualizacion` (se borra solo) |
+
+**Linux:**
+
+| Qué | Dónde |
+|---|---|
+| Subtítulos | Junto a cada vídeo, igual que en Windows |
+| Copias de los subtítulos sustituidos | `~/.subtitulos-esp/backup` (la misma carpeta que la skill) |
+| Preferencias, tamaño y posición de la ventana | `~/.config/BajarSubtitulosEsp/config.json` |
+| Contraseñas de OpenSubtitles | Llavero del escritorio (KWallet o GNOME Keyring), con los mismos nombres que en Windows |
+| La app (`.deb` y `.rpm`) | `/opt/bajar-subtitulos-esp`, con la orden `/usr/bin/bajar-subtitulos-esp` |
+| Menú contextual | `~/.local/share/kio/servicemenus` (Dolphin), `~/.local/share/nemo/actions` (Nemo), `~/.local/share/nautilus/scripts` (Nautilus) y `~/.local/share/bajar-subtitulos-esp` |
+| Entrada del AppImage en el menú de aplicaciones | `~/.local/share/applications/bajar-subtitulos-esp.desktop` y su icono |
+| Paquete de la última actualización | `~/.cache/bajar-subtitulos-esp/actualizacion` (se borra solo) |
 
 Al desinstalar, todo esto se conserva (salvo el menú contextual): es tuyo y lo comparte la skill.
 
@@ -229,7 +333,9 @@ verdad lo necesitas, sube el límite en Configuración. Los proveedores son serv
 mejor no saturarlos.
 
 **No veo «Bajar subtítulos» al hacer clic derecho.** En Windows 11 está dentro de *Mostrar más
-opciones*. Comprueba también que está activado en *Configuración › Menú contextual del Explorador*.
+opciones*. En Nautilus (GNOME), dentro de *Scripts*. Comprueba también que está activado en
+*Configuración › Menú contextual*. En Linux, si acabas de activarlo y no aparece, cierra y vuelve a
+abrir el gestor de archivos.
 
 **Sigo viendo «Bajar subtítulos» después de desinstalar o de borrar la versión portable.** Abre la
 app (instalada o portable) una vez: si el menú apunta a un programa que ya no existe, lo quita (o,
@@ -245,6 +351,13 @@ derecho en el icono › *Salir*.
 era muy lento».** El vídeo trae una pista en español, pero está en un disco lento y extraerla iba a
 tardar más de 15 segundos. La app lo deja y busca en internet. Si prefieres la pista del vídeo,
 copia el vídeo a un disco más rápido y vuelve a buscar.
+
+**Linux: no puedo activar «seguir junto al reloj».** Tu escritorio no muestra iconos junto al reloj.
+En GNOME, instala la extensión *AppIndicator and KStatusNotifierItem Support* (en Fedora, el paquete
+`gnome-shell-extension-appindicator`) y vuelve a abrir la app.
+
+**Linux en WSL (Windows 11):** la app funciona con WSLg, pero no se pueden arrastrar archivos desde el
+Explorador de Windows (usa *Elegir carpeta…* o *Elegir vídeo…*) ni hay icono junto al reloj.
 
 **¿Sube o comparte algo de mis vídeos?** No. Solo consulta a los proveedores el nombre del
 episodio o de la película, y lee los vídeos desde tu disco.
@@ -262,17 +375,19 @@ app/            interfaz gráfica (Qt / PySide6)
   ventana.py    ventana principal, menú lateral, arrastrar y soltar, cola
   menu_contextual.py  menú contextual: cuándo se pone y se quita (sin Qt)
   plataforma/   lo que depende del sistema: windows.py (mutex, registro, shell32) y
-                menu_windows.py (el menú del Explorador en HKCU\Software\Classes)
+                menu_windows.py (el menú del Explorador en HKCU\Software\Classes); linux.py (carpetas
+                XDG, bloqueo, certificados, cómo se instaló), menu_linux.py (Dolphin, Nemo y Nautilus)
+                y menu_aplicaciones.py (el AppImage en el menú de aplicaciones)
   instancia.py  una sola app abierta: mutex, canal local y agrupar lo que llega seguido
   bandeja.py    icono junto al reloj: segundo plano, aviso al terminar y seguir abierta al cerrar
   vista_inicio.py  zona de arrastre, búsqueda en curso y resumen con colores
   vista_ajustes.py Configuración
   trabajador.py procesar() en un hilo; señales, avisos y cancelación inmediata
   componentes.py   interruptor, tarjetas, barras, tabla de vídeos
-  config.py     preferencias (%APPDATA%\BajarSubtitulosEsp\config.json)
+  config.py     preferencias (%APPDATA%\BajarSubtitulosEsp\config.json o ~/.config/BajarSubtitulosEsp)
   credenciales.py  cuentas de opensubtitles.org y .com (keyring)
   actualizar.py consultar las Releases (solo las que cambian algo para este sistema), descargar y
-                verificar el instalador y lanzarlo (sin Qt)
+                verificar el instalador (o el .deb, .rpm o AppImage) e instalarlo (sin Qt)
   vista_actualizacion.py  aviso de versión nueva y comprobación/descarga en hilos aparte
   tema.py       colores claro/oscuro, tamaño del texto y hoja de estilos
   iconos.py     iconos SVG (Lucide, ISC)
@@ -286,10 +401,12 @@ subtitulos/     núcleo, compartido con la línea de comandos
   pistas.py     subtítulos incrustados en MKV y MP4 (sin ffmpeg)
   nucleo.py     proveedores y procesar(ruta(s), opciones, eventos, cancelado, credenciales)
 bajar_subs.py   línea de comandos (mismos parámetros y salida que la skill; siempre en castellano)
-packaging/      recursos comunes (icono, licencias) y, en windows/, PyInstaller, Inno Setup y compilar.py
+packaging/      recursos comunes (icono, licencias); windows/: PyInstaller, Inno Setup y compilar.py;
+                linux/: PyInstaller, compilar.py (.deb, .rpm, AppImage, .tar.gz), bibliotecas.py (qué
+                pone el sistema) y probar.sh (pruebas en cada distribución)
 scripts/        windows.sh: desarrollo desde WSL con el Python de Windows;
                 linux.sh: desarrollo en Linux
-tests/          pruebas (núcleo, seguridad, app)
+tests/          pruebas (núcleo, seguridad, app, menú, idioma, actualizaciones y Linux)
 ```
 
 Todos los módulos de `subtitulos/`, menos `nucleo.py`, solo usan la biblioteca estándar. La
@@ -311,8 +428,7 @@ scripts/windows.sh compilar    # .exe, zip portable (e instalador si hay Inno Se
 
 ### Desarrollo en Linux
 
-La versión para Linux está en preparación (llegará en la 1.5.0). Desde el código ya funciona: hace
-falta Python 3.10 o posterior.
+Desde el código hace falta Python 3.10 o posterior.
 
 ```bash
 scripts/linux.sh entorno       # una vez: crea .venv e instala las dependencias (requirements-app.txt)
@@ -320,6 +436,7 @@ scripts/linux.sh app           # abre la app
 scripts/linux.sh app --demo    # con resultados de demostración (no busca ni descarga)
 scripts/linux.sh pruebas       # pruebas automáticas, sin ventanas
 scripts/linux.sh info          # sistema, escritorio, versiones y llavero (para informar de un fallo)
+scripts/linux.sh compilar      # programa, .tar.gz, AppImage, .deb y .rpm en dist/ (mejor en AlmaLinux 9)
 ```
 
 ### Línea de comandos
@@ -359,6 +476,10 @@ scripts/windows.sh python -I -m unittest discover -s tests  # todas, con el Pyth
 - `tests/test_menu.py`: el menú contextual en una clave de pruebas del registro, búsquedas sin
   subcarpetas, una sola app abierta (varias aperturas a la vez), el segundo plano y seguir junto
   al reloj al cerrar la ventana.
+- `tests/test_actualizar.py`: consultar las Releases, las novedades de cada sistema, la descarga
+  contra un servidor local e instalar en Windows y en Linux (gestor de paquetes y AppImage).
+- `tests/test_linux.py`: carpetas XDG, una sola app abierta, certificados, el menú contextual de
+  Dolphin, Nemo y Nautilus (en una carpeta temporal) y el AppImage en el menú de aplicaciones.
 
 ### Compilar y publicar
 
@@ -373,6 +494,11 @@ scripts/windows.sh python -I -m unittest discover -s tests  # todas, con el Pyth
 `<exe> --autoprueba informe.txt --con-red` añade una búsqueda real (en simulación) contra los
 proveedores.
 
+En Linux, `packaging/linux/compilar.py` hace lo mismo con PyInstaller y, además, comprueba que el
+programa no pida librerías que no vayan dentro ni estén en `bibliotecas.py` (de ahí salen las
+dependencias del `.deb` y del `.rpm`) ni una glibc más nueva que la 2.34. Después crea el `.tar.gz`,
+el AppImage y, con nfpm, el `.deb` y el `.rpm`.
+
 **GitHub Actions** (`.github/workflows/compilar.yml`) hace tres cosas:
 
 1. Compila.
@@ -380,7 +506,12 @@ proveedores.
    Windows 11): pruebas, instalación silenciosa, autoprueba del programa instalado y del portable,
    el menú contextual (el instalador se lo queda aunque fuera de la portable; dos aperturas a la vez,
    una sola app), el idioma (instalación en inglés; al actualizar se respeta el elegido después) y
-   desinstalación sin restos (también si el menú apuntaba a otra copia).
+   desinstalación sin restos (también si el menú apuntaba a otra copia). En Linux
+   (`.github/workflows/linux.yml`, que también se ejecuta al subir una rama `linux-*`) compila en
+   AlmaLinux 9 y prueba el `.deb` en Ubuntu 22.04, 24.04 y 26.04 y Debian 12 y 13, el `.rpm` en
+   AlmaLinux 9 y 10, Fedora y openSUSE Tumbleweed, y el AppImage en todas y en Arch: autoprueba, que no
+   falte ninguna librería, la ventana en X11 y Wayland, el menú contextual, actualizar como la app y
+   desinstalar sin restos.
 3. Con una etiqueta `vX.Y.Z`, publica la Release con las notas de `CHANGELOG.md` y, tras la marca
    `<!-- en -->`, las de `CHANGELOG.en.md` (la app enseña las de su idioma). Junto con
    `SHA256SUMS.txt` y la atestación de procedencia de cada archivo.

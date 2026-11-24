@@ -1,5 +1,29 @@
 # Cambios
 
+## 1.5.0
+
+- **Ya disponible para Linux**: la misma app, con el mismo número de versión que la de Windows. Hay un
+  `.deb` (Ubuntu, Debian, Linux Mint…), un `.rpm` (Fedora, AlmaLinux, Rocky Linux, openSUSE…), un
+  AppImage (cualquier distribución, sin instalar nada) y un `.tar.gz`. Cómo elegir e instalar, en el
+  README.
+- [Linux] Hace lo mismo que en Windows:
+  - arrastrar vídeos y carpetas a la ventana, en castellano o en inglés;
+  - las cuentas de OpenSubtitles se guardan en el llavero del escritorio (KWallet o GNOME Keyring);
+  - tema claro u oscuro, y tamaño del texto con un porcentaje (100 % es el normal del sistema);
+  - icono junto al reloj para seguir abierta al cerrar la ventana. En GNOME necesita la extensión
+    *AppIndicator*; sin ella, la opción sale desactivada con la explicación.
+- [Linux] **Menú contextual** con el botón derecho:
+  - en Dolphin (KDE) y Nemo (Cinnamon): *Bajar subtítulos aquí* en las carpetas (solo esa carpeta o
+    también sus subcarpetas) y *Bajar subtítulos* en los vídeos;
+  - en Nautilus (GNOME), dentro de *Scripts*;
+  - con el `.deb` y el `.rpm` se pone solo al abrir la app; con el AppImage, desde Configuración. Si
+    desinstalas la app o borras el AppImage, el menú se quita solo la primera vez que lo uses.
+- [Linux] **Actualizaciones**: el `.deb` y el `.rpm` los instala el gestor de paquetes del sistema,
+  que pide tu contraseña; el AppImage se sustituye por el nuevo. Antes se comprueba siempre la huella
+  SHA-256 publicada en GitHub. El `.tar.gz` solo avisa.
+- [Linux] El AppImage ofrece añadirse al menú de aplicaciones. Si lo mueves de carpeta, se corrige al
+  abrirlo.
+
 ## 1.4.0
 
 - [Windows] **Avisos de actualización solo cuando hay algo para Windows.** Es el primer paso hacia

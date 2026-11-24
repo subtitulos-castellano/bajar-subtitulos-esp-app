@@ -1,7 +1,8 @@
 # Bajar Subtítulos ESP para Linux: compila en AlmaLinux 9 (glibc 2.34, la mínima admitida) el programa, el
 # .deb, el .rpm, el AppImage y el .tar.gz, y los prueba en contenedores de las distribuciones admitidas:
 # instalar, autoprueba, que no falte ninguna librería, abrir la ventana en X11 (y en Wayland donde se puede)
-# y desinstalar sin dejar nada. Los archivos quedan como artefacto; aún no se publican.
+# y desinstalar sin dejar nada. Los archivos quedan como artefacto: los publica compilar.yml (que llama a
+# este workflow) con una etiqueta vX.Y.Z.
 # - Se ejecuta al subir una rama linux-*, o a mano (Actions › Linux › Run workflow).
 name: Linux
 
@@ -138,7 +139,7 @@ jobs:
           case "${{ matrix.imagen }}" in
             ubuntu*|debian*) apt-get update -q && apt-get install -y -q --no-install-recommends bash ;;
             opensuse*) zypper -n -q install -y bash findutils gzip tar ;;
-            *) dnf install -y -q bash findutils ;;
+            *) dnf install -y -q bash findutils tar gzip ;;
           esac
 
       - uses: actions/checkout@v7
@@ -164,8 +165,10 @@ jobs:
       - name: Probar lo instalado
         run: packaging/linux/probar.sh programa /opt/bajar-subtitulos-esp bajar-subtitulos-esp
 
-      - name: Probar el AppImage
-        run: packaging/linux/probar.sh appimage dist/*.AppImage
+      - name: Probar el AppImage y el .tar.gz
+        run: |
+          packaging/linux/probar.sh appimage dist/*.AppImage
+          packaging/linux/probar.sh targz dist/*-linux-x86_64.tar.gz
 
       - name: Menú contextual (del paquete y del AppImage; sin ellos, se limpia solo)
         run: |
