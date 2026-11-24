@@ -96,6 +96,7 @@ class ArgumentosDelExplorador(unittest.TestCase):
         ap.menu_archivos, ap.rutas = None, ['a.mkv']
         self.assertFalse(main._pedido(ap)['menu'])
 
+    @unittest.skipUnless(sys.platform.startswith('linux'), 'rutas de Linux')
     def test_linux_varias_rutas_y_relativas(self):
         """Los gestores de archivos de Linux pasan todo lo seleccionado junto; los scripts de Nautilus, con
         rutas relativas a la carpeta abierta."""
