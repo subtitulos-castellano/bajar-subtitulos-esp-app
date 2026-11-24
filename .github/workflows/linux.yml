@@ -99,6 +99,7 @@ jobs:
 
   # .deb y .rpm: instalar (el gestor de paquetes pone las dependencias), probar el paquete y el AppImage,
   # abrir la ventana y desinstalar. Las librerías se comprueban antes de instalar nada más (Xvfb, weston…).
+  # (openSUSE: su repositorio a veces no responde; zypper se reintenta.)
   paquetes:
     needs: compilar
     strategy:
@@ -138,7 +139,7 @@ jobs:
         run: |
           case "${{ matrix.imagen }}" in
             ubuntu*|debian*) apt-get update -q && apt-get install -y -q --no-install-recommends bash ;;
-            opensuse*) zypper -n -q install -y bash findutils gzip tar ;;
+            opensuse*) for i in 1 2 3 4; do zypper -n -q install -y bash findutils gzip tar && break; [ $i != 4 ] || exit 1; sleep 30; done ;;
             *) dnf install -y -q bash findutils tar gzip ;;
           esac
 
@@ -158,7 +159,7 @@ jobs:
         run: |
           case "${{ matrix.imagen }}" in
             ubuntu*|debian*) apt-get install -y -q --no-install-recommends ./dist/*.deb ;;
-            opensuse*) zypper -n install -y --allow-unsigned-rpm ./dist/*.rpm ;;
+            opensuse*) for i in 1 2 3 4; do zypper -n install -y --allow-unsigned-rpm ./dist/*.rpm && break; [ $i != 4 ] || exit 1; sleep 30; done ;;
             *) dnf install -y -q ./dist/*.rpm ;;
           esac
 
@@ -184,7 +185,7 @@ jobs:
         run: |
           case "${{ matrix.imagen }}" in
             ubuntu*|debian*) apt-get install -y -q --no-install-recommends xvfb ${{ matrix.wayland && 'weston' || '' }} ;;
-            opensuse*) zypper -n -q install -y xorg-x11-server-Xvfb ;;
+            opensuse*) for i in 1 2 3 4; do zypper -n -q install -y xorg-x11-server-Xvfb && break; [ $i != 4 ] || exit 1; sleep 30; done ;;
             almalinux:10) dnf install -y -q epel-release && dnf install -y -q weston ;;
             *) dnf install -y -q xorg-x11-server-Xvfb ${{ matrix.wayland && 'weston' || '' }} ;;
           esac
