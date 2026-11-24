@@ -80,3 +80,36 @@ def entorno_para_otros_programas():
         os.environ.pop('LD_LIBRARY_PATH', None)
     else:
         os.environ['LD_LIBRARY_PATH'] = antes
+
+
+# Certificados de confianza de cada familia de distribuciones (los mismos que usan su navegador y sus
+# programas). El OpenSSL que lleva dentro el programa compilado viene de AlmaLinux y solo los busca donde
+# los pone ella (/etc/pki/tls); en Debian, Ubuntu, Arch, openSUSE… no los encontraría y cualquier conexión
+# segura que no lleve los suyos propios (p. ej. la cuenta de OpenSubtitles.org) fallaría.
+CERTIFICADOS = (
+    '/etc/ssl/certs/ca-certificates.crt',     # Debian, Ubuntu, Mint, Arch, Gentoo
+    '/etc/pki/tls/certs/ca-bundle.crt',       # Fedora, RHEL, AlmaLinux, Rocky
+    '/etc/ssl/ca-bundle.pem',                 # openSUSE
+    '/etc/ssl/cert.pem',                      # Alpine, Void y otras
+)
+
+
+def certificados():
+    """En el programa compilado, que OpenSSL use los certificados del sistema (SSL_CERT_FILE). Si el usuario
+    ya ha elegido otros, o están donde OpenSSL los busca, no se toca nada; si el sistema no tiene ninguno,
+    los de certifi, que van dentro. Devuelve el archivo que se usa (None si no se ha cambiado)."""
+    if not getattr(sys, 'frozen', False) or os.environ.get('SSL_CERT_FILE') or os.environ.get('SSL_CERT_DIR'):
+        return None
+    import ssl
+    if os.path.isfile(ssl.get_default_verify_paths().openssl_cafile):
+        return None
+    for ruta in CERTIFICADOS:
+        if os.path.isfile(ruta):
+            os.environ['SSL_CERT_FILE'] = ruta
+            return ruta
+    try:
+        import certifi
+        os.environ['SSL_CERT_FILE'] = certifi.where()
+        return os.environ['SSL_CERT_FILE']
+    except Exception:  # noqa: BLE001
+        return None

@@ -118,14 +118,16 @@ def dependencias(carpeta):
 
 
 def depende_deb(sistema):
-    """Dependencias del .deb (sin repetir) para las librerías del sistema que usa el programa."""
+    """Dependencias del .deb (sin repetir) para las librerías del sistema que usa el programa, más los
+    certificados de confianza del sistema (los usa OpenSSL; ver app/plataforma/linux.certificados)."""
     vistas = []
     for nombre in sistema:
         if SISTEMA[nombre] not in vistas:
             vistas.append(SISTEMA[nombre])
-    return [f'libc6 (>= {GLIBC_MAXIMA[0]}.{GLIBC_MAXIMA[1]})'] + sorted(vistas)
+    return [f'libc6 (>= {GLIBC_MAXIMA[0]}.{GLIBC_MAXIMA[1]})', 'ca-certificates'] + sorted(vistas)
 
 
 def depende_rpm(sistema):
     """Dependencias del .rpm: por el nombre de cada librería, como las calcula rpmbuild."""
-    return [f'libc.so.6(GLIBC_{GLIBC_MAXIMA[0]}.{GLIBC_MAXIMA[1]})(64bit)'] + [f'{n}()(64bit)' for n in sistema]
+    return ([f'libc.so.6(GLIBC_{GLIBC_MAXIMA[0]}.{GLIBC_MAXIMA[1]})(64bit)', 'ca-certificates']
+            + [f'{n}()(64bit)' for n in sistema])

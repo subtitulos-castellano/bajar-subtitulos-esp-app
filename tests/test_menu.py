@@ -564,6 +564,18 @@ class JuntoAlReloj(test_nucleo.ConSimulacion):
         self.assertTrue(self.v.close())
         self.assertEqual(ocultas, [])
 
+    def test_sin_zona_de_iconos_la_opcion_no_se_puede_usar(self):
+        a = self.v.ajustes
+        a.poner_bandeja_disponible(False)                 # GNOME sin extensión, WSLg…
+        self.assertFalse(a.bandeja.isEnabled())
+        self.assertFalse(a.bandeja.isChecked())
+        self.assertIn('AppIndicator', a.ayuda_bandeja.text())
+        self.assertTrue(self.config.cerrar_a_bandeja)     # lo elegido no cambia
+        a.poner_bandeja_disponible(True)
+        self.assertTrue(a.bandeja.isEnabled())
+        self.assertTrue(a.bandeja.isChecked())
+        self.assertNotIn('AppIndicator', a.ayuda_bandeja.text())
+
     def test_la_opcion_se_guarda(self):
         self.v.ajustes.bandeja.setChecked(False)
         self.assertFalse(Config(self.config.ruta).cerrar_a_bandeja)

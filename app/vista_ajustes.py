@@ -307,6 +307,8 @@ class VistaAjustes(QWidget):
         self.bandeja = fila.control
         self.bandeja.setChecked(config.cerrar_a_bandeja)
         self.bandeja.toggled.connect(self._bandeja)
+        self.ayuda_bandeja = fila.findChild(QLabel, 'ayuda')
+        self._texto_bandeja = self.ayuda_bandeja.text()
         temas = QWidget()
         tl = QHBoxLayout(temas)
         tl.setContentsMargins(0, 0, 0, 0)
@@ -586,6 +588,17 @@ class VistaAjustes(QWidget):
         self.estado_menu.setText(self._texto_menu)
         self.config.menu_contextual = activo
         self.config.guardar()
+
+    def poner_bandeja_disponible(self, disponible):
+        """Sin zona de iconos junto al reloj (GNOME sin extensión, WSLg…) la opción no se puede usar: se
+        muestra apagada y se explica por qué, sin cambiar lo guardado (vuelve si el escritorio la tiene)."""
+        self.bandeja.blockSignals(True)
+        self.bandeja.setChecked(self.config.cerrar_a_bandeja and disponible)
+        self.bandeja.blockSignals(False)
+        self.bandeja.setEnabled(disponible)
+        self.ayuda_bandeja.setText(self._texto_bandeja if disponible else tr(
+            'No disponible: este escritorio no muestra iconos junto al reloj. En GNOME se activan con la '
+            'extensión «AppIndicator and KStatusNotifierItem Support».'))
 
     def _bandeja(self, activo):
         self.config.cerrar_a_bandeja = activo

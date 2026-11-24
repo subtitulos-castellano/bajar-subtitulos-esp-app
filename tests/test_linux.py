@@ -40,6 +40,60 @@ class EntornoParaOtrosProgramas(unittest.TestCase):
 
 
 @unittest.skipUnless(LINUX, 'solo en Linux')
+class Certificados(unittest.TestCase):
+    """El OpenSSL del programa compilado viene de AlmaLinux: en otras distribuciones hay que decirle dónde
+    están los certificados del sistema (si no, «SSLCertVerificationError» con OpenSubtitles.org)."""
+    SIN = {'SSL_CERT_FILE': '', 'SSL_CERT_DIR': ''}
+
+    def _limpio(self, extra=None):
+        entorno = mock.patch.dict(os.environ, dict(self.SIN, **(extra or {})))
+        entorno.start()
+        self.addCleanup(entorno.stop)
+        for v in ('SSL_CERT_FILE', 'SSL_CERT_DIR'):
+            if not os.environ[v]:
+                del os.environ[v]
+
+    def _openssl_busca_en(self, ruta):
+        import ssl
+        rutas = ssl.get_default_verify_paths()
+        return mock.patch('ssl.get_default_verify_paths', return_value=rutas._replace(openssl_cafile=ruta))
+
+    def test_desde_el_codigo_no_cambia(self):
+        self._limpio()
+        with self._openssl_busca_en('/no-existe/cert.pem'):
+            self.assertIsNone(linux.certificados())
+        self.assertNotIn('SSL_CERT_FILE', os.environ)
+
+    def test_compilado_usa_los_del_sistema(self):
+        self._limpio()
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(sys, 'frozen', True, create=True):
+            debian = Path(d, 'ca-certificates.crt')
+            debian.write_text('x')
+            with self._openssl_busca_en('/no-existe/cert.pem'), \
+                    mock.patch.object(linux, 'CERTIFICADOS', ('/no-existe/ca-bundle.crt', str(debian))):
+                self.assertEqual(linux.certificados(), str(debian))
+                self.assertEqual(os.environ['SSL_CERT_FILE'], str(debian))
+
+    def test_compilado_sin_certificados_del_sistema_usa_certifi(self):
+        self._limpio()
+        import certifi
+        with mock.patch.object(sys, 'frozen', True, create=True), self._openssl_busca_en('/no-existe/cert.pem'), \
+                mock.patch.object(linux, 'CERTIFICADOS', ('/no-existe/ca-bundle.crt',)):
+            self.assertEqual(linux.certificados(), certifi.where())
+
+    def test_no_toca_nada_si_openssl_los_encuentra_o_el_usuario_eligio(self):
+        with tempfile.NamedTemporaryFile() as f, mock.patch.object(sys, 'frozen', True, create=True):
+            self._limpio()
+            with self._openssl_busca_en(f.name):            # AlmaLinux, Fedora…
+                self.assertIsNone(linux.certificados())
+                self.assertNotIn('SSL_CERT_FILE', os.environ)
+            self._limpio({'SSL_CERT_DIR': '/mis/certificados'})
+            with self._openssl_busca_en('/no-existe/cert.pem'):
+                self.assertIsNone(linux.certificados())
+                self.assertNotIn('SSL_CERT_FILE', os.environ)
+
+
+@unittest.skipUnless(LINUX, 'solo en Linux')
 class Carpetas(unittest.TestCase):
     def test_config_xdg(self):
         with mock.patch.dict(os.environ, {'XDG_CONFIG_HOME': '/tmp/xdg-prueba'}):

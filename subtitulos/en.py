@@ -297,6 +297,10 @@ TEXTOS = {
         'Show the window: as when dragging onto the app. In the background: no window; just an icon next to the '
         'clock while searching (to see the progress or cancel) and a notification with the summary at the end.',
     'Solo en Windows.': 'Windows only.',
+    'No disponible: este escritorio no muestra iconos junto al reloj. En GNOME se activan con la '
+    'extensión «AppIndicator and KStatusNotifierItem Support».':
+        'Not available: this desktop does not show icons next to the clock. In GNOME, they are enabled with '
+        'the "AppIndicator and KStatusNotifierItem Support" extension.',
     'Todavía no está disponible en Linux: llegará en una próxima versión.':
         'Not available on Linux yet: it will come in a future version.',
     'No se ha podido cambiar el menú contextual ({error}).': 'The context menu could not be changed ({error}).',

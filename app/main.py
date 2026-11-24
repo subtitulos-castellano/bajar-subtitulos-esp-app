@@ -121,6 +121,18 @@ def autoprueba(salida, con_red=False):
     paso('keyring', llavero)
     paso('certificados', lambda: __import__('certifi').where())
 
+    def certificados_sistema():
+        """Las conexiones que usan los certificados del sistema (no los de certifi), p. ej. OpenSubtitles.org."""
+        import os
+        import ssl
+        contexto = ssl.create_default_context()
+        n = contexto.cert_store_stats()['x509_ca']
+        if not n:
+            rutas = ssl.get_default_verify_paths()
+            raise RuntimeError(f'sin certificados de confianza (OpenSSL los busca en {rutas.openssl_cafile})')
+        return f"{n} certificados · {os.environ.get('SSL_CERT_FILE') or ssl.get_default_verify_paths().cafile}"
+    paso('certificados del sistema', certificados_sistema)
+
     def actualizaciones():
         from app import actualizar
         if actualizar.version(__version__) is None:
@@ -338,6 +350,7 @@ def main(argv=None):
     if LINUX:
         from app.plataforma import linux
         linux.entorno_para_otros_programas()
+        linux.certificados()
     if args.autoprueba:
         return autoprueba(args.autoprueba, args.con_red)
     if args.menu_contextual_instalar or args.menu_contextual_quitar:
@@ -447,6 +460,7 @@ def _atender_pedidos(app, ventana, config, args):
     app.agrupador = instancia.Agrupador(parent=app)
     app.bandeja = Bandeja(ventana, icono_app(), salir, lambda: config.cerrar_a_bandeja, app)
     ventana.puede_ir_a_bandeja = QSystemTrayIcon.isSystemTrayAvailable()
+    ventana.ajustes.poner_bandeja_disponible(ventana.puede_ir_a_bandeja)
     ventana.ajustes.bandeja_cambiada.connect(app.bandeja.actualizar)
     app.bandeja.actualizar()
     # Al apagar Windows o cerrar sesión, la ventana se cierra de verdad (si no, lo impediría).
@@ -467,9 +481,11 @@ def _atender_pedidos(app, ventana, config, args):
             if not ventana.isVisible() and ventana.trabajador is None:
                 ventana.mostrar()          # nada válido que buscar: al menos se abre la app
             return
-        if menu and config.menu_segundo_plano and not ventana.isVisible():
+        # En segundo plano solo si hay icono junto al reloj: si no, no habría forma de volver a la ventana.
+        segundo_plano = menu and config.menu_segundo_plano and ventana.puede_ir_a_bandeja
+        if segundo_plano and not ventana.isVisible():
             app.bandeja.empezar()
-        elif not (menu and config.menu_segundo_plano):
+        elif not segundo_plano:
             ventana.traer_al_frente()
         ventana.procesar(rutas, recursivo)
 
