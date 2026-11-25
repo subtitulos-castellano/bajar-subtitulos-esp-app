@@ -153,7 +153,7 @@ def autoprueba(salida, con_red=False):
         srt = traducir_srt('1\n00:00:05,000 --> 00:00:07,000\nWhere is my phone?\n', modelo.motor())
         if 'teléfono' not in srt:
             raise RuntimeError(f'no traduce: {srt!r}')
-        return f'ctranslate2 {ctranslate2.__version__} · traducido: {srt.splitlines()[-1]}'
+        return f'ctranslate2 {ctranslate2.__version__} · traducido: {srt.strip().splitlines()[-1]}'
     paso('traductor', traductor)
 
     def actualizaciones():

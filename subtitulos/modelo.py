@@ -22,8 +22,8 @@ from .idioma import tr
 NOMBRE = 'traductor-en-es-1'
 MODELO_TAG = 'traductor-en-es-1'
 URL = f'https://github.com/subtitulos-castellano/bajar-subtitulos-esp-app/releases/download/{MODELO_TAG}/{NOMBRE}.zip'
-SHA256 = 'PENDIENTE'
-TAMANO = 0                       # bytes del .zip (para la barra de progreso y el aviso)
+SHA256 = '61e9cf3902216bbcb35a6792e5b6ee5f583ce36840ec646ec33faadb156ee09c'
+TAMANO = 214771090                     # bytes del .zip (para la barra de progreso y el aviso)
 TAMANO_MAX = 400 * 1024 * 1024   # nunca se descarga ni se descomprime más que esto
 # Lo único que se saca del .zip (nada de rutas: cada uno va directo a la carpeta del modelo).
 ARCHIVOS = ('config.json', 'model.bin', 'shared_vocabulary.json', 'source.spm', 'target.spm', 'LICENSE.txt',
