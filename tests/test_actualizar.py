@@ -5,6 +5,7 @@ La descarga se prueba de verdad contra un servidor HTTP local.
 import hashlib
 import http.server
 import json
+import re
 import sys
 import tempfile
 import threading
@@ -132,6 +133,25 @@ class Interpretar(unittest.TestCase):
             n, _ = interpretar(d, sistema='linux')
         self.assertEqual(n.version, '1.0.2')
         self.assertIsNone(n.instalador)                     # solo se ofrece abrir la página
+
+    def test_tambien_con_el_sistema_en_el_nombre(self):
+        """Las Releases pueden pasar a llamarse …-windows-instalador.exe, …-linux-amd64.deb… (para que en
+        GitHub salgan agrupados): esta versión ya los reconoce."""
+        tag, v = 'v2.0.0', '2.0.0'
+        win = f'BajarSubtitulosESP-{v}-windows-instalador.exe'
+        linux = [f'BajarSubtitulosESP-{v}-linux-{s}' for s in ('amd64.deb', 'x86_64.rpm', 'x86_64.AppImage')]
+
+        def con(*nombres):
+            return release(tag=tag, assets=[{'name': n, 'size': 5, 'digest': f'sha256:{SHA}',
+                                             'browser_download_url': f'{REPO}/releases/download/{tag}/{n}'}
+                                            for n in nombres])
+        n, _ = act.interpretar([con(win, *linux)], actual='1.5.1', sistema='windows')
+        self.assertEqual(n.instalador.nombre, win)
+        for tipo, nombre in zip(('deb', 'rpm', 'appimage'), linux):
+            n, _ = act.interpretar([con(win, *linux)], actual='1.5.1', sistema='linux', tipo=tipo)
+            self.assertEqual(n.instalador.nombre, nombre)
+        n, _ = act.interpretar([con(f'BajarSubtitulosESP-{v}-linux-instalador.exe')], actual='1.5.1', sistema='windows')
+        self.assertIsNone(n.instalador)                     # el sistema del nombre tiene que ser el suyo
 
     def test_leer_sumas(self):
         texto = f'{SHA}  BajarSubtitulosESP-1.0.2-instalador.exe\n{"cd" * 32} *otro.zip\nbasura\n'
@@ -321,11 +341,12 @@ class Descargar(unittest.TestCase):
         self.assertEqual(act.descargar(self.archivo(), self.carpeta).read_bytes(), _Servidor.contenido)
 
     def test_nombres_de_linux(self):
-        for sufijo in ('amd64.deb', 'x86_64.rpm', 'x86_64.AppImage'):
+        for sufijo in ('amd64.deb', 'x86_64.rpm', 'x86_64.AppImage', 'linux-amd64.deb', 'linux-x86_64.rpm',
+                       'linux-x86_64.AppImage', 'windows-instalador.exe'):
             self.assertTrue(act.descargar(self.archivo(nombre=f'BajarSubtitulosESP-1.0.2-{sufijo}'), self.carpeta)
                             .is_file())
         for malo in ('BajarSubtitulosESP-1.0.2-amd64.deb.sh', 'BajarSubtitulosESP-1.0.2-x86_64.AppImage/../x',
-                     'otro-1.0.2-amd64.deb'):
+                     'otro-1.0.2-amd64.deb', 'BajarSubtitulosESP-1.0.2-mac-amd64.deb'):
             with self.assertRaises(act.ErrorActualizacion):
                 act.descargar(self.archivo(nombre=malo), self.carpeta)
 
@@ -371,9 +392,6 @@ class Instalar(unittest.TestCase):
             self.assertTrue(act.instalada(exe))
         self.assertFalse(act.instalada())          # desde el código fuente: nunca se instala sola
 
-
-if __name__ == '__main__':
-    unittest.main(verbosity=2)
 
 
 @unittest.skipUnless(sys.platform.startswith('linux'), 'solo en Linux')
@@ -464,3 +482,30 @@ class InstalarEnLinux(unittest.TestCase):
     def test_descargas_en_la_cache_del_usuario(self):
         with mock.patch.dict(act.os.environ, {'XDG_CACHE_HOME': str(self.d)}):
             self.assertEqual(act.carpeta_descargas(), self.d / 'bajar-subtitulos-esp' / 'actualizacion')
+
+
+class InstruccionesDeLaRelease(unittest.TestCase):
+    """packaging/INSTALAR.md (el workflow pone la versión y lo sube a cada Release) nombra exactamente los
+    archivos que se publican: si cambia un nombre, hay que cambiarlo también ahí."""
+    PLANTILLA = Path(__file__).resolve().parent.parent / 'packaging' / 'INSTALAR.md'
+
+    def test_nombra_los_archivos_de_la_release(self):
+        texto = self.PLANTILLA.read_text(encoding='utf-8').replace('@VERSION@', '9.8.7')
+        nombres = {act.nombre_instalador('9.8.7', 'windows')}
+        nombres |= {act.nombre_instalador('9.8.7', 'linux', t) for t in act.SUFIJOS_LINUX}
+        nombres |= {'BajarSubtitulosESP-9.8.7-portable.zip', 'BajarSubtitulosESP-9.8.7-linux-x86_64.tar.gz'}
+        for nombre in nombres:
+            self.assertIn(nombre, texto)
+        # y ningún otro (una errata en un nombre dejaría una orden que no funciona)
+        citados = set(re.findall(r'BajarSubtitulosESP-9\.8\.7-[A-Za-z0-9_.-]*[A-Za-z0-9]', texto))
+        self.assertEqual(citados, nombres)
+        self.assertNotRegex(texto, r'BajarSubtitulosESP-(?!9\.8\.7-)[0-9]')    # sin versiones escritas a mano
+
+    def test_el_workflow_lo_publica(self):
+        wf = (self.PLANTILLA.parent.parent / '.github' / 'workflows' / 'compilar.yml').read_text(encoding='utf-8')
+        self.assertIn('packaging/INSTALAR.md > dist/INSTALAR.md', wf)
+        self.assertIn('"dist/INSTALAR.md#', wf)
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)

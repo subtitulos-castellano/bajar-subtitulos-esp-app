@@ -1,5 +1,13 @@
 # Cambios
 
+## 1.5.1
+
+- En la página de descargas de GitHub, cada archivo dice si es de **Windows** o de **Linux** y para qué
+  distribución, y hay un **`INSTALAR.md`** con la línea exacta que hay que pegar en el terminal para
+  instalar cada archivo de Linux (en castellano y en inglés).
+- Las actualizaciones automáticas reconocen ya los archivos de las próximas versiones aunque lleven el
+  sistema en el nombre (`…-windows-instalador.exe`, `…-linux-amd64.deb`…).
+
 ## 1.5.0
 
 - **Ya disponible para Linux**: la misma app, con el mismo número de versión que la de Windows. Hay un

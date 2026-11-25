@@ -39,7 +39,9 @@ segundos para extraer la pista de un vídeo en un disco lento.
 ## Instalar
 
 Descarga la última versión desde **Releases**. Windows y Linux tienen siempre el mismo número de
-versión.
+versión. Cada Release trae **`INSTALAR.md`**, con estas mismas instrucciones resumidas (en castellano y
+en inglés) y los nombres de los archivos de esa versión ya escritos: en Linux basta con copiar la línea
+de tu distribución y pegarla en un terminal abierto en la carpeta de la descarga.
 
 ### Windows
 
@@ -514,7 +516,9 @@ el AppImage y, con nfpm, el `.deb` y el `.rpm`.
    desinstalar sin restos.
 3. Con una etiqueta `vX.Y.Z`, publica la Release con las notas de `CHANGELOG.md` y, tras la marca
    `<!-- en -->`, las de `CHANGELOG.en.md` (la app enseña las de su idioma). Junto con
-   `SHA256SUMS.txt` y la atestación de procedencia de cada archivo.
+   `INSTALAR.md` (`packaging/INSTALAR.md` con `@VERSION@` cambiado por la versión), `SHA256SUMS.txt` y
+   la atestación de procedencia de cada archivo. Cada archivo lleva una etiqueta (*Windows · …*,
+   *Linux · …*), que GitHub muestra en lugar del nombre.
 
 Para publicar una versión:
 

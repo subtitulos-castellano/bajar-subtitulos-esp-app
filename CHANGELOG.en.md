@@ -3,6 +3,14 @@
 English version of the release notes, shown by the app when it is in English. Earlier versions are
 only in Spanish: see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.5.1
+
+- On the GitHub downloads page, each file now says whether it is for **Windows** or **Linux** and which
+  distribution, and there is an **`INSTALAR.md`** with the exact line to paste into the terminal to
+  install each Linux file (in Spanish and English).
+- Automatic updates already recognise the files of upcoming versions even if they carry the system in
+  their name (`…-windows-instalador.exe`, `…-linux-amd64.deb`…).
+
 ## 1.5.0
 
 - **Now available for Linux**: the same app, with the same version number as the Windows one. There is a

@@ -243,10 +243,15 @@ jobs:
             [ -f "$f" ] || { echo "Falta $f"; ls -l; exit 1; }
           done
 
+      - name: Instrucciones de instalación (INSTALAR.md, con los nombres de esta versión)
+        run: |
+          sed "s/@VERSION@/${GITHUB_REF_NAME#v}/g" packaging/INSTALAR.md > dist/INSTALAR.md
+          if grep -q @VERSION@ dist/INSTALAR.md; then echo 'Queda @VERSION@ sin sustituir'; exit 1; fi
+
       - name: Sumas SHA-256
         working-directory: dist
         run: |
-          sha256sum *-instalador.exe *-portable.zip *.deb *.rpm *.AppImage *-linux-x86_64.tar.gz > SHA256SUMS.txt
+          sha256sum *-instalador.exe *-portable.zip *.deb *.rpm *.AppImage *-linux-x86_64.tar.gz INSTALAR.md > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Atestación de procedencia
@@ -259,6 +264,7 @@ jobs:
             dist/*.rpm
             dist/*.AppImage
             dist/*-linux-x86_64.tar.gz
+            dist/INSTALAR.md
 
       - name: Release
         env:
@@ -271,6 +277,16 @@ jobs:
           if [ -n "$notas_en" ]; then
             notas="${notas}"$'\n\n<!-- en -->\n\n### English\n\n'"${notas_en}"
           fi
-          gh release create "$GITHUB_REF_NAME" dist/*-instalador.exe dist/*-portable.zip dist/*.deb dist/*.rpm \
-            dist/*.AppImage dist/*-linux-x86_64.tar.gz dist/SHA256SUMS.txt \
+          # Cada archivo con una etiqueta («archivo#etiqueta»): GitHub la muestra en lugar del nombre, para
+          # que se vea de un vistazo cuál es de Windows y cuál de Linux. La descarga conserva el nombre.
+          a="dist/BajarSubtitulosESP-${GITHUB_REF_NAME#v}"
+          gh release create "$GITHUB_REF_NAME" \
+            "$a-instalador.exe#Windows · Instalador (.exe)" \
+            "$a-portable.zip#Windows · Portable, sin instalar (.zip)" \
+            "$a-amd64.deb#Linux · Ubuntu, Debian, Linux Mint… (.deb)" \
+            "$a-x86_64.rpm#Linux · Fedora, AlmaLinux, Rocky, openSUSE… (.rpm)" \
+            "$a-x86_64.AppImage#Linux · AppImage, cualquier distribución" \
+            "$a-linux-x86_64.tar.gz#Linux · Comprimido (.tar.gz)" \
+            "dist/INSTALAR.md#Cómo instalar · How to install (INSTALAR.md)" \
+            "dist/SHA256SUMS.txt#Sumas SHA-256 de todos los archivos" \
             --title "Bajar Subtítulos ESP $GITHUB_REF_NAME" --notes "${notas:-Ver CHANGELOG.md}"
