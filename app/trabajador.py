@@ -26,12 +26,9 @@ def nucleo():
         return n
 
 
-_motor = None          # el traductor cargado (modo 'traducido'): se reutiliza en las siguientes búsquedas
-
-
 def traductor(detalle, cancelado):
-    """El traductor listo, descargándolo antes si hace falta (solo la primera vez)."""
-    global _motor
+    """El traductor listo, descargándolo antes si hace falta (solo la primera vez). Se carga en cada búsqueda
+    (tarda menos de medio segundo) y se suelta al terminar: cargado ocupa unos 300 MB de memoria."""
     from subtitulos import modelo
     from subtitulos.idioma import tr
     if not modelo.instalado():
@@ -44,10 +41,7 @@ def traductor(detalle, cancelado):
                 ultimo[0] = pct
                 detalle(f'  {pct} %')
         modelo.descargar(progreso, cancelado)
-    with _carga:
-        if _motor is None:
-            _motor = modelo.motor()
-        return _motor
+    return modelo.motor()
 
 
 def precargar():

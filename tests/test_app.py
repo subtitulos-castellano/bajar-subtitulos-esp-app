@@ -367,6 +367,43 @@ class VentanaCompleta(test_nucleo.ConSimulacion):
             v.close()
 
 
+    def test_idioma_de_los_subtitulos(self):
+        """El selector guarda el modo; las opciones de latino e inglés solo cuentan con el castellano."""
+        with tempfile.TemporaryDirectory() as d:
+            ruta = Path(d) / 'config.json'
+            v = Ventana(Config(ruta))
+            a = v.ajustes
+            self.assertTrue(a.botones_modo['castellano'].isChecked())
+            self.assertTrue(a.fila_latino.isEnabled())
+            a.botones_modo['ingles'].click()
+            self.assertEqual(Config(ruta).opciones.modo, 'ingles')
+            for fila in (a.fila_latino, a.fila_ingles, a.fila_ingles_extra):
+                self.assertFalse(fila.isEnabled())
+            self.assertIn('Solo inglés', v.inicio.resumen_opciones.text())
+            with mock.patch.object(a, '_descargar_modelo') as descargar, \
+                    mock.patch('subtitulos.modelo.instalado', return_value=False):
+                a.botones_modo['traducido'].click()
+            descargar.assert_called_once()              # sin traductor: se descarga al elegirlo
+            self.assertEqual(Config(ruta).opciones.modo, 'traducido')
+            a.restaurar()
+            self.assertTrue(a.botones_modo['castellano'].isChecked())
+            self.assertTrue(a.fila_latino.isEnabled())
+            self.assertEqual(Config(ruta).opciones, Opciones())
+            v.close()
+
+    def test_en_ingles_desde_el_menu(self):
+        """«Bajar subtítulos en inglés»: esa búsqueda, en inglés, sin cambiar la configuración; lo pedido, en verde."""
+        with tempfile.TemporaryDirectory() as d:
+            config = Config(Path(d) / 'config.json')
+            v = Ventana(config)
+            v.procesar([self.videos / 'c_incrustado.mkv'], True, 'ingles')
+            esperar(lambda: v.trabajador is None)
+            self.assertEqual([r.estado for r in v.inicio.modelo.resultados], ['INGLÉS (incrustado)'])
+            self.assertEqual(v.inicio.r_titulo.text(), 'Listo')
+            self.assertEqual(config.opciones.modo, 'castellano')
+            v.close()
+
+
 class PoolLento(test_nucleo.PoolFalso):
     """Proveedor que tarda 3 s en responder."""
 
