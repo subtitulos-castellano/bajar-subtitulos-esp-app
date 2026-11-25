@@ -68,29 +68,31 @@ Windows: Configuración de Windows > Aplicaciones > Bajar Subtítulos ESP > Desi
 La versión portable se borra sin más.
 
 Linux: cierra antes la app (también el icono junto al reloj, si lo tiene). Copia la línea
-de la misma letra con la que la instalaste y pégala en un terminal. Cada línea quita
-primero el menú contextual (Dolphin, Nemo, Nautilus) y después la app.
+de la misma letra con la que la instalaste y pégala en un terminal. Además de la app, se
+quitan su menú contextual (Dolphin, Nemo, Nautilus), los accesos que le hayas puesto en el
+escritorio y en la barra de tareas, y si la habías quitado del menú de aplicaciones, al
+volver a instalarla aparecerá otra vez.
 
 A. Ubuntu, Debian, Linux Mint:
 
-    bajar-subtitulos-esp --menu-contextual-quitar; sudo apt remove bajar-subtitulos-esp
+    sudo apt remove bajar-subtitulos-esp
 
 B. Fedora, AlmaLinux, Rocky Linux, RHEL:
 
-    bajar-subtitulos-esp --menu-contextual-quitar; sudo dnf remove bajar-subtitulos-esp
+    sudo dnf remove bajar-subtitulos-esp
 
 C. openSUSE Tumbleweed:
 
-    bajar-subtitulos-esp --menu-contextual-quitar; sudo zypper remove bajar-subtitulos-esp
+    sudo zypper remove bajar-subtitulos-esp
 
 D. AppImage, en la carpeta donde lo tengas (sirve aunque se haya actualizado y su nombre
    lleve otra versión; también lo quita del menú de aplicaciones):
 
-    for a in BajarSubtitulosESP-*-x86_64.AppImage; do "./$a" --menu-contextual-quitar; rm -f "$a"; done; rm -f ~/.local/share/applications/bajar-subtitulos-esp.desktop ~/.local/share/icons/hicolor/scalable/apps/bajar-subtitulos-esp.svg
+    for a in BajarSubtitulosESP-*-x86_64.AppImage; do "./$a" --desinstalar; rm -f "$a"; done
 
 E. Carpeta comprimida, en la carpeta donde la descomprimiste:
 
-    ./bajar-subtitulos-esp/bajar-subtitulos-esp --menu-contextual-quitar; rm -rf bajar-subtitulos-esp
+    ./bajar-subtitulos-esp/bajar-subtitulos-esp --desinstalar; rm -rf bajar-subtitulos-esp
 
 Tus preferencias se conservan por si vuelves a instalarla. Para borrarlas también:
 
@@ -192,29 +194,31 @@ Windows: Windows Settings > Apps > Bajar Subtítulos ESP > Uninstall. The portab
 is simply deleted.
 
 Linux: close the app first (including the icon next to the clock, if it has one). Copy the
-line with the same letter you installed it with and paste it into a terminal. Each line
-first removes the context menu (Dolphin, Nemo, Nautilus) and then the app.
+line with the same letter you installed it with and paste it into a terminal. Besides the
+app, this removes its context menu (Dolphin, Nemo, Nautilus) and the shortcuts you gave it
+on the desktop and the taskbar, and if you had removed it from the applications menu, it
+will appear again when you reinstall it.
 
 A. Ubuntu, Debian, Linux Mint:
 
-    bajar-subtitulos-esp --menu-contextual-quitar; sudo apt remove bajar-subtitulos-esp
+    sudo apt remove bajar-subtitulos-esp
 
 B. Fedora, AlmaLinux, Rocky Linux, RHEL:
 
-    bajar-subtitulos-esp --menu-contextual-quitar; sudo dnf remove bajar-subtitulos-esp
+    sudo dnf remove bajar-subtitulos-esp
 
 C. openSUSE Tumbleweed:
 
-    bajar-subtitulos-esp --menu-contextual-quitar; sudo zypper remove bajar-subtitulos-esp
+    sudo zypper remove bajar-subtitulos-esp
 
 D. AppImage, in the folder where you keep it (it works even if it has updated itself and
    its name has another version; it also removes it from the applications menu):
 
-    for a in BajarSubtitulosESP-*-x86_64.AppImage; do "./$a" --menu-contextual-quitar; rm -f "$a"; done; rm -f ~/.local/share/applications/bajar-subtitulos-esp.desktop ~/.local/share/icons/hicolor/scalable/apps/bajar-subtitulos-esp.svg
+    for a in BajarSubtitulosESP-*-x86_64.AppImage; do "./$a" --desinstalar; rm -f "$a"; done
 
 E. Compressed folder, in the folder where you unpacked it:
 
-    ./bajar-subtitulos-esp/bajar-subtitulos-esp --menu-contextual-quitar; rm -rf bajar-subtitulos-esp
+    ./bajar-subtitulos-esp/bajar-subtitulos-esp --desinstalar; rm -rf bajar-subtitulos-esp
 
 Your settings are kept in case you install it again. To delete them too:
 

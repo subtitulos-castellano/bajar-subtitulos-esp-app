@@ -74,8 +74,10 @@ el archivo según tu distribución:
 - **`.deb` y `.rpm`:** el gestor de paquetes instala también lo que haga falta del sistema. La app
   queda en el menú de aplicaciones (*Bajar Subtítulos ESP*) y en la orden `bajar-subtitulos-esp`. Se
   desinstala con `sudo apt remove bajar-subtitulos-esp`, `sudo dnf remove bajar-subtitulos-esp` o
-  `sudo zypper remove bajar-subtitulos-esp` (en `INSTALAR-<versión>.txt`, la línea que quita también el
-  menú contextual).
+  `sudo zypper remove bajar-subtitulos-esp`. Al desinstalarse del todo (no al actualizar), quita además,
+  a cada usuario del equipo, el menú contextual, los accesos que le haya puesto en el escritorio y en la
+  barra de tareas de Plasma, y la nota que deja KDE si la quitó del menú de aplicaciones: así, al
+  reinstalarla, vuelve a aparecer en él.
 - **AppImage:** un solo archivo con todo dentro. Dale permiso de ejecución y ábrelo:
 
   ```bash
@@ -84,7 +86,9 @@ el archivo según tu distribución:
   ```
 
   No necesita `libfuse2`. La primera vez pregunta si lo añades al menú de aplicaciones. Para
-  desinstalarlo, bórralo (antes, si quieres, quítalo del menú en Configuración).
+  desinstalarlo, en su carpeta, `./BajarSubtitulosESP-<versión>-x86_64.AppImage --desinstalar` (quita lo
+  mismo que el `.deb` y el `.rpm`, y su entrada del menú de aplicaciones) y bórralo. La línea exacta está
+  en `INSTALAR-<versión>.txt`.
 - **`BajarSubtitulosESP-<versión>-linux-x86_64.tar.gz`:** la misma carpeta, comprimida. Descomprímela y
   abre `bajar-subtitulos-esp/bajar-subtitulos-esp`. No se actualiza sola.
 
@@ -316,7 +320,8 @@ app solo pregunta a GitHub por la última versión publicada, sin enviar nada tu
 | Entrada del AppImage en el menú de aplicaciones | `~/.local/share/applications/bajar-subtitulos-esp.desktop` y su icono |
 | Paquete de la última actualización | `~/.cache/bajar-subtitulos-esp/actualizacion` (se borra solo) |
 
-Al desinstalar, todo esto se conserva (salvo el menú contextual): es tuyo y lo comparte la skill.
+Al desinstalar, todo esto se conserva (salvo el menú contextual y, en Linux, los accesos del escritorio
+y de la barra de tareas): es tuyo y lo comparte la skill.
 
 ## Preguntas frecuentes
 

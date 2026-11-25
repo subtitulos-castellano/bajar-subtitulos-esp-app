@@ -257,9 +257,6 @@ class LlaveroQueNoHay(unittest.TestCase):
             self.assertFalse(credenciales.disponible())
 
 
-if __name__ == '__main__':
-    unittest.main(verbosity=2)
-
 
 @unittest.skipUnless(LINUX, 'solo en Linux')
 class MenuContextualLinux(unittest.TestCase):
@@ -509,3 +506,167 @@ class MenuDeAplicaciones(unittest.TestCase):
             v2.ajustes.menu_apps.click()
             self.assertFalse(self.ma.anadida())
             self.assertIs(self.config.menu_aplicaciones, False)
+
+
+@unittest.skipUnless(LINUX, 'solo en Linux')
+class AccesosAlDesinstalar(unittest.TestCase):
+    """--desinstalar (los .deb y .rpm lo ejecutan para cada usuario): accesos del escritorio, anclado en la
+    barra de Plasma y la app oculta a mano del menú. En un $HOME temporal, nunca en el de verdad."""
+
+    # Lo que dejó KDE en un AlmaLinux 10 con Plasma 6 al «borrar» la app del menú (y, abajo, cómo debe quedar).
+    KMENUEDIT = """<!DOCTYPE Menu PUBLIC '-//freedesktop//DTD Menu 1.0//EN' 'http://www.freedesktop.org/standards/menu-spec/menu-1.0.dtd'>
+<Menu>
+ <Menu>
+  <Name>Multimedia</Name>
+  <Layout>
+   <Merge type="menus"/>
+   <Menuname>More</Menuname>
+   <Merge type="files"/>
+   <Filename>org.kde.dragonplayer.desktop</Filename>
+   <Filename>org.kde.elisa.desktop</Filename>
+  </Layout>
+  <Exclude>
+   <Filename>bajar-subtitulos-esp.desktop</Filename>
+  </Exclude>
+ </Menu>
+ <Menu>
+  <Name>.hidden</Name>
+  <Include>
+   <Filename>bajar-subtitulos-esp.desktop</Filename>
+  </Include>
+ </Menu>
+</Menu>
+"""
+    KMENUEDIT_LIMPIO = KMENUEDIT.replace('   <Filename>bajar-subtitulos-esp.desktop</Filename>\n', '')
+    SISTEMA = Path(__file__).resolve().parent.parent / 'packaging' / 'linux' / 'bajar-subtitulos-esp.desktop'
+
+    def setUp(self):
+        from app.plataforma import accesos_linux as al
+        self.al = al
+        self._d = tempfile.TemporaryDirectory()
+        self.addCleanup(self._d.cleanup)
+        self.casa = Path(self._d.name) / 'casa'
+        self.config = self.casa / '.config'
+        self.datos = self.casa / '.local' / 'share'
+        self.escritorio = self.casa / 'Escritorio'
+        for c in (self.config / 'menus', self.datos / 'applications', self.escritorio):
+            c.mkdir(parents=True)
+        (self.config / 'user-dirs.dirs').write_text('# xdg-user-dirs\nXDG_DESKTOP_DIR="$HOME/Escritorio"\n'
+                                                     'XDG_DOWNLOAD_DIR="$HOME/Descargas"\n')
+        self.entorno = {'HOME': str(self.casa), 'XDG_CONFIG_HOME': str(self.config),
+                        'XDG_DATA_HOME': str(self.datos)}
+        e = mock.patch.dict(os.environ, self.entorno)
+        e.start()
+        self.addCleanup(e.stop)
+        sin_kde = mock.patch.object(al, '_ejecutar', return_value=True)     # kbuildsycoca, qdbus…
+        self.ejecutar = sin_kde.start()
+        self.addCleanup(sin_kde.stop)
+
+    def test_carpeta_del_escritorio(self):
+        self.assertEqual(self.al.carpeta_escritorio(), self.escritorio)
+        (self.config / 'user-dirs.dirs').unlink()
+        self.assertEqual(self.al.carpeta_escritorio(), self.casa / 'Desktop')
+
+    def test_vuelve_al_menu_tras_ocultarla_en_kde(self):
+        menu = self.config / 'menus' / 'applications-kmenuedit.menu'
+        menu.write_text(self.KMENUEDIT)
+        self.assertTrue(self.al.mostrar_en_menu())
+        self.assertEqual(menu.read_text(), self.KMENUEDIT_LIMPIO)        # lo demás, igual
+        self.ejecutar.assert_called_once_with(['kbuildsycoca6'], ['kbuildsycoca5'])
+        self.assertFalse(self.al.mostrar_en_menu())                      # ya no hay nada que quitar
+
+    def test_solo_quita_lo_de_la_app(self):
+        texto = ('<Menu><Menu><Name>Juegos</Name><Exclude><Filename>otro.desktop</Filename>'
+                 '<Filename>bajar-subtitulos-esp.desktop</Filename></Exclude>'
+                 '<Layout><Filename>bajar-subtitulos-esp.desktop</Filename></Layout></Menu></Menu>\n')
+        self.assertEqual(self.al.sin_ocultar(texto), texto.replace(
+            '<Filename>bajar-subtitulos-esp.desktop</Filename></Exclude>', '</Exclude>'))
+
+    def test_copia_que_la_oculta_en_otros_escritorios(self):
+        copia = self.datos / 'applications' / 'bajar-subtitulos-esp.desktop'
+        copia.write_text(self.SISTEMA.read_text(encoding='utf-8') + 'NoDisplay=true\n', encoding='utf-8')
+        self.assertTrue(self.al.mostrar_en_menu())
+        self.assertFalse(copia.exists())
+        # La entrada del AppImage no es una nota para ocultarla: la quita menu_aplicaciones, si es suya.
+        copia.write_text('[Desktop Entry]\nNoDisplay=true\nX-BajarSubtitulosESP-AppImage=true\n')
+        self.assertFalse(self.al.mostrar_en_menu())
+        self.assertTrue(copia.exists())
+
+    def test_accesos_del_escritorio(self):
+        enlace = self.escritorio / 'bajar-subtitulos-esp.desktop'
+        enlace.symlink_to('/usr/share/applications/bajar-subtitulos-esp.desktop')    # como KDE (aquí, roto)
+        copia = self.escritorio / 'Bajar Subtítulos ESP.desktop'                     # como Cinnamon o GNOME
+        copia.write_text(self.SISTEMA.read_text(encoding='utf-8'), encoding='utf-8')
+        appimage = self.escritorio / 'subtitulos.desktop'
+        appimage.write_text('[Desktop Entry]\nType=Application\nName=Bajar Subtítulos ESP\n'
+                            'Exec="/home/x/Apps/BajarSubtitulosESP-1.5.4-x86_64.AppImage" %F\n'
+                            'Icon=bajar-subtitulos-esp\n', encoding='utf-8')
+        otros = {
+            'firefox.desktop': '[Desktop Entry]\nType=Application\nExec=firefox %u\nIcon=firefox\n',
+            'parecido.desktop': '[Desktop Entry]\nType=Application\nExec=otro-programa\nIcon=bajar-subtitulos-esp\n',
+            'bajar-subtitulos-esp.txt': 'notas',
+            'Link.desktop': '[Desktop Entry]\nType=Link\nURL=https://example.com\nIcon=bajar-subtitulos-esp\n',
+        }
+        for nombre, texto in otros.items():
+            (self.escritorio / nombre).write_text(texto, encoding='utf-8')
+        (self.escritorio / 'otro-enlace.desktop').symlink_to('/usr/share/applications/firefox.desktop')
+        quitados = self.al.quitar_accesos_escritorio()
+        self.assertEqual(sorted(p.name for p in quitados), sorted([enlace.name, copia.name, appimage.name]))
+        self.assertEqual(sorted(p.name for p in self.escritorio.iterdir()), sorted([*otros, 'otro-enlace.desktop']))
+
+    def test_anclado_con_plasma_cerrado(self):
+        archivo = self.config / 'plasma-org.kde.plasma.desktop-appletsrc'
+        antes = ('[Containments][2][Applets][5][Configuration][General]\n'
+                 'launchers=applications:systemsettings.desktop,preferred://filemanager,'
+                 'applications:bajar-subtitulos-esp.desktop,file:///usr/share/applications/bajar-subtitulos-esp.desktop,'
+                 'preferred://browser\n\n[Otro]\nclave=applications:bajar-subtitulos-esp.desktop\n')
+        archivo.write_text(antes, encoding='utf-8')
+        with mock.patch.object(self.al, '_plasma_abierto', return_value=False):
+            self.assertTrue(self.al.quitar_anclado())
+        self.assertEqual(archivo.read_text(encoding='utf-8'), antes.replace(
+            'applications:bajar-subtitulos-esp.desktop,file:///usr/share/applications/bajar-subtitulos-esp.desktop,', '', 1))
+        self.ejecutar.assert_not_called()
+
+    def test_anclado_con_plasma_abierto(self):
+        archivo = self.config / 'plasma-org.kde.plasma.desktop-appletsrc'
+        antes = 'launchers=preferred://browser,applications:bajar-subtitulos-esp.desktop\n'
+        archivo.write_text(antes, encoding='utf-8')
+        with mock.patch.object(self.al, '_plasma_abierto', return_value=True):
+            self.assertTrue(self.al.quitar_anclado())
+        self.assertEqual(archivo.read_text(encoding='utf-8'), antes)    # Plasma lo reescribiría: se le pide a él
+        qdbus = self.ejecutar.call_args.args[0]
+        self.assertEqual(qdbus[:4], ['qdbus6', 'org.kde.plasmashell', '/PlasmaShell',
+                                     'org.kde.PlasmaShell.evaluateScript'])
+        self.assertIn('"applications:bajar-subtitulos-esp.desktop"', qdbus[4])
+        gdbus = self.ejecutar.call_args.args[2]
+        self.assertEqual(gdbus[-1], self.al._variant_texto(self.al.SCRIPT_PLASMA))
+        self.assertTrue(gdbus[-1].startswith("'") and "\\'" not in self.al.SCRIPT_PLASMA)
+
+    def test_sin_anclado_no_hace_nada(self):
+        (self.config / 'plasma-org.kde.plasma.desktop-appletsrc').write_text('launchers=preferred://browser\n')
+        with mock.patch.object(self.al, '_plasma_abierto', side_effect=AssertionError('no hace falta mirarlo')):
+            self.assertTrue(self.al.quitar_anclado())
+        self.ejecutar.assert_not_called()
+
+    def test_la_opcion_desinstalar_sin_pantalla(self):
+        """La app con --desinstalar (como la ejecutan los paquetes): sin pantalla ni sesión, lo limpia todo."""
+        import subprocess
+        (self.config / 'menus' / 'applications-kmenuedit.menu').write_text(self.KMENUEDIT)
+        (self.escritorio / 'bajar-subtitulos-esp.desktop').symlink_to('/usr/share/applications/bajar-subtitulos-esp.desktop')
+        (self.config / 'plasma-org.kde.plasma.desktop-appletsrc').write_text(
+            'launchers=applications:bajar-subtitulos-esp.desktop,preferred://browser\n')
+        entorno = {k: v for k, v in os.environ.items() if k not in ('DISPLAY', 'WAYLAND_DISPLAY')}
+        entorno.update(self.entorno, PATH='/usr/bin:/bin')           # sin kbuildsycoca ni qdbus de verdad
+        raiz = Path(__file__).resolve().parent.parent
+        r = subprocess.run([sys.executable, '-m', 'app.main', '--desinstalar', '--config',
+                            str(self.casa / 'config.json')], cwd=raiz, env=entorno, timeout=60,
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual((self.config / 'menus' / 'applications-kmenuedit.menu').read_text(), self.KMENUEDIT_LIMPIO)
+        self.assertEqual(list(self.escritorio.iterdir()), [])
+        self.assertEqual((self.config / 'plasma-org.kde.plasma.desktop-appletsrc').read_text(),
+                         'launchers=preferred://browser\n')
+
+
+if __name__ == '__main__':
+    unittest.main(verbosity=2)

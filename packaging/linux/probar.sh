@@ -11,11 +11,15 @@
 #   probar.sh actualizar-paquete DEB|RPM  actualiza el paquete instalado a la revisión 2 (dist/prueba) como la
 #                                         app: la vuelve a abrir y conserva la configuración
 #   probar.sh actualizar-appimage ARCHIVO lo mismo con una copia del AppImage, que se sustituye por la «nueva»
-#   probar.sh desinstalado                no queda nada del .deb o del .rpm (y el menú se ha limpiado)
+#   probar.sh usuario                     crea un usuario con la app en el escritorio, anclada en la barra de
+#                                         Plasma y oculta a mano del menú de aplicaciones (como hace KDE)
+#   probar.sh usuario-intacto             eso sigue igual (al actualizar no se toca)
+#   probar.sh desinstalado                no queda nada del .deb o del .rpm (y lo del usuario de prueba se ha limpiado)
 set -euo pipefail
 
 ID=bajar-subtitulos-esp
 MENU_DATOS="${MENU_DATOS:-/tmp/menu-contextual-prueba}"     # fuera de $TMP: se comprueba también tras desinstalar
+USUARIO=prueba-subtitulos                                   # el de «probar.sh usuario»
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -76,6 +80,25 @@ menu_limpio() {
     quedan="$(find "$datos" -type f -printf ' %P')"
     [ -z "$quedan" ] || fallo "el menú contextual no se ha limpiado:$quedan"
     echo "Menú contextual limpio sin el programa"
+}
+
+# Lo que el usuario de prueba tiene de la app: «si» si sigue todo, «no» si no queda nada.
+usuario_tiene() {
+    local casa esperado="$1" hay=""
+    casa="$(getent passwd "$USUARIO" | cut -d: -f6)"
+    [ -L "$casa/Escritorio/$ID.desktop" ] && hay+=" escritorio"
+    grep -q "<Filename>$ID.desktop</Filename>" "$casa/.config/menus/applications-kmenuedit.menu" && hay+=" oculta-del-menú"
+    grep -q "^launchers=.*applications:$ID.desktop" "$casa/.config/plasma-org.kde.plasma.desktop-appletsrc" && hay+=" anclada"
+    if [ "$esperado" = si ]; then
+        [ "$hay" = " escritorio oculta-del-menú anclada" ] || fallo "al usuario le falta algo (tiene:${hay:- nada})"
+        echo "El usuario conserva el acceso del escritorio, el anclado y la app oculta del menú"
+    else
+        [ -z "$hay" ] || fallo "la desinstalación ha dejado al usuario:$hay"
+        grep -q 'org.kde.elisa.desktop' "$casa/.config/menus/applications-kmenuedit.menu" || fallo "se ha tocado el resto del menú"
+        grep -q '^launchers=preferred://browser$' "$casa/.config/plasma-org.kde.plasma.desktop-appletsrc" \
+            || fallo "se ha tocado el resto de la barra"
+        echo "Del usuario se han quitado el acceso del escritorio, el anclado y la nota que la ocultaba del menú"
+    fi
 }
 
 # Configuración en inglés: la actualización no debe cambiarla.
@@ -163,8 +186,44 @@ case "$orden" in
         [ -x "$nuevo" ] || fallo "el AppImage nuevo no es ejecutable"
         echo "AppImage sustituido por el nuevo"
         config_intacta ;;
+    usuario)
+        if ! getent passwd "$USUARIO" > /dev/null; then
+            if command -v useradd > /dev/null; then useradd -m -u 1500 "$USUARIO"
+            else echo "$USUARIO:x:1500:1500::/home/$USUARIO:/bin/sh" >> /etc/passwd
+                 echo "$USUARIO:x:1500:" >> /etc/group; fi
+        fi
+        casa="$(getent passwd "$USUARIO" | cut -d: -f6)"
+        mkdir -p "$casa/.config/menus" "$casa/Escritorio"
+        echo 'XDG_DESKTOP_DIR="$HOME/Escritorio"' > "$casa/.config/user-dirs.dirs"
+        ln -sfn "/usr/share/applications/$ID.desktop" "$casa/Escritorio/$ID.desktop"
+        printf 'launchers=applications:%s.desktop,preferred://browser\n' "$ID" \
+            > "$casa/.config/plasma-org.kde.plasma.desktop-appletsrc"
+        cat > "$casa/.config/menus/applications-kmenuedit.menu" << FIN
+<Menu>
+ <Menu>
+  <Name>Multimedia</Name>
+  <Layout>
+   <Filename>org.kde.elisa.desktop</Filename>
+  </Layout>
+  <Exclude>
+   <Filename>$ID.desktop</Filename>
+  </Exclude>
+ </Menu>
+ <Menu>
+  <Name>.hidden</Name>
+  <Include>
+   <Filename>$ID.desktop</Filename>
+  </Include>
+ </Menu>
+</Menu>
+FIN
+        chown -R "$(id -u "$USUARIO"):$(id -g "$USUARIO")" "$casa"
+        usuario_tiene si ;;
+    usuario-intacto)
+        usuario_tiene si ;;
     desinstalado)
         if [ -d "$MENU_DATOS" ]; then menu_limpio "$MENU_DATOS"; fi
+        if getent passwd "$USUARIO" > /dev/null; then usuario_tiene no; fi
         quedan=""
         for r in "/opt/$ID" "/usr/bin/$ID" "/usr/share/applications/$ID.desktop"; do
             if [ -e "$r" ] || [ -L "$r" ]; then quedan+=" $r"; fi

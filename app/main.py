@@ -331,6 +331,32 @@ def _menu_desde_instalador(args):
     return 0
 
 
+def _desinstalar(args):
+    """Quita lo que la app o el usuario han dejado de ella en su escritorio: el menú contextual, los
+    accesos del escritorio, el anclado en la barra de tareas, la nota que la oculta del menú de
+    aplicaciones (si no, al reinstalarla no volvería a aparecer) y, con el AppImage, su entrada en ese
+    menú. En Windows, lo mismo que --menu-contextual-quitar. Cada paso va por su cuenta: si uno falla,
+    se hacen los demás. Devuelve 1 si alguno ha fallado."""
+    from app import menu_contextual
+    from app.config import Config
+    fallos = 0
+    try:
+        menu_contextual.al_desinstalar(Config(args.config))
+    except OSError:
+        fallos += 1
+    if LINUX:
+        from app.plataforma import accesos_linux, menu_aplicaciones
+        try:
+            menu_aplicaciones.quitar()
+        except OSError:
+            fallos += 1
+        accesos_linux.quitar_accesos_escritorio()
+        if not accesos_linux.quitar_anclado():
+            fallos += 1
+        accesos_linux.mostrar_en_menu()
+    return 1 if fallos else 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument('rutas', nargs='*', metavar='VÍDEO_O_CARPETA')
@@ -349,6 +375,9 @@ def main(argv=None):
     ap.add_argument('--menu-archivos', nargs='+', metavar='VÍDEO', help=argparse.SUPPRESS)
     ap.add_argument('--menu-contextual-instalar', action='store_true', help=argparse.SUPPRESS)
     ap.add_argument('--menu-contextual-quitar', action='store_true', help=argparse.SUPPRESS)
+    # Linux, al desinstalar (los .deb y .rpm, para cada usuario; el AppImage y el .tar.gz, a mano): ver
+    # _desinstalar.
+    ap.add_argument('--desinstalar', action='store_true', help=argparse.SUPPRESS)
     ap.add_argument('--idioma-inicial', choices=('es', 'en'), help=argparse.SUPPRESS)
     ap.add_argument('--pagina', choices=('ajustes',), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
@@ -360,6 +389,8 @@ def main(argv=None):
         return autoprueba(args.autoprueba, args.con_red)
     if args.menu_contextual_instalar or args.menu_contextual_quitar:
         return _menu_desde_instalador(args)
+    if args.desinstalar:
+        return _desinstalar(args)
     pedido = _pedido(args)
     # Una sola app abierta (salvo en las pruebas y capturas): si ya hay una, se le pasa el pedido.
     unica = not (args.demo or args.captura or args.medir_arranque or args.probar_actualizacion)

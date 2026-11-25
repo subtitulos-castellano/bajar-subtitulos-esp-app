@@ -196,6 +196,7 @@ def paquetes(sistema):
         contenido.append({'src': str(icono), 'dst': f'/usr/share/icons/hicolor/{icono.relative_to(BUILD / "hicolor")}',
                           'file_info': {'mode': 0o644}})
     despues = str(AQUI / 'despues.sh')
+    antes_de_quitar = str(AQUI / 'antes_de_quitar.sh')     # al desinstalar: limpia lo de cada usuario
     config = {
         'name': ID_ESCRITORIO,
         'arch': 'amd64',
@@ -212,7 +213,7 @@ def paquetes(sistema):
                        'Busca en varios proveedores, prefiere siempre el castellano de España y nunca sustituye '
                        'un subtítulo por otro peor.',
         'contents': contenido,
-        'scripts': {'postinstall': despues, 'postremove': despues},
+        'scripts': {'postinstall': despues, 'preremove': antes_de_quitar, 'postremove': despues},
         'overrides': {'deb': {'depends': bibliotecas.depende_deb(sistema)},
                       'rpm': {'depends': bibliotecas.depende_rpm(sistema)}},
         'deb': {'compression': 'xz'},

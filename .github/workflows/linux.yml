@@ -178,7 +178,9 @@ jobs:
 
       - name: Actualizar como la app (el paquete, a la revisión 2; el AppImage, sustituyéndose)
         run: |
+          packaging/linux/probar.sh usuario       # al actualizar no se le toca nada; al desinstalar, sí
           packaging/linux/probar.sh actualizar-paquete ${{ matrix.tipo }}
+          packaging/linux/probar.sh usuario-intacto
           packaging/linux/probar.sh actualizar-appimage dist/*.AppImage
 
       - name: Abrir la ventana
