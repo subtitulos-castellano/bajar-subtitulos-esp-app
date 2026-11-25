@@ -485,12 +485,13 @@ class InstalarEnLinux(unittest.TestCase):
 
 
 class InstruccionesDeLaRelease(unittest.TestCase):
-    """packaging/INSTALAR.md (el workflow pone la versión y lo sube a cada Release como INSTALAR-<versión>.md)
+    """packaging/INSTALAR.txt (el workflow pone la versión y lo sube a cada Release como INSTALAR-<versión>.txt)
     nombra exactamente los archivos que se publican: si cambia un nombre, hay que cambiarlo también ahí."""
-    PLANTILLA = Path(__file__).resolve().parent.parent / 'packaging' / 'INSTALAR.md'
+    PLANTILLA = Path(__file__).resolve().parent.parent / 'packaging' / 'INSTALAR.txt'
 
     def test_nombra_los_archivos_de_la_release(self):
         texto = self.PLANTILLA.read_text(encoding='utf-8').replace('@VERSION@', '9.8.7')
+        self.assertNotIn('\r', texto)          # con retornos de carro, las órdenes pegadas en Linux fallan
         nombres = {act.nombre_instalador('9.8.7', 'windows')}
         nombres |= {act.nombre_instalador('9.8.7', 'linux', t) for t in act.SUFIJOS_LINUX}
         nombres |= {'BajarSubtitulosESP-9.8.7-portable.zip', 'BajarSubtitulosESP-9.8.7-linux-x86_64.tar.gz'}
@@ -503,10 +504,10 @@ class InstruccionesDeLaRelease(unittest.TestCase):
 
     def test_el_workflow_lo_publica(self):
         wf = (self.PLANTILLA.parent.parent / '.github' / 'workflows' / 'compilar.yml').read_text(encoding='utf-8')
-        self.assertIn('f="dist/INSTALAR-${GITHUB_REF_NAME#v}.md"', wf)
-        self.assertIn('packaging/INSTALAR.md > "$f"', wf)
-        self.assertIn('"dist/INSTALAR-${GITHUB_REF_NAME#v}.md#', wf)
-        self.assertIn('INSTALAR-*.md > SHA256SUMS.txt', wf)
+        self.assertIn('f="dist/INSTALAR-${GITHUB_REF_NAME#v}.txt"', wf)
+        self.assertIn('packaging/INSTALAR.txt > "$f"', wf)
+        self.assertIn('"dist/INSTALAR-${GITHUB_REF_NAME#v}.txt#', wf)
+        self.assertIn('INSTALAR-*.txt > SHA256SUMS.txt', wf)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,10 @@
 # Cambios
 
+## 1.5.3
+
+- Las instrucciones de instalar y desinstalar de la página de descargas son ahora un texto sin formato,
+  **`INSTALAR-<versión>.txt`**, que se abre con cualquier editor (el Bloc de notas, Kate, gedit…).
+
 ## 1.5.2
 
 - Las instrucciones de la página de descargas se llaman ahora **`INSTALAR-<versión>.md`** y explican

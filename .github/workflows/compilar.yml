@@ -243,16 +243,16 @@ jobs:
             [ -f "$f" ] || { echo "Falta $f"; ls -l; exit 1; }
           done
 
-      - name: Instrucciones de instalación (INSTALAR-<versión>.md, con los nombres de esta versión)
+      - name: Instrucciones de instalación (INSTALAR-<versión>.txt, con los nombres de esta versión)
         run: |
-          f="dist/INSTALAR-${GITHUB_REF_NAME#v}.md"
-          sed "s/@VERSION@/${GITHUB_REF_NAME#v}/g" packaging/INSTALAR.md > "$f"
+          f="dist/INSTALAR-${GITHUB_REF_NAME#v}.txt"
+          sed "s/@VERSION@/${GITHUB_REF_NAME#v}/g" packaging/INSTALAR.txt > "$f"
           if grep -q @VERSION@ "$f"; then echo 'Queda @VERSION@ sin sustituir'; exit 1; fi
 
       - name: Sumas SHA-256
         working-directory: dist
         run: |
-          sha256sum *-instalador.exe *-portable.zip *.deb *.rpm *.AppImage *-linux-x86_64.tar.gz INSTALAR-*.md > SHA256SUMS.txt
+          sha256sum *-instalador.exe *-portable.zip *.deb *.rpm *.AppImage *-linux-x86_64.tar.gz INSTALAR-*.txt > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Atestación de procedencia
@@ -265,7 +265,7 @@ jobs:
             dist/*.rpm
             dist/*.AppImage
             dist/*-linux-x86_64.tar.gz
-            dist/INSTALAR-*.md
+            dist/INSTALAR-*.txt
 
       - name: Release
         env:
@@ -288,6 +288,6 @@ jobs:
             "$a-x86_64.rpm#Linux · Fedora, AlmaLinux, Rocky, openSUSE… (.rpm)" \
             "$a-x86_64.AppImage#Linux · AppImage, cualquier distribución" \
             "$a-linux-x86_64.tar.gz#Linux · Comprimido (.tar.gz)" \
-            "dist/INSTALAR-${GITHUB_REF_NAME#v}.md#Cómo instalar y desinstalar · How to install and uninstall" \
+            "dist/INSTALAR-${GITHUB_REF_NAME#v}.txt#Cómo instalar y desinstalar · How to install and uninstall" \
             "dist/SHA256SUMS.txt#Sumas SHA-256 de todos los archivos" \
             --title "Bajar Subtítulos ESP $GITHUB_REF_NAME" --notes "${notas:-Ver CHANGELOG.md}"

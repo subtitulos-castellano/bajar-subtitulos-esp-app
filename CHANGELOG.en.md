@@ -3,6 +3,11 @@
 English version of the release notes, shown by the app when it is in English. Earlier versions are
 only in Spanish: see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.5.3
+
+- The install and uninstall instructions on the downloads page are now plain text,
+  **`INSTALAR-<version>.txt`**, which opens in any editor (Notepad, Kate, gedit…).
+
 ## 1.5.2
 
 - The instructions on the downloads page are now called **`INSTALAR-<version>.md`** and also explain
