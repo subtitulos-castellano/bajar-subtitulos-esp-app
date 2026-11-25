@@ -133,6 +133,29 @@ def autoprueba(salida, con_red=False):
         return f"{n} certificados · {os.environ.get('SSL_CERT_FILE') or ssl.get_default_verify_paths().cafile}"
     paso('certificados del sistema', certificados_sistema)
 
+    def traductor():
+        """Las librerías del traductor (van dentro del programa). Con BAJARSUBS_PROBAR_TRADUCTOR=1 (los
+        workflows), además descarga el traductor publicado y traduce un subtítulo."""
+        import os
+        import re
+
+        import ctranslate2
+        import sentencepiece  # noqa: F401
+        tipos = ctranslate2.get_supported_compute_types('cpu')
+        if 'int8' not in tipos:
+            raise RuntimeError(f'sin int8: {tipos}')
+        from subtitulos import modelo
+        if os.environ.get('BAJARSUBS_PROBAR_TRADUCTOR') == '1' and re.fullmatch(r'[0-9a-f]{64}', modelo.SHA256):
+            modelo.descargar()
+        if not modelo.instalado():
+            return f'ctranslate2 {ctranslate2.__version__} · cpu: {sorted(tipos)} · sin traductor descargado'
+        from subtitulos.traducir import traducir_srt
+        srt = traducir_srt('1\n00:00:05,000 --> 00:00:07,000\nWhere is my phone?\n', modelo.motor())
+        if 'teléfono' not in srt:
+            raise RuntimeError(f'no traduce: {srt!r}')
+        return f'ctranslate2 {ctranslate2.__version__} · traducido: {srt.splitlines()[-1]}'
+    paso('traductor', traductor)
+
     def actualizaciones():
         from app import actualizar
         if actualizar.version(__version__) is None:

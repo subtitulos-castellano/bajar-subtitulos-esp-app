@@ -10,7 +10,7 @@ cualquier reproductor lo cargue solo. Orden de preferencia: castellano > latino 
 Nunca se sustituye un .srt por otro de un tipo peor.
 
 Con --solo-ingles se guarda solo inglés; con --traducir, el inglés traducido automáticamente al
-castellano sin conexión (la primera vez descarga el traductor, unos 200 MB). En los dos casos se
+castellano sin conexión (la primera vez descarga el traductor, unos 215 MB). En los dos casos se
 sustituye el .srt que hubiera (con copia de seguridad).
 
 La lógica está en el paquete `subtitulos` (compartido con la app); este archivo solo lee

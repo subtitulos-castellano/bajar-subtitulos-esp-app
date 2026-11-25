@@ -83,7 +83,8 @@ def version():
 def avisos():
     """Nombre, versión y licencia de cada librería instalada que acaba dentro del programa."""
     excluir = {'pip', 'setuptools', 'wheel', 'pyinstaller', 'pyinstaller-hooks-contrib', 'altgraph',
-               'pefile', 'packaging', 'pywin32-ctypes'}
+               'pefile', 'packaging', 'pywin32-ctypes',
+               'numpy', 'pyyaml'}      # dependencias de ctranslate2 que solo usa para convertir modelos
     filas = []
     for d in sorted(metadata.distributions(), key=lambda d: d.metadata['Name'].lower()):
         nombre = d.metadata['Name']
@@ -106,6 +107,10 @@ Qt 6 / PySide6 (The Qt Company): LGPL v3. Las librerías de Qt van como archivos
 https://www.qt.io/licensing/  https://www.gnu.org/licenses/lgpl-3.0.html
 
 Iconos: Lucide (https://lucide.dev), licencia ISC.
+
+Traductor (se descarga aparte la primera vez que se traduce): modelo Opus-MT
+Helsinki-NLP/opus-mt-tc-big-en-es (Language Technology Research Group, Universidad de Helsinki),
+licencia CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), convertido a CTranslate2 (int8).
 
 Python y librerías:
 ''' + '\n'.join(f'  - {f}' for f in filas) + '\n'

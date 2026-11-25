@@ -5,6 +5,9 @@ Aplicación de escritorio para **Windows 10 y 11** y para **Linux** que descarga
 ventana y se ocupa de todo, sin preguntas. También funciona con el botón derecho del ratón en el
 Explorador de Windows o en el gestor de archivos de Linux, sin abrir antes la app.
 
+Si lo prefieres, en Configuración puedes pedirle **solo subtítulos en inglés**, o **castellano traducido
+automáticamente del inglés** en tu propio ordenador, sin conexión y sin depender de ningún servicio.
+
 La app está en **castellano o en inglés** (*English*): se elige al instalarla y se cambia en
 Configuración.
 
@@ -30,6 +33,10 @@ Configuración.
   tienen subtítulo o lo traen dentro no cuentan), de cada uno se bajan como mucho 5 subtítulos para
   elegir el mejor, y entre un vídeo y el siguiente hay una pausa de 3 segundos. Lo que pase del
   límite queda como *Pendiente* para la próxima vez.
+
+- **Otros idiomas, si los pides** (*Configuración › Idioma de los subtítulos*): **solo inglés**, o
+  **castellano traducido automáticamente del inglés** (ver [Idioma de los subtítulos](#idioma-de-los-subtítulos)).
+  En esos dos modos, el `.srt` que hubiera se sustituye, siempre con copia de seguridad.
 
 Este programa se ha creado utilizando como base la skill
 [`bajar-subtitulos-esp`](https://github.com/subtitulos-castellano/bajar-subtitulos-esp) (para Claude
@@ -165,9 +172,12 @@ gh attestation verify BajarSubtitulosESP-<versión>-linux-x86_64.rpm -R subtitul
 | 🟢 **Ya lo tenían** | Ya había un subtítulo en castellano: no se toca |
 | 🟠 **Latino** | Solo había español latino y se ha guardado (se puede desactivar) |
 | 🟠 **Inglés** | No había nada en español y se ha guardado inglés (se puede desactivar) |
-| ⚪ **Sin cambios** | Ya tenía latino o inglés y no se ha encontrado nada mejor |
+| ⚪ **Sin cambios** | Ya tenía latino, inglés o una traducción automática y no se ha encontrado nada mejor |
 | 🟣 **Pendientes** | Superan el límite de vídeos por tanda: *Procesar pendientes* los busca |
 | 🔴 **Sin subtítulos** | No se ha encontrado nada |
+
+Con *Solo inglés* o *Castellano traducido del inglés*, lo que pides sale en verde: 🟢 **Inglés** o
+🟢 **Traducidos** (guardados ahora) y 🟢 **Ya lo tenían**.
 
 ![Resumen](docs/capturas/claro_4_resumen.png)
 
@@ -180,6 +190,9 @@ Con el **botón derecho del ratón**, sin abrir antes la app:
 - En **uno o varios vídeos** seleccionados: *Bajar subtítulos*. Todos los seleccionados se revisan
   en una sola búsqueda. En los `.ts` no aparece, porque esa extensión también es de TypeScript; esos
   vídeos se buscan con el menú de su carpeta o arrastrándolos a la app.
+- **En inglés:** en las carpetas, el submenú tiene también *Solo esta carpeta, en inglés* y *Esta
+  carpeta y sus subcarpetas, en inglés*; en los vídeos, *Bajar subtítulos en inglés*. Buscan solo
+  inglés esa vez, sin cambiar la configuración.
 
 En **Windows 11** estas opciones están dentro de *Mostrar más opciones* (o con Mayús + clic
 derecho): el menú corto de Windows 11 solo admite programas firmados digitalmente.
@@ -209,11 +222,11 @@ Si la app ya está abierta, lo que pides desde el menú va a su cola.
 También con el **botón derecho del ratón**:
 
 - **Dolphin** (KDE) y **Nemo** (Cinnamon): en una carpeta, o en el fondo de una carpeta abierta,
-  *Bajar subtítulos aquí › Solo esta carpeta* o *Esta carpeta y sus subcarpetas*; en uno o varios
-  vídeos, *Bajar subtítulos*.
+  *Bajar subtítulos aquí › Solo esta carpeta* o *Esta carpeta y sus subcarpetas* (y las dos *en
+  inglés*); en uno o varios vídeos, *Bajar subtítulos* y *Bajar subtítulos en inglés*.
 - **Nautilus** (GNOME) no deja añadir opciones propias al menú, solo *scripts*: están en *Scripts ›
   Bajar subtítulos* (lo seleccionado, con sus subcarpetas, o la carpeta abierta si no hay nada
-  seleccionado) y *Bajar subtítulos (solo esta carpeta)*.
+  seleccionado) y *Bajar subtítulos (solo esta carpeta)*, y las dos *en inglés*.
 
 Con el `.deb` y el `.rpm`, el menú se pone solo la primera vez que abres la app. Con el AppImage y el
 `.tar.gz`, actívalo en *Configuración › Menú contextual del gestor de archivos*. Funciona igual que en
@@ -229,10 +242,11 @@ Los cambios se guardan al momento y se usan en la siguiente búsqueda.
 | Opción | Por defecto |
 |---|---|
 | Idioma de la app: Español o English | El elegido al instalar (portable y Linux: Español) |
-| Si no hay castellano, guardar latino | Sí |
-| Si no hay nada en español, guardar inglés (primero la pista del vídeo, mejor si es SDH) | Sí |
-| Extraer también la pista inglesa incrustada como `<vídeo>.en.srt` | No |
-| Rehacer aunque ya haya castellano | No |
+| Idioma de los subtítulos: castellano de España (con latino o inglés de reserva), solo inglés, o castellano traducido automáticamente del inglés | Castellano de España |
+| Si no hay castellano, guardar latino (solo con castellano de España) | Sí |
+| Si no hay nada en español, guardar inglés (primero la pista del vídeo, mejor si es SDH; solo con castellano de España) | Sí |
+| Extraer también la pista inglesa incrustada como `<vídeo>.en.srt` (solo con castellano de España) | No |
+| Rehacer aunque ya tengan subtítulo | No |
 | Modo simulación (muestra qué haría sin escribir nada) | No |
 | Vídeos que buscan en internet en cada tanda | 40 |
 | Candidatos que se descargan por vídeo | 5 |
@@ -247,6 +261,39 @@ Los cambios se guardan al momento y se usan en la siguiente búsqueda.
 | Buscar actualizaciones automáticamente | Sí |
 
 ![Configuración](docs/capturas/claro_6_configuracion.png)
+
+### Idioma de los subtítulos
+
+- **Castellano de España (con latino o inglés de reserva)**, lo recomendado y lo de siempre: busca
+  castellano; si no hay, guarda latino o inglés según las tres opciones de debajo. Nunca sustituye un
+  subtítulo por otro peor.
+- **Solo inglés**: busca directamente inglés (primero la pista del propio vídeo, luego un
+  `<vídeo>.en.srt` que ya tuvieras y, si no, los proveedores) y lo guarda como `<vídeo>.srt`. Las
+  opciones de latino e inglés de debajo se desactivan, porque no cuentan.
+- **Castellano traducido automáticamente del inglés**: consigue el inglés igual que el modo anterior y lo
+  traduce **en tu ordenador, sin conexión**: nada sale de él y no hay que pagar ni registrarse en ningún
+  servicio. Lo guarda como `<vídeo>.srt` y el inglés original como `<vídeo>.en.srt`.
+
+En los dos últimos, si el vídeo ya tenía un `.srt` en otro idioma, **se sustituye** (antes se guarda una
+copia en la carpeta de copias de seguridad). Con *Rehacer aunque ya tengan subtítulo*, se vuelve a hacer
+aunque ya tenga el del modo elegido. Si después vuelves a *Castellano de España*, la traducción se
+sustituye en cuanto aparece un castellano o un latino hecho por personas.
+
+Sobre la traducción:
+
+- Usa el modelo de traducción [Opus-MT](https://huggingface.co/Helsinki-NLP/opus-mt-tc-big-en-es) de la
+  Universidad de Helsinki (licencia CC BY 4.0). No va dentro del programa: se descarga **una sola vez**
+  (unos 215 MB) al elegir esta opción, o al traducir por primera vez, desde las Releases de este
+  repositorio, comprobando su huella SHA-256. En Configuración se ve si está descargado, y *Borrar* lo
+  quita para liberar espacio.
+- Traduce un episodio en unos segundos. Conserva los tiempos de cada línea, traduce cada intervención
+  de un diálogo por separado, une las frases partidas entre líneas antes de traducirlas y quita las
+  anotaciones para sordos (`[risas]`, `(SUSPIRA)`…).
+- Es una **traducción automática**: se entiende, pero no es tan buena como un subtítulo hecho por
+  personas. A veces usa palabras o formas de Latinoamérica («ustedes» en vez de «vosotros»); las más
+  frecuentes («computadora», «celular», «auto»…) se cambian por las de España.
+- Los primeros segundos del vídeo muestran *Subtítulos traducidos automáticamente del inglés*. Así
+  quien lo ve lo sabe, y la app reconoce después sus propias traducciones.
 
 **Idioma:** al cambiarlo, la app se cierra y se vuelve a abrir sola en el idioma elegido, en la misma
 pantalla de Configuración. Cambia todo: la interfaz, los avisos (también las novedades de las
@@ -307,8 +354,9 @@ app solo pregunta a GitHub por la última versión publicada, sin enviar nada tu
 
 | Qué | Dónde |
 |---|---|
-| Subtítulos | Junto a cada vídeo: `<vídeo>.srt` (y `<vídeo>.en.srt` si se pide) |
+| Subtítulos | Junto a cada vídeo: `<vídeo>.srt` (y `<vídeo>.en.srt` si se pide o al traducir) |
 | Copias de los subtítulos sustituidos | `%USERPROFILE%\.subtitulos-esp\backup` (la misma carpeta que la skill) |
+| Traductor (si se ha descargado) | `%USERPROFILE%\.subtitulos-esp\modelos\traductor-en-es-1` |
 | Preferencias, tamaño y posición de la ventana | `%APPDATA%\BajarSubtitulosEsp\config.json` |
 | Contraseñas de OpenSubtitles | Administrador de credenciales de Windows (`BajarSubtitulosESP/opensubtitles` y `BajarSubtitulosESP/opensubtitlescom`) |
 | Menú contextual del Explorador | Registro de tu usuario (`HKCU\Software\Classes`): se quita al desinstalar |
@@ -320,6 +368,7 @@ app solo pregunta a GitHub por la última versión publicada, sin enviar nada tu
 |---|---|
 | Subtítulos | Junto a cada vídeo, igual que en Windows |
 | Copias de los subtítulos sustituidos | `~/.subtitulos-esp/backup` (la misma carpeta que la skill) |
+| Traductor (si se ha descargado) | `~/.subtitulos-esp/modelos/traductor-en-es-1` |
 | Preferencias, tamaño y posición de la ventana | `~/.config/BajarSubtitulosEsp/config.json` |
 | Contraseñas de OpenSubtitles | Llavero del escritorio (KWallet o GNOME Keyring), con los mismos nombres que en Windows |
 | La app (`.deb` y `.rpm`) | `/opt/bajar-subtitulos-esp`, con la orden `/usr/bin/bajar-subtitulos-esp` |
@@ -331,6 +380,14 @@ Al desinstalar, todo esto se conserva (salvo el menú contextual y, en Linux, lo
 y de la barra de tareas): es tuyo y lo comparte la skill.
 
 ## Preguntas frecuentes
+
+**¿La traducción automática envía mis subtítulos a algún sitio?** No. Lo único que se descarga de
+internet es el inglés (de los mismos proveedores de siempre) y, una sola vez, el traductor. La traducción
+se hace en tu ordenador.
+
+**La traducción tiene frases raras.** Es una traducción automática: sirve para entender el capítulo
+cuando no hay subtítulos en español. Vuelve a *Castellano de España* de vez en cuando: si aparece un
+castellano o un latino hecho por personas, sustituye a la traducción.
 
 **No me aparece el aviso de la versión nueva.** La comprobación se hace como mucho una vez al
 día. Usa *Configuración › Actualizaciones › Buscar ahora*. La versión 1.0.0 aún no sabía
@@ -418,9 +475,13 @@ subtitulos/     núcleo, compartido con la línea de comandos
   opciones.py   Opciones de una búsqueda (= los parámetros de la CLI)
   texto.py      limpieza de textos de terceros, idioma y dialecto
   pistas.py     subtítulos incrustados en MKV y MP4 (sin ffmpeg)
-  nucleo.py     proveedores y procesar(ruta(s), opciones, eventos, cancelado, credenciales)
+  nucleo.py     proveedores y procesar(ruta(s), opciones, eventos, cancelado, credenciales, traductor):
+                los modos castellano, solo inglés y traducido
+  traducir.py   traducir un .srt del inglés conservando los tiempos (CTranslate2 + sentencepiece)
+  modelo.py     el traductor: dónde está y descargarlo comprobando su SHA-256
 bajar_subs.py   línea de comandos (mismos parámetros y salida que la skill; siempre en castellano)
-packaging/      recursos comunes (icono, licencias); windows/: PyInstaller, Inno Setup y compilar.py;
+packaging/      recursos comunes (icono, licencias); traductor.py (prepara el traductor que se publica);
+                windows/: PyInstaller, Inno Setup y compilar.py;
                 linux/: PyInstaller, compilar.py (.deb, .rpm, AppImage, .tar.gz), bibliotecas.py (qué
                 pone el sistema) y probar.sh (pruebas en cada distribución)
 scripts/        windows.sh: desarrollo desde WSL con el Python de Windows;
@@ -463,7 +524,12 @@ scripts/linux.sh compilar      # programa, .tar.gz, AppImage, .deb y .rpm en dis
 ```bash
 python -I bajar_subs.py "<carpeta o vídeo>" [--dry-run] [--force] [--solo-castellano]
                        [--sin-ingles] [--ingles] [--max-videos N] [--max-descargas N]
+                       [--solo-ingles | --traducir]
 ```
+
+`--solo-ingles` y `--traducir` son los otros dos modos de *Idioma de los subtítulos*. Con
+`--traducir`, la primera vez se descarga el traductor (hacen falta `ctranslate2` y `sentencepiece`, que
+están en `requirements-app.txt`). Sin ellos, la salida es exactamente la de la skill.
 
 ### Pruebas
 
@@ -499,6 +565,9 @@ scripts/windows.sh python -I -m unittest discover -s tests  # todas, con el Pyth
   contra un servidor local e instalar en Windows y en Linux (gestor de paquetes y AppImage).
 - `tests/test_linux.py`: carpetas XDG, una sola app abierta, certificados, el menú contextual de
   Dolphin, Nemo y Nautilus (en una carpeta temporal) y el AppImage en el menú de aplicaciones.
+- `tests/test_traducir.py`: los modos solo inglés y traducido con los proveedores simulados, cómo se
+  traduce un `.srt` (con un traductor simulado: tiempos, diálogos, anotaciones para sordos, frases
+  partidas) y la descarga del traductor (huella, `.zip` incompleto, rutas fuera de su carpeta).
 
 ### Compilar y publicar
 
@@ -507,7 +576,8 @@ scripts/windows.sh python -I -m unittest discover -s tests  # todas, con el Pyth
 1. Genera el icono, la versión del `.exe` y los avisos de licencias.
 2. Compila con PyInstaller en modo carpeta, sin UPX y sin `-O`.
 3. Ejecuta la **autoprueba del `.exe` empaquetado**: proveedores, refinadores, idiomas, keyring,
-   certificados, una búsqueda sin red con un MKV y una ruta larga con acentos.
+   certificados, el traductor (en GitHub Actions, descarga el publicado y traduce una línea), una
+   búsqueda sin red con un MKV y una ruta larga con acentos.
 4. Crea el zip portable y, si está Inno Setup, el instalador (`packaging/windows/instalador.iss`).
 
 `<exe> --autoprueba informe.txt --con-red` añade una búsqueda real (en simulación) contra los
@@ -536,6 +606,14 @@ el AppImage y, con nfpm, el `.deb` y el `.rpm`.
    `INSTALAR-<versión>.txt` y `.md` (los genera `packaging/instalar.py`, con un solo texto para los dos),
    `SHA256SUMS.txt` y la atestación de procedencia de cada archivo. Cada archivo lleva una etiqueta
    (*Windows · …*, *Linux · …*), que GitHub muestra en lugar del nombre.
+
+**El traductor** se publica aparte, en su propia Release (preliminar: nunca es la *Latest* ni la ve el
+actualizador), con `.github/workflows/traductor.yml`: al subir la etiqueta con su nombre
+(`modelo.NOMBRE`, p. ej. `git tag traductor-en-es-1 && git push origin traductor-en-es-1`), convierte el
+modelo con `packaging/traductor.py`, comprueba que traduce y lo publica con `SHA256SUMS.txt` y su
+atestación. Después, su huella y su tamaño van en `subtitulos/modelo.py`: sin ellos, el workflow de la
+versión no publica nada. Comprobarlo: `sha256sum -c SHA256SUMS.txt` y
+`gh attestation verify traductor-en-es-1.zip -R subtitulos-castellano/bajar-subtitulos-esp-app`.
 
 Para publicar una versión:
 
@@ -571,5 +649,6 @@ Al terminar, actualiza aquí el último commit incorporado.
 ## Licencia
 
 MIT (ver `LICENSE`). Qt/PySide6 se distribuye bajo LGPL v3, como librerías separadas dentro de la
-carpeta `_internal`. Iconos de Lucide (ISC). La lista completa de componentes y licencias va con
+carpeta `_internal`. Iconos de Lucide (ISC). El traductor, que se descarga aparte, es el modelo Opus-MT
+`opus-mt-tc-big-en-es` de la Universidad de Helsinki (CC BY 4.0), convertido a CTranslate2 (MIT). La lista completa de componentes y licencias va con
 el programa, en `AVISOS_TERCEROS.txt`.

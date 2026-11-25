@@ -8,7 +8,7 @@
 import sys
 from pathlib import Path
 
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs
 
 RAIZ = Path(SPECPATH).parent.parent
 RECURSOS = RAIZ / 'packaging' / 'build'
@@ -26,6 +26,11 @@ for paquete in ('subliminal', 'guessit', 'rebulk', 'babelfish', 'knowit', 'traki
     binaries += b
     hiddenimports += h
 
+# Traductor (subtitulos/traducir.py): solo lo que hace falta para traducir. Sus conversores (torch,
+# transformers) y numpy no: el modelo ya viene convertido. En Windows, sus DLL van junto al paquete.
+binaries += collect_dynamic_libs('ctranslate2')
+hiddenimports += ['ctranslate2', 'sentencepiece', 'subtitulos.traducir', 'subtitulos.modelo']
+
 datas += [(str(RAIZ / 'LICENSE'), '.'), (str(RECURSOS / 'AVISOS_TERCEROS.txt'), '.')]
 
 a = Analysis(
@@ -42,7 +47,8 @@ a = Analysis(
               # Pruebas y herramientas de las librerías que la app no usa.
               'guessit.test', 'rebulk.test', 'babelfish.tests', 'subliminal.cli', 'click', 'tomlkit',
               'setuptools', 'stevedore.example', 'stevedore.example2', 'stevedore.sphinxext',
-              'stevedore.tests', 'docutils', 'sphinx'],
+              'stevedore.tests', 'docutils', 'sphinx',
+              'numpy', 'yaml', 'torch', 'transformers', 'ctranslate2.converters', 'ctranslate2.specs'],
     noarchive=False,
     optimize=0,     # sin -O: las librerías se comportan exactamente igual que en la skill (con sus assert)
 )

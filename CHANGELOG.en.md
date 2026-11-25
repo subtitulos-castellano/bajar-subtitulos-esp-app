@@ -3,6 +3,28 @@
 English version of the release notes, shown by the app when it is in English. Earlier versions are
 only in Spanish: see [CHANGELOG.md](CHANGELOG.md).
 
+## 3.0.0
+
+- **Subtitle language**, in Settings, with three options:
+  - **Spanish from Spain** (with Latin American or English as a fallback), as always and recommended.
+  - **English only**: goes straight to English subtitles and saves them as `<video>.srt`.
+  - **Spanish from Spain machine-translated from English**: gets the English subtitle and translates it
+    on your computer, offline and without any paid service. The translator (about 215 MB) is downloaded
+    only once. Timings, dialogues and sentences split across lines are kept, and the English one is also
+    saved as `<video>.en.srt`. It is a machine translation: understandable, but not as good as a
+    subtitle made by people.
+
+  With the two new ones, any existing `.srt` is replaced (with a backup copy) and the Latin American and
+  English options are disabled, because they only apply to Spanish from Spain.
+- **Context menu:** new options *in English* (on folders, *This folder only, in English* and *This
+  folder and its subfolders, in English*; on videos, *Get English subtitles*), which look for English
+  that time without changing the settings.
+- [Windows] To update, just open the installer of a new version: it no longer shows the licence again.
+  If the one you open is an **older** version than the installed one, it asks before replacing it.
+- The instructions of each version (`INSTALAR-<version>.txt` and `.md`) also explain **how to open the
+  app** depending on how you installed it, including Linux inside Windows (WSL). And they make clear that
+  apt's «N: Download is performed unsandboxed…» notice is not an error.
+
 ## 2.0.0
 
 The first version released for **Windows and Linux** at the same time: from now on, every new version is

@@ -1,5 +1,28 @@
 # Cambios
 
+## 3.0.0
+
+- **Idioma de los subtítulos**, en Configuración, con tres opciones:
+  - **Castellano de España** (con latino o inglés de reserva), lo de siempre y lo recomendado.
+  - **Solo inglés**: va directo a los subtítulos en inglés y los guarda como `<vídeo>.srt`.
+  - **Castellano traducido automáticamente del inglés**: baja el inglés y lo traduce en tu ordenador,
+    sin conexión y sin ningún servicio de pago. El traductor (unos 215 MB) se descarga una sola vez. Se
+    conservan los tiempos, los diálogos y las frases partidas entre líneas, y el inglés queda también
+    como `<vídeo>.en.srt`. Es una traducción automática: se entiende, pero no es tan buena como un
+    subtítulo hecho por personas.
+
+  Con las dos nuevas, el `.srt` que hubiera se sustituye (con copia de seguridad) y las opciones de
+  latino e inglés se desactivan, porque solo cuentan para el castellano.
+- **Menú contextual:** nuevas opciones *en inglés* (en las carpetas, *Solo esta carpeta, en inglés* y
+  *Esta carpeta y sus subcarpetas, en inglés*; en los vídeos, *Bajar subtítulos en inglés*), que buscan
+  inglés esa vez sin cambiar la configuración.
+- [Windows] Para actualizar basta con abrir el instalador de una versión nueva: ya no vuelve a enseñar
+  la licencia. Si el que abres es de una versión **más antigua** que la instalada, pregunta antes de
+  sustituirla.
+- Las instrucciones de cada versión (`INSTALAR-<versión>.txt` y `.md`) explican también **cómo abrir la
+  app** según cómo la instalaste, también en Linux dentro de Windows (WSL). Y aclaran que el aviso
+  «N: Download is performed unsandboxed…» de `apt` no es un error.
+
 ## 2.0.0
 
 Primera versión que sale a la vez para **Windows y Linux**: desde ahora, cada versión nueva es para los

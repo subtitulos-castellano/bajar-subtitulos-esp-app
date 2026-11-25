@@ -164,6 +164,8 @@ class Modelo(unittest.TestCase):
         with self.assertRaises(modelo.ErrorModelo):
             modelo.motor(self.d / 'no-existe')
 
+    @unittest.skipIf(modelo.SHA256 == 'PENDIENTE', 'el traductor aún no está publicado (el workflow de la '
+                                                   'versión no deja publicar sin él)')
     def test_el_publicado_tiene_huella(self):
         self.assertRegex(modelo.SHA256, r'^[0-9a-f]{64}$')
         self.assertGreater(modelo.TAMANO, 50_000_000)

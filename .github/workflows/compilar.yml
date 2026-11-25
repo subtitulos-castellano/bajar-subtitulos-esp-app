@@ -36,6 +36,9 @@ jobs:
         run: |
           $version = python -I -c "import sys; sys.path.insert(0, '.'); import app; print(app.__version__)"
           if ("v$version" -ne "${{ github.ref_name }}") { throw "La etiqueta ${{ github.ref_name }} no coincide con app.__version__ ($version)" }
+          # El traductor que descarga la app tiene que estar publicado (su huella, en subtitulos/modelo.py).
+          $sha = python -I -c "import sys; sys.path.insert(0, '.'); from subtitulos import modelo; print(modelo.SHA256)"
+          if ($sha -notmatch '^[0-9a-f]{64}$') { throw "Falta la huella del traductor en subtitulos/modelo.py: $sha" }
 
       - name: Pruebas
         env:
@@ -48,6 +51,8 @@ jobs:
           if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
 
       - name: Compilar (incluye la autoprueba del .exe)
+        env:
+          BAJARSUBS_PROBAR_TRADUCTOR: '1'     # la autoprueba descarga el traductor publicado y traduce
         run: python -I packaging/windows/compilar.py
 
       - uses: actions/upload-artifact@v7

@@ -1,6 +1,6 @@
 """El modelo de traducción inglés → español (para traducir.py): dónde está y cómo se descarga.
 
-No va dentro del programa (ocupa unos 200 MB): se descarga la primera vez que se traduce, de la Release
+No va dentro del programa (ocupa unos 215 MB): se descarga la primera vez que se traduce, de la Release
 `MODELO_TAG` de este mismo repositorio, comprobando su SHA-256, y se guarda en
 ~/.subtitulos-esp/modelos/<NOMBRE>. Lo publica el workflow .github/workflows/modelo.yml a partir del
 modelo Opus-MT «opus-mt-tc-big-en-es» (Universidad de Helsinki, licencia CC-BY 4.0), convertido para
@@ -49,7 +49,7 @@ def instalado(ruta=None):
 
 
 def tamano_mb():
-    return round(TAMANO / 1e6) if TAMANO else 200
+    return round(TAMANO / 1e6) if TAMANO else 215
 
 
 def _contexto_ssl():
