@@ -3,10 +3,15 @@
 Uso:
     python -I bajar_subs.py <carpeta_o_video> [--force] [--solo-castellano] [--sin-ingles]
                             [--ingles] [--dry-run] [--max-videos N] [--max-descargas N]
+                            [--solo-ingles | --traducir]
 
 El subtítulo principal se guarda como <video>.srt (mismo nombre que el vídeo), para que
 cualquier reproductor lo cargue solo. Orden de preferencia: castellano > latino > inglés.
 Nunca se sustituye un .srt por otro de un tipo peor.
+
+Con --solo-ingles se guarda solo inglés; con --traducir, el inglés traducido automáticamente al
+castellano sin conexión (la primera vez descarga el traductor, unos 200 MB). En los dos casos se
+sustituye el .srt que hubiera (con copia de seguridad).
 
 La lógica está en el paquete `subtitulos` (compartido con la app); este archivo solo lee
 los parámetros e imprime el progreso y el resumen.
@@ -23,7 +28,7 @@ from pathlib import Path
 # carpeta, nunca la carpeta actual, que puede ser la de los vídeos).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from subtitulos import nucleo  # noqa: E402
+from subtitulos import modelo, nucleo  # noqa: E402
 from subtitulos.opciones import MAX_DESCARGAS, MAX_VIDEOS, Opciones  # noqa: E402
 from subtitulos.texto import visible  # noqa: E402
 
@@ -61,6 +66,13 @@ def main(argv=None):
                     help=f'máximo de candidatos que se descargan por vídeo (por defecto '
                          f'{MAX_DESCARGAS}; 0 = sin límite), elegidos por sincronía y '
                          f'puntuación alternando proveedores')
+    modo = ap.add_mutually_exclusive_group()
+    modo.add_argument('--solo-ingles', dest='modo', action='store_const', const='ingles', default='castellano',
+                      help='guardar solo subtítulos en inglés como .srt (sustituye el que hubiera en otro idioma)')
+    modo.add_argument('--traducir', dest='modo', action='store_const', const='traducido',
+                      help='guardar el inglés traducido automáticamente al castellano, sin conexión, como '
+                           '.srt (y el inglés como .en.srt). La primera vez descarga el traductor (unos '
+                           f'{modelo.tamano_mb()} MB)')
     args = ap.parse_args(argv)
     for opcion in ('max_videos', 'max_descargas'):
         if getattr(args, opcion) < 0:
@@ -68,7 +80,26 @@ def main(argv=None):
     ruta = args.ruta
     opciones = Opciones(**{k: v for k, v in vars(args).items() if k != 'ruta'})
 
-    resumen = nucleo.procesar(ruta, opciones, SalidaConsola())
+    if opciones.modo == 'traducido' and not modelo.instalado():
+        print(f'Descargando el traductor (unos {modelo.tamano_mb()} MB, solo la primera vez)...', flush=True)
+        ultimo = [-1]
+
+        def progreso(hecho, total):
+            pct = hecho * 100 // total if total else 0
+            if pct >= ultimo[0] + 10:
+                ultimo[0] = pct
+                print(f'  {pct} %', flush=True)
+        try:
+            modelo.descargar(progreso)
+        except modelo.ErrorModelo as e:
+            print(f'error: {e}', file=sys.stderr)
+            return 1
+
+    try:
+        resumen = nucleo.procesar(ruta, opciones, SalidaConsola())
+    except modelo.ErrorModelo as e:
+        print(f'error: {e}', file=sys.stderr)
+        return 1
 
     print('\n==== RESUMEN ====')
     for r in resumen:

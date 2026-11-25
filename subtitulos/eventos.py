@@ -13,6 +13,13 @@ INGLES = 'ingles'                # INGLÉS, INGLÉS (incrustado)
 SIN_CAMBIOS = 'sin_cambios'      # <TIPO> (ya tenía .srt): no se encontró nada mejor
 PENDIENTE = 'pendiente'          # PENDIENTE (límite)
 NO_ENCONTRADO = 'no_encontrado'  # NO ENCONTRADO
+# Modo «solo inglés» y modo «traducido» (Opciones.modo): lo pedido, guardado ahora o que ya estaba.
+SOLO_INGLES = 'solo_ingles'      # INGLÉS, INGLÉS (incrustado), INGLÉS (de .en.srt)
+YA_INGLES = 'ya_ingles'          # ya tenía inglés
+TRADUCIDO = 'traducido'          # TRADUCIDO
+YA_TRADUCIDO = 'ya_traducido'    # ya tenía traducido
+# Categorías en las que el vídeo tiene lo que se pedía (en verde en la app).
+CORRECTAS = {CASTELLANO, YA_CASTELLANO, SOLO_INGLES, YA_INGLES, TRADUCIDO, YA_TRADUCIDO}
 
 
 @dataclass(frozen=True)

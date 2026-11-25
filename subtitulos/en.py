@@ -211,8 +211,6 @@ TEXTOS = {
     'No se ha podido volver a abrir la app: el idioma nuevo se usará la próxima vez que la abras.':
         'The app could not be reopened: the new language will be used the next time you open it.',
     'Qué subtítulos guardar': 'Which subtitles to save',
-    'Siempre se prefiere castellano de España. Nunca se sustituye un subtítulo por otro peor.':
-        'Spanish from Spain is always preferred. A subtitle is never replaced with a worse one.',
     'Si no hay castellano, guardar latino': 'If there is no Spanish from Spain, save Latin American',
     'El resumen lo marca como Latino para que sepas que no es castellano.':
         'The summary marks it as Latin American so you know it is not Spanish from Spain.',
@@ -223,9 +221,6 @@ TEXTOS = {
     'Se guarda aparte como <vídeo>.en.srt, además del subtítulo principal.':
         'It is saved separately as <video>.en.srt, besides the main subtitle.',
     'Cómo trabajar': 'How to work',
-    'Rehacer aunque ya haya castellano': 'Redo even if there is Spanish from Spain already',
-    'Vuelve a buscar en todos los vídeos. El subtítulo anterior se copia a la carpeta de copias de seguridad.':
-        'Searches again for every video. The previous subtitle is copied to the backup folder.',
     'Modo simulación': 'Simulation mode',
     'Muestra qué se haría, sin escribir ni renombrar ningún archivo.':
         'Shows what would be done, without writing or renaming any file.',
@@ -444,4 +439,79 @@ TEXTOS = {
         'The download was interrupted. Check your internet connection.',
     'La descarga no coincide con la huella SHA-256 publicada en GitHub: no se ha instalado nada.':
         'The download does not match the SHA-256 fingerprint published on GitHub: nothing has been installed.',
+    # ---------- 3.0.0: solo inglés y castellano traducido del inglés ----------
+    'TRADUCIDO': 'TRANSLATED',
+    'TRADUCIDO (de .en.srt)': 'TRANSLATED (from .en.srt)',
+    'TRADUCIDO (de su .srt)': 'TRANSLATED (from its .srt)',
+    'TRADUCIDO (incrustado)': 'TRANSLATED (embedded)',
+    'INGLÉS (de .en.srt)': 'ENGLISH (from .en.srt)',
+    'castellano traducido automáticamente': 'machine-translated Spanish',
+    '  traduciendo al castellano (sin conexión)...': '  translating into Spanish from Spain (offline)...',
+    'ya tenía inglés': 'already had English',
+    'ya tenía traducido': 'already had a translation',
+    'sin inglés que traducir': 'no English to translate',
+    'Falta el traductor: se descarga al elegir «Castellano traducido del inglés» en Configuración.':
+        'The translator is missing: it is downloaded when you choose «Spanish from Spain translated from English» '
+        'in Settings.',
+    'El traductor descargado no coincide con su huella SHA-256: no se ha guardado.':
+        'The downloaded translator does not match its SHA-256 fingerprint: it has not been saved.',
+    'No se ha podido cargar el traductor: {error}': 'The translator could not be loaded: {error}',
+    'No se ha podido descargar el traductor. Comprueba la conexión a internet.':
+        'The translator could not be downloaded. Check your internet connection.',
+    'El traductor descargado está dañado.': 'The downloaded translator is damaged.',
+    'El traductor descargado es demasiado grande: no se ha guardado.':
+        'The downloaded translator is too large: it has not been saved.',
+    'traducidos': 'translated',
+    'Traducidos': 'Translated',
+    'Bajar subtítulos en inglés': 'Get English subtitles',
+    'Bajar subtítulos en inglés (solo esta carpeta)': 'Get English subtitles (this folder only)',
+    'Solo esta carpeta, en inglés': 'This folder only, in English',
+    'Esta carpeta y sus subcarpetas, en inglés': 'This folder and its subfolders, in English',
+    'Subtítulo en inglés guardado ahora': 'English subtitle saved now',
+    'Ya tenían subtítulo en inglés': 'They already had an English subtitle',
+    'Subtítulo en inglés traducido automáticamente al castellano y guardado ahora':
+        'English subtitle machine-translated into Spanish from Spain and saved now',
+    'Ya tenían un subtítulo traducido': 'They already had a translated subtitle',
+    'Descargando el traductor (unos {n} MB, solo la primera vez)...':
+        'Downloading the translator (about {n} MB, only the first time)...',
+    'Descargar ahora': 'Download now',
+    'Borrar': 'Delete',
+    'Borra el traductor descargado para liberar espacio. Si vuelves a necesitarlo, se descarga otra vez.':
+        'Deletes the downloaded translator to free up space. If you need it again, it is downloaded again.',
+    'Descargando el traductor…': 'Downloading the translator…',
+    'Solo inglés': 'English only',
+    'Idioma de los subtítulos': 'Subtitle language',
+    'Castellano de España (con latino o inglés de reserva)':
+        'Spanish from Spain (with Latin American or English as a fallback)',
+    'Lo recomendado. Si no hay castellano, guarda latino o inglés según las opciones de abajo. Nunca sustituye '
+    'un subtítulo por otro peor.':
+        'Recommended. If there is no Spanish from Spain, it saves Latin American or English according to the '
+        'options below. It never replaces a subtitle with a worse one.',
+    'Busca directamente subtítulos en inglés y los guarda como <vídeo>.srt. Si el vídeo ya tenía un .srt en '
+    'otro idioma, lo sustituye (antes guarda una copia de seguridad).':
+        'Looks directly for English subtitles and saves them as <video>.srt. If the video already had an .srt in '
+        'another language, it replaces it (after saving a backup copy).',
+    'Castellano traducido automáticamente del inglés': 'Spanish from Spain machine-translated from English',
+    'Baja el inglés y lo traduce en tu ordenador, sin enviar nada a ningún servicio. Es una traducción '
+    'automática: se entiende, pero no es tan buena como un subtítulo hecho por personas y a veces usa palabras '
+    'de Latinoamérica. Se guarda como <vídeo>.srt, con un aviso de unos segundos al principio, y el inglés como '
+    '<vídeo>.en.srt. Sustituye el .srt que hubiera (antes guarda una copia de seguridad).':
+        'Gets the English subtitle and translates it on your computer, without sending anything to any service. '
+        'It is a machine translation: it is understandable, but not as good as a subtitle made by people, and '
+        'it sometimes uses Latin American words. It is saved as <video>.srt, with a notice for a few seconds at '
+        'the start, and the English one as <video>.en.srt. It replaces any existing .srt (after saving a backup '
+        'copy).',
+    'Traductor descargado, en {carpeta}.': 'Translator downloaded, in {carpeta}.',
+    'El traductor se descarga una sola vez (unos {n} MB) al elegir esta opción o al traducir por primera vez.':
+        'The translator is downloaded only once (about {n} MB) when you choose this option or translate for '
+        'the first time.',
+    'Descargando el traductor: {pct} % de {n} MB…': 'Downloading the translator: {pct} % of {n} MB…',
+    'No se ha podido descargar el traductor: {error} Se volverá a intentar al traducir.':
+        'The translator could not be downloaded: {error} It will be tried again when translating.',
+    'Rehacer aunque ya tengan subtítulo': 'Redo even if they already have a subtitle',
+    'Vuelve a buscar en todos los vídeos, aunque ya tengan el subtítulo elegido. El anterior se copia a la '
+    'carpeta de copias de seguridad.':
+        'Searches again for every video, even if it already has the chosen subtitle. The previous one is copied '
+        'to the backup folder.',
+    'Solo se usa con «Castellano de España».': 'Only used with «Spanish from Spain».',
 }

@@ -1,4 +1,5 @@
 """Ventana principal: barra lateral (Inicio, Buscando…, Configuración), arrastre en toda la ventana y cola."""
+import dataclasses
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QPoint, QRectF, Qt, QTimer, QUrl, Signal
@@ -374,11 +375,12 @@ class Ventana(QMainWindow):
 
     # ---------- Cola y trabajo ----------
 
-    def procesar(self, rutas, recursivo=True):
+    def procesar(self, rutas, recursivo=True, modo=None):
         """Lo soltado de una vez (vídeos sueltos, carpetas o ambos) es una sola búsqueda, como si todo
         estuviera en la misma carpeta. Va a la cola y empieza si no hay nada en marcha. Sin preguntas.
-        Con `recursivo=False` (menú contextual › Solo esta carpeta), sin entrar en las subcarpetas."""
-        self.cola.append((list(rutas), recursivo))
+        Con `recursivo=False` (menú contextual › Solo esta carpeta), sin entrar en las subcarpetas. Con
+        `modo` ('ingles': las opciones «en inglés» del menú), ese en vez del de Configuración."""
+        self.cola.append((list(rutas), recursivo, modo))
         if self.trabajador is None:
             self._siguiente()
         else:
@@ -390,10 +392,12 @@ class Ventana(QMainWindow):
             self._actualizar_nav()
             self.en_reposo.emit()
             return
-        lote, recursivo = self.cola.pop(0)
+        lote, recursivo, modo = self.cola.pop(0)
         ruta = lote[0] if len(lote) == 1 else lote
         self.inicio.poner_cola(len(self.cola))
         opciones = self.config.opciones       # las preferencias de este momento valen para toda la tanda
+        if modo and modo != opciones.modo:
+            opciones = dataclasses.replace(opciones, modo=modo)
         if self.demo:
             t = TrabajadorDemo(ruta, self, recursivo=recursivo)
         else:

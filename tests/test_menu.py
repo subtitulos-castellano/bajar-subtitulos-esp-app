@@ -85,10 +85,16 @@ class ArgumentosDelExplorador(unittest.TestCase):
         self.assertEqual(mc.ruta_de_argumento(r'C:\Series\Mi serie'), Path(r'C:\Series\Mi serie'))
 
     def test_pedido(self):
-        ap = mock.Mock(menu_carpeta=None, menu_subcarpetas=None, menu_archivos=None, rutas=[])
+        ap = mock.Mock(menu_carpeta=None, menu_subcarpetas=None, menu_archivos=None, rutas=[], menu_ingles=False)
         self.assertIsNone(main._pedido(ap))
         ap.menu_carpeta = r'C:\Series'
-        self.assertEqual(main._pedido(ap), {'rutas': [str(Path(r'C:\Series'))], 'recursivo': False, 'menu': True})
+        self.assertEqual(main._pedido(ap), {'rutas': [str(Path(r'C:\Series'))], 'recursivo': False, 'menu': True,
+                                            'modo': None})
+        ap.menu_ingles = True                 # «Solo esta carpeta, en inglés»
+        self.assertEqual(main._pedido(ap)['modo'], 'ingles')
+        self.assertEqual(main.modo_del_pedido(main._pedido(ap)), 'ingles')
+        self.assertIsNone(main.modo_del_pedido({'modo': 'traducido'}))      # del canal: solo 'ingles'
+        ap.menu_ingles = False
         ap.menu_carpeta, ap.menu_subcarpetas = None, r'C:\Series'
         self.assertTrue(main._pedido(ap)['recursivo'])
         ap.menu_subcarpetas, ap.menu_archivos = None, r'C:\Series\a.mkv'
@@ -104,7 +110,8 @@ class ArgumentosDelExplorador(unittest.TestCase):
             antes = os.getcwd()
             os.chdir(d)
             self.addCleanup(os.chdir, antes)
-            ap = mock.Mock(menu_carpeta=None, menu_subcarpetas=None, menu_archivos=['a.mkv', '/x/b.mkv'], rutas=[])
+            ap = mock.Mock(menu_carpeta=None, menu_subcarpetas=None, menu_archivos=['a.mkv', '/x/b.mkv'], rutas=[],
+                           menu_ingles=False)
             real = os.path.realpath(d)
             self.assertIn(main._pedido(ap)['rutas'][0], (os.path.join(d, 'a.mkv'), os.path.join(real, 'a.mkv')))
             self.assertEqual(main._pedido(ap)['rutas'][1], '/x/b.mkv')
@@ -400,14 +407,15 @@ class UnaSolaApp(unittest.TestCase):
     def test_agrupador_junta_lo_que_llega_seguido(self):
         listos = []
         g = instancia.Agrupador(pausa=150)
-        g.listo.connect(lambda r, rec, menu: listos.append((r, rec, menu)))
+        g.listo.connect(lambda r, rec, menu, modo: listos.append((r, rec, menu, modo)))
         for n in ('a.mkv', 'b.mkv', 'a.mkv', 'c.mkv'):
             g.agregar([Path(n)], True, True)
         g.agregar([Path('carpeta')], False, True)
+        g.agregar([Path('d.mkv')], True, True, 'ingles')      # «Bajar subtítulos en inglés»: otra búsqueda
         self.assertEqual(listos, [])
         esperar(lambda: listos, 5)
-        self.assertEqual(listos, [([Path('a.mkv'), Path('b.mkv'), Path('c.mkv')], True, True),
-                                  ([Path('carpeta')], False, True)])
+        self.assertEqual(listos, [([Path('a.mkv'), Path('b.mkv'), Path('c.mkv')], True, True, ''),
+                                  ([Path('carpeta')], False, True, ''), ([Path('d.mkv')], True, True, 'ingles')])
 
     def test_agrupador_no_espera_para_siempre(self):
         listos = []

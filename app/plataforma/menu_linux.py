@@ -3,12 +3,12 @@ app/menu_contextual.py). Solo para este usuario, en ~/.local/share (o $XDG_DATA_
 administrador:
 
 - Dolphin (KDE): dos *service menus* en kio/servicemenus. En una carpeta (o en el fondo de una carpeta),
-  «Bajar subtítulos aquí» con «Solo esta carpeta» / «Esta carpeta y sus subcarpetas»; en uno o varios
-  vídeos, «Bajar subtítulos».
+  «Bajar subtítulos aquí» con «Solo esta carpeta» / «Esta carpeta y sus subcarpetas» (y lo mismo «en
+  inglés»); en uno o varios vídeos, «Bajar subtítulos» y «Bajar subtítulos en inglés».
 - Nemo (Cinnamon): las mismas opciones, como acciones (nemo/actions).
 - Nautilus (GNOME): no deja poner opciones propias en el menú, solo *scripts* (clic derecho › Scripts):
   «Bajar subtítulos» (lo seleccionado, con subcarpetas, o la carpeta abierta si no hay nada seleccionado)
-  y «Bajar subtítulos (solo esta carpeta)».
+  y «Bajar subtítulos (solo esta carpeta)», y los dos «en inglés».
 
 Todas las opciones ejecutan el mismo lanzador (LANZADOR), que es quien sabe dónde está la app. Si ya no
 está (se ha desinstalado el .deb o el .rpm, o se ha borrado el AppImage), el lanzador quita el menú
@@ -23,8 +23,11 @@ from pathlib import Path
 
 from subtitulos.idioma import tr
 
-from ..menu_contextual import (ARG_ARCHIVOS, ARG_CARPETA, ARG_SUBCARPETAS, SUBMENU, TEXTO_ARCHIVOS, TEXTO_CARPETA,
-                               TEXTO_SOLO_CARPETA)
+from ..menu_contextual import (ARG_ARCHIVOS, ARG_CARPETA, ARG_INGLES, ARG_SUBCARPETAS, SUBMENU, SUBMENU_INGLES,
+                               TEXTO_ARCHIVOS, TEXTO_ARCHIVOS_INGLES, TEXTO_CARPETA, TEXTO_SOLO_CARPETA,
+                               TEXTO_SOLO_CARPETA_INGLES)
+
+NEMO = 10        # acciones de Nemo: {ID}-1 … {ID}-10
 
 ID = 'bajar-subtitulos-esp'
 MARCA = f'# {ID}: menú contextual de Bajar Subtítulos ESP (lo pone y lo quita la app, en Configuración)'
@@ -94,11 +97,11 @@ def _texto_lanzador(prog, a_borrar):
             'exit 0\n')
 
 
-def _texto_script(argumento):
+def _texto_script(*argumentos):
     """Script de Nautilus: lo seleccionado (rutas relativas a la carpeta abierta), o la carpeta abierta."""
     return (f'#!/bin/sh\n{MARCA}\n'
             'if [ "$#" -eq 0 ]; then set -- "$PWD"; fi\n'
-            f'exec {shlex.quote(str(lanzador()))} {argumento} "$@"\n')
+            f'exec {shlex.quote(str(lanzador()))} {" ".join(argumentos)} "$@"\n')
 
 
 def archivos(prog):
@@ -106,15 +109,20 @@ def archivos(prog):
     lz = str(lanzador())
     icono = str(lanzador().with_name('icono.svg'))
     carpetas = _desktop(
-        [('Desktop Entry', {'Type': 'Service', 'MimeType': 'inode/directory;', 'Actions': 'solo;todo;',
+        [('Desktop Entry', {'Type': 'Service', 'MimeType': 'inode/directory;',
+                            'Actions': 'solo;todo;solo_ingles;todo_ingles;',
                             'X-KDE-Submenu': tr(TEXTO_CARPETA), 'X-KDE-Priority': 'TopLevel', 'Icon': icono})]
         + [(f'Desktop Action {nombre}', {'Name': tr(texto), 'Icon': icono, 'Exec': _exec(lz, arg, '%F')})
-           for nombre, (texto, arg) in zip(('solo', 'todo'), SUBMENU)])
+           for nombre, (texto, arg) in zip(('solo', 'todo'), SUBMENU)]
+        + [(f'Desktop Action {nombre}', {'Name': tr(texto), 'Icon': icono, 'Exec': _exec(lz, ARG_INGLES, arg, '%F')})
+           for nombre, (texto, arg) in zip(('solo_ingles', 'todo_ingles'), SUBMENU_INGLES)])
     videos = _desktop(
-        [('Desktop Entry', {'Type': 'Service', 'MimeType': ';'.join(TIPOS_VIDEO) + ';', 'Actions': 'bajar;',
-                            'X-KDE-Priority': 'TopLevel'}),
+        [('Desktop Entry', {'Type': 'Service', 'MimeType': ';'.join(TIPOS_VIDEO) + ';',
+                            'Actions': 'bajar;bajar_ingles;', 'X-KDE-Priority': 'TopLevel'}),
          ('Desktop Action bajar', {'Name': tr(TEXTO_ARCHIVOS), 'Icon': icono,
-                                   'Exec': _exec(lz, ARG_ARCHIVOS, '%F')})])
+                                   'Exec': _exec(lz, ARG_ARCHIVOS, '%F')}),
+         ('Desktop Action bajar_ingles', {'Name': tr(TEXTO_ARCHIVOS_INGLES), 'Icon': icono,
+                                          'Exec': _exec(lz, ARG_INGLES, ARG_ARCHIVOS, '%F')})])
     res = {
         _dolphin() / f'{ID}-carpetas.desktop': (carpetas, True),     # Dolphin exige que sean ejecutables
         _dolphin() / f'{ID}-videos.desktop': (videos, True),
@@ -124,17 +132,22 @@ def archivos(prog):
             ('2', ARG_SUBCARPETAS, 'notnone', 'Extensions=dir;', '%F'),
             ('3', ARG_CARPETA, 'none', 'Extensions=any;', '%P'),
             ('4', ARG_SUBCARPETAS, 'none', 'Extensions=any;', '%P')]
-    titulos = dict((arg, texto) for texto, arg in SUBMENU)
-    for n, arg, seleccion, tipos, variable in nemo:
-        clave, valor = tipos.split('=')
+    for submenu, primero, extra in ((SUBMENU, 0, ()), (SUBMENU_INGLES, 5, (ARG_INGLES,))):
+        titulos = dict((arg, texto) for texto, arg in submenu)
+        for n, arg, seleccion, tipos, variable in nemo:
+            clave, valor = tipos.split('=')
+            res[_nemo() / f'{ID}-{int(n) + primero}.nemo_action'] = (_desktop([('Nemo Action', {
+                'Name': f'{tr(TEXTO_CARPETA)}: {tr(titulos[arg]).lower()}',
+                'Exec': _exec(lz, *extra, arg, variable), 'Selection': seleccion, clave: valor})]), False)
+    for n, texto, extra in (('5', TEXTO_ARCHIVOS, ()), ('10', TEXTO_ARCHIVOS_INGLES, (ARG_INGLES,))):
         res[_nemo() / f'{ID}-{n}.nemo_action'] = (_desktop([('Nemo Action', {
-            'Name': f'{tr(TEXTO_CARPETA)}: {tr(titulos[arg]).lower()}',
-            'Exec': _exec(lz, arg, variable), 'Selection': seleccion, clave: valor})]), False)
-    res[_nemo() / f'{ID}-5.nemo_action'] = (_desktop([('Nemo Action', {
-        'Name': tr(TEXTO_ARCHIVOS), 'Exec': _exec(lz, ARG_ARCHIVOS, '%F'),
-        'Selection': 'notnone', 'Mimetypes': ';'.join(TIPOS_VIDEO) + ';'})]), False)
+            'Name': tr(texto), 'Exec': _exec(lz, *extra, ARG_ARCHIVOS, '%F'),
+            'Selection': 'notnone', 'Mimetypes': ';'.join(TIPOS_VIDEO) + ';'})]), False)
     res[_nautilus() / _nombre_script(tr(TEXTO_ARCHIVOS))] = (_texto_script(ARG_SUBCARPETAS), True)
     res[_nautilus() / _nombre_script(tr(TEXTO_SOLO_CARPETA))] = (_texto_script(ARG_CARPETA), True)
+    res[_nautilus() / _nombre_script(tr(TEXTO_ARCHIVOS_INGLES))] = (_texto_script(ARG_INGLES, ARG_SUBCARPETAS), True)
+    res[_nautilus() / _nombre_script(tr(TEXTO_SOLO_CARPETA_INGLES))] = (_texto_script(ARG_INGLES, ARG_CARPETA),
+                                                                         True)
     from ..iconos import ICONO_APP
     res[Path(icono)] = (ICONO_APP, False)
     res[lanzador()] = (_texto_lanzador(prog, list(res)), True)
@@ -162,7 +175,7 @@ def _nuestros_scripts():
 def _existentes():
     candidatos = [_dolphin() / f'{ID}-carpetas.desktop', _dolphin() / f'{ID}-videos.desktop',
                   lanzador(), lanzador().with_name('icono.svg')]
-    candidatos += [_nemo() / f'{ID}-{n}.nemo_action' for n in range(1, 6)]
+    candidatos += [_nemo() / f'{ID}-{n}.nemo_action' for n in range(1, NEMO + 1)]
     return [p for p in candidatos if p.exists()] + _nuestros_scripts()
 
 

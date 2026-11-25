@@ -11,6 +11,13 @@ correcto y con una duración compatible con el vídeo. Las etiquetas de idioma d
 NO son fiables (se han visto latinos marcados como "es" y episodios mal etiquetados), por
 eso se comprueba el texto.
 
+Con `Opciones.modo`:
+- 'ingles': solo inglés, como <video>.srt (pista incrustada, <video>.en.srt que ya hubiera o proveedores).
+  Sustituye el .srt que hubiera en otro idioma (con copia de seguridad).
+- 'traducido': el inglés (de <video>.en.srt, de la pista incrustada o de los proveedores) traducido
+  automáticamente al castellano sin conexión (traducir.py), como <video>.srt; el inglés se guarda
+  también como <video>.en.srt. Sustituye el .srt que hubiera (con copia de seguridad).
+
 `procesar()` no escribe nada en pantalla: avisa de lo que pasa a un objeto `Eventos`. La CLI
 lo convierte en texto y la app en su interfaz.
 """
@@ -33,7 +40,7 @@ from subliminal.video import Episode
 
 from .archivos import HOME, VIDEO_EXT, buscar_en_varias, buscar_videos  # noqa: F401
 from .eventos import (CASTELLANO, INGLES, LATINO, NO_ENCONTRADO, PENDIENTE, SIN_CAMBIOS,  # noqa: F401
-                      YA_CASTELLANO, Eventos, Resultado)
+                      SOLO_INGLES, TRADUCIDO, YA_CASTELLANO, YA_INGLES, YA_TRADUCIDO, Eventos, Resultado)
 from .idioma import N_, tr
 from .opciones import MAX_DESCARGAS, Opciones
 from .pistas import incrustado, ingles_incrustado
@@ -48,12 +55,16 @@ PROVIDERS = ['opensubtitles', 'addic7ed', 'gestdown', 'subtitulamos']
 ULTIMO = 'opensubtitlescom'
 PAUSA = 3           # segundos de espera entre un vídeo que busca en internet y el siguiente
 
-RANGO = {None: 0, 'otro': 0, 'ingles': 1, 'latino': 2, 'castellano': 3}
-ETIQUETA = {'castellano': N_('CASTELLANO'), 'latino': N_('LATINO'), 'ingles': N_('INGLÉS')}
+# Una traducción automática (de este programa) vale más que el inglés y menos que un subtítulo en español
+# hecho por personas.
+RANGO = {None: 0, 'otro': 0, 'ingles': 1, 'traducido': 2, 'latino': 3, 'castellano': 4}
+ETIQUETA = {'castellano': N_('CASTELLANO'), 'latino': N_('LATINO'), 'ingles': N_('INGLÉS'),
+            'traducido': N_('TRADUCIDO')}
 
 # Idioma de un .srt que ya existe (idioma_srt), en el registro.
 # (En castellano, 'ingles' sin tilde: la salida de la CLI no cambia.)
-IDIOMA_SRT = {'castellano': N_('castellano'), 'latino': N_('latino'), 'ingles': N_('ingles'), 'otro': N_('otro')}
+IDIOMA_SRT = {'castellano': N_('castellano'), 'latino': N_('latino'), 'ingles': N_('ingles'),
+              'traducido': N_('castellano traducido automáticamente'), 'otro': N_('otro')}
 
 
 def ya_tenia(tipo):
@@ -282,7 +293,7 @@ class _Cancelado(Exception):
     """Uso interno: corta procesar() en cuanto se cancela, sin esperar a terminar el vídeo."""
 
 
-def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=None, recursivo=True):
+def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=None, recursivo=True, traductor=None):
     """Busca y guarda subtítulos para un vídeo o para todos los de una carpeta (con sus subcarpetas,
     salvo `recursivo=False`).
 
@@ -297,6 +308,8 @@ def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=Non
     - `credenciales`: configuración de proveedores ({'opensubtitles': {...}, 'opensubtitlescom': {...}},
       cada una con 'username' y 'password'; .com solo como último recurso); None = leer
       ~/.subtitulos-esp/credenciales.json.
+    - `traductor`: solo en el modo 'traducido', función que traduce una lista de frases del inglés
+      (traducir.Motor); None = cargar el modelo descargado (modelo.motor(), que lanza ErrorModelo si falta).
 
     Devuelve la lista de `Resultado` (el resumen).
     """
@@ -333,24 +346,142 @@ def procesar(ruta, opciones=None, eventos=None, cancelado=None, credenciales=Non
         resultados.append(r)
         eventos.resultado(r)
 
+    if opciones.modo == 'traducido' and traductor is None and videos:
+        from .modelo import motor
+        traductor = motor()
     try:
         _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar, detalle,
-                  max_descargas, providers, configs)
+                  max_descargas, providers, configs, traductor)
     except _Cancelado:
         pass
     return resultados
 
 
+def _leer_srt(ruta):
+    """Texto de un .srt que ya existe (sin convertir los saltos de línea), o None."""
+    try:
+        with open(ruta, encoding='utf-8', errors='replace', newline='') as f:
+            return f.read(MAX_SRT + 1)
+    except OSError:
+        return None
+
+
 def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar, detalle, max_descargas,
-              providers, configs):
+              providers, configs, traductor=None):
     buscados = 0  # vídeos que ya han buscado en internet en esta ejecución
     with contextlib.ExitStack() as pila:
         pool = pila.enter_context(ProviderPool(providers=providers, provider_configs=configs))
         ultimo = _UltimoRecurso(configs, detalle, pila)
-        for indice, path in enumerate(videos, 1):
-            if cancelado():
-                break
-            eventos.video(indice, len(videos), path)
+
+        def internet(path):
+            """Antes de buscar en internet: límite por ejecución y pausa entre vídeos. Devuelve el vídeo
+            para los proveedores, o None si queda pendiente."""
+            nonlocal buscados
+            if opciones.max_videos and buscados >= opciones.max_videos:
+                detalle(tr('  límite de {n} vídeos con búsqueda en internet alcanzado: queda para otra ejecución',
+                           n=opciones.max_videos))
+                anotar(path, tr('PENDIENTE (límite)'), tr('máx. {n} por ejecución', n=opciones.max_videos),
+                       PENDIENTE)
+                return None
+            if buscados and _esperar(PAUSA, cancelado):
+                raise _Cancelado
+            buscados += 1
+
+            video = scan_video(str(path))
+            # scan_video adivina sobre la ruta completa: una carpeta como "<SERIE> - FULL"
+            # convierte la serie en "<SERIE> FULL" y ningún proveedor encuentra nada.
+            if isinstance(video, Episode):
+                g = guessit(path.name)
+                if g.get('title'):
+                    video.series = g['title']
+                    video.title = g.get('episode_title')
+            refine(video, refiners=['hash', 'metadata', 'tvdb'])
+            comprobar()
+            return video
+
+        def ingles_internet(video):
+            """(texto, sub) del mejor inglés de los proveedores (opensubtitles.com, como último recurso)."""
+            texto, sub = ingles_proveedores(pool, video, max_descargas, detalle, comprobar)
+            if not texto and ultimo.activo:
+                texto, sub = ingles_proveedores(ultimo, video, max_descargas, detalle, comprobar)
+                ultimo.informar()
+            return texto, sub
+
+        def ingles_de(path, usar_en_srt):
+            """El inglés de un vídeo, para los modos 'ingles' y 'traducido': (texto, estado, fuente, origen)
+            con origen 'en.srt', 'incrustado' o 'internet'; (None, ...) si no hay; None si queda pendiente."""
+            destino_en = path.with_suffix('.en.srt')
+            if usar_en_srt and not opciones.force and destino_en.exists():
+                texto = _leer_srt(destino_en)
+                if texto and len(texto) <= MAX_SRT and idioma_srt(texto) == 'ingles':
+                    return texto, '.en.srt', destino_en.name, 'en.srt'
+            texto, pista = ingles_incrustado(path, detalle)
+            comprobar()
+            if texto:
+                return texto, 'incrustado', pista[:30], 'incrustado'
+            video = internet(path)
+            if video is None:
+                return None
+            texto, sub = ingles_internet(video)
+            if texto:
+                return texto, '', f'{sub.provider_name} {sub.id}', 'internet'
+            return None, '', '', ''
+
+        def modo_ingles(path):
+            destino = path.with_suffix('.srt')
+            previo = _leer_srt(destino) if destino.exists() else None
+            actual = idioma_srt(previo) if previo else None
+            if actual == 'ingles' and not opciones.force:
+                anotar(path, tr('ya tenía inglés'), '-', YA_INGLES)
+                return
+            detalle(f'\n== {path.name}')
+            if actual:
+                detalle(tr('  ya tiene {nombre} en {idioma}', nombre=destino.name, idioma=tr(IDIOMA_SRT[actual])))
+            hallado = ingles_de(path, usar_en_srt=True)
+            if hallado is None:
+                return
+            texto, _, fuente, origen = hallado
+            if not texto:
+                anotar(path, tr('NO ENCONTRADO'), tr('sin inglés'), NO_ENCONTRADO)
+                return
+            escribir(texto, destino)
+            estado = {'en.srt': tr('INGLÉS (de .en.srt)'), 'incrustado': tr('INGLÉS (incrustado)')}.get(
+                origen, tr('INGLÉS'))
+            anotar(path, estado, fuente, SOLO_INGLES)
+
+        def modo_traducido(path):
+            destino = path.with_suffix('.srt')
+            destino_en = path.with_suffix('.en.srt')
+            previo = _leer_srt(destino) if destino.exists() else None
+            actual = idioma_srt(previo) if previo else None
+            if actual == 'traducido' and not opciones.force:
+                anotar(path, tr('ya tenía traducido'), '-', YA_TRADUCIDO)
+                return
+            detalle(f'\n== {path.name}')
+            if actual:
+                detalle(tr('  ya tiene {nombre} en {idioma}', nombre=destino.name, idioma=tr(IDIOMA_SRT[actual])))
+            # Un .srt en inglés que ya estaba (de antes) también sirve como original.
+            if actual == 'ingles' and not destino_en.exists():
+                hallado = previo, '.srt', destino.name, 'srt'
+            else:
+                hallado = ingles_de(path, usar_en_srt=True)
+            if hallado is None:
+                return
+            texto, _, fuente, origen = hallado
+            if not texto:
+                anotar(path, tr('NO ENCONTRADO'), tr('sin inglés que traducir'), NO_ENCONTRADO)
+                return
+            detalle(tr('  traduciendo al castellano (sin conexión)...'))
+            from .traducir import traducir_srt
+            traducido = traducir_srt(texto, traductor, avance=lambda hecho, total: comprobar())
+            if origen != 'en.srt' and (opciones.force or not destino_en.exists()):
+                escribir(texto, destino_en)          # el original en inglés, junto al traducido
+            escribir(traducido, destino)
+            estado = {'en.srt': tr('TRADUCIDO (de .en.srt)'), 'srt': tr('TRADUCIDO (de su .srt)'),
+                      'incrustado': tr('TRADUCIDO (incrustado)')}.get(origen, tr('TRADUCIDO'))
+            anotar(path, estado, fuente, TRADUCIDO)
+
+        def modo_castellano(path):
             destino = path.with_suffix('.srt')
             # Formato antiguo: <video>.es.srt (o .en.srt si no había español) -> <video>.srt
             previo = destino if destino.exists() else next(
@@ -367,7 +498,7 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
 
             if actual == 'castellano' and not opciones.force:
                 anotar(path, tr('ya tenía castellano'), nota, YA_CASTELLANO)
-                continue
+                return
 
             detalle(f'\n== {path.name}')
             if actual:
@@ -388,29 +519,12 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
                 escribir(emb['ingles'][0], destino_en)
             if emb['castellano']:
                 aplicar('castellano', emb['castellano'][0], tr('CASTELLANO (incrustado)'), emb['castellano'][1][:30])
-                continue
+                return
 
             # A partir de aquí se busca en internet: límite por ejecución y pausa entre vídeos.
-            if opciones.max_videos and buscados >= opciones.max_videos:
-                detalle(tr('  límite de {n} vídeos con búsqueda en internet alcanzado: queda para otra ejecución',
-                           n=opciones.max_videos))
-                anotar(path, tr('PENDIENTE (límite)'), tr('máx. {n} por ejecución', n=opciones.max_videos),
-                       PENDIENTE)
-                continue
-            if buscados and _esperar(PAUSA, cancelado):
-                break
-            buscados += 1
-
-            video = scan_video(str(path))
-            # scan_video adivina sobre la ruta completa: una carpeta como "<SERIE> - FULL"
-            # convierte la serie en "<SERIE> FULL" y ningún proveedor encuentra nada.
-            if isinstance(video, Episode):
-                g = guessit(path.name)
-                if g.get('title'):
-                    video.series = g['title']
-                    video.title = g.get('episode_title')
-            refine(video, refiners=['hash', 'metadata', 'tvdb'])
-            comprobar()
+            video = internet(path)
+            if video is None:
+                return
 
             candidatos = pool.list_subtitles(video, {Language('spa')})
             comprobar()
@@ -472,7 +586,7 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
                 sinc, es, score, sub, texto = max(latinos, key=lambda c: (c[0], c[2]))
                 aplicar('latino', texto, tr('LATINO'), f'{sub.provider_name} {sub.id}')
             elif RANGO[actual] >= RANGO['ingles'] and (not opciones.force or RANGO[actual] > RANGO['ingles']):
-                # Ya hay latino o inglés y no se ha encontrado nada mejor: se deja como está.
+                # Ya hay latino, una traducción o inglés y no se ha encontrado nada mejor: se deja como está.
                 anotar(path, ya_tenia(actual), nota, SIN_CAMBIOS)
             elif opciones.sin_ingles:
                 anotar(path, tr('NO ENCONTRADO'), tr('{n} latinos descartados', n=len(latinos)), NO_ENCONTRADO)
@@ -483,12 +597,16 @@ def _recorrer(videos, opciones, eventos, cancelado, comprobar, escribir, anotar,
                     texto, pista = ingles_incrustado(path, detalle)
                 if texto:
                     aplicar('ingles', texto, tr('INGLÉS (incrustado)'), pista[:30])
-                    continue
-                texto, sub = ingles_proveedores(pool, video, max_descargas, detalle, comprobar)
-                if not texto and ultimo.activo:
-                    texto, sub = ingles_proveedores(ultimo, video, max_descargas, detalle, comprobar)
-                    ultimo.informar()
+                    return
+                texto, sub = ingles_internet(video)
                 if texto:
                     aplicar('ingles', texto, tr('INGLÉS'), f'{sub.provider_name} {sub.id}')
                 else:
                     anotar(path, tr('NO ENCONTRADO'), tr('ni español ni inglés'), NO_ENCONTRADO)
+
+        por_modo = {'ingles': modo_ingles, 'traducido': modo_traducido}.get(opciones.modo, modo_castellano)
+        for indice, path in enumerate(videos, 1):
+            if cancelado():
+                break
+            eventos.video(indice, len(videos), path)
+            por_modo(path)

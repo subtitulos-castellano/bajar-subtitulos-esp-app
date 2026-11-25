@@ -447,7 +447,7 @@ class VistaInicio(QWidget):
             self.r_titulo.setText(tr('No hay vídeos'))
             self.r_icono.poner('igual', 'texto3')
         else:
-            buenos = conteo[ev.CASTELLANO] + conteo[ev.YA_CASTELLANO]
+            buenos = sum(conteo[c] for c in ev.CORRECTAS)
             self.r_titulo.setText(tr('Listo') if buenos == n else tr('Listo, con avisos'))
             self.r_icono.poner('ok' if buenos == n else 'aviso',
                                tema.color_estado(ev.CASTELLANO if buenos == n else ev.LATINO))

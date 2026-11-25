@@ -50,6 +50,12 @@ ESTADOS = {
     ev.YA_CASTELLANO: ('#79c779', '#2f7a2f', 'ya', N_('Ya lo tenían'), N_('Ya tenían subtítulo en castellano')),
     ev.LATINO: ('#e09a00', '#fab219', 'aviso', N_('Latino'), N_('Solo había latino: se ha guardado latino')),
     ev.INGLES: ('#e0703f', '#ec835a', 'idioma', N_('Inglés'), N_('No había nada en español: se ha guardado inglés')),
+    # Con «Solo inglés» o «Castellano traducido» (Configuración), lo pedido va en verde, como el castellano.
+    ev.SOLO_INGLES: ('#0ca30c', '#0ca30c', 'ok', N_('Inglés'), N_('Subtítulo en inglés guardado ahora')),
+    ev.YA_INGLES: ('#79c779', '#2f7a2f', 'ya', N_('Ya lo tenían'), N_('Ya tenían subtítulo en inglés')),
+    ev.TRADUCIDO: ('#0ca30c', '#0ca30c', 'ok', N_('Traducidos'),
+                   N_('Subtítulo en inglés traducido automáticamente al castellano y guardado ahora')),
+    ev.YA_TRADUCIDO: ('#79c779', '#2f7a2f', 'ya', N_('Ya lo tenían'), N_('Ya tenían un subtítulo traducido')),
     ev.SIN_CAMBIOS: ('#8a8984', '#8f8e86', 'igual', N_('Sin cambios'),
                      N_('Ya tenían latino o inglés y no se ha encontrado nada mejor')),
     ev.PENDIENTE: ('#6250d6', '#9085e9', 'reloj', N_('Pendientes'),
@@ -283,6 +289,12 @@ QCheckBox {{ spacing: {p(8)}; }}
 QCheckBox::indicator {{ width: {p(16)}; height: {p(16)}; border: 1px solid {t['borde_fuerte']}; border-radius: 4px;
                         background: {t['superficie']}; }}
 QCheckBox::indicator:checked {{ background: {t['acento']}; border-color: {t['acento']}; }}
+QRadioButton {{ spacing: {p(10)}; }}
+QRadioButton::indicator {{ width: {p(16)}; height: {p(16)}; border: 1px solid {t['borde_fuerte']};
+                           border-radius: {p(8)}; background: {t['superficie']}; }}
+QRadioButton::indicator:checked {{ border: {p(5)} solid {t['acento']}; width: {p(8)}; height: {p(8)};
+                                   border-radius: {p(9)}; }}
+QLabel:disabled, QRadioButton:disabled {{ color: {t['texto3']}; }}
 
 QScrollArea {{ border: none; background: transparent; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}

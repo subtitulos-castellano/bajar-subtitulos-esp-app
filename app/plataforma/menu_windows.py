@@ -2,7 +2,8 @@
 
 - Clic derecho en una carpeta, en una unidad o en el fondo de una carpeta: «Bajar subtítulos aquí»,
   con un submenú «Solo esta carpeta» / «Esta carpeta y sus subcarpetas».
-- Clic derecho en uno o varios vídeos: «Bajar subtítulos».
+- Clic derecho en uno o varios vídeos: «Bajar subtítulos» y «Bajar subtítulos en inglés».
+- Las opciones de las carpetas también están «en inglés».
 
 Se registra en HKCU\\Software\\Classes: solo para este usuario y sin permisos de administrador. Es el
 menú clásico: en Windows 11 aparece en «Mostrar más opciones» (el menú nuevo solo admite programas
@@ -16,9 +17,11 @@ from pathlib import Path
 from subtitulos.archivos import VIDEO_EXT
 from subtitulos.idioma import tr
 
-from ..menu_contextual import ARG_ARCHIVOS, ARG_CARPETA, ARG_SUBCARPETAS, SUBMENU, TEXTO_ARCHIVOS, TEXTO_CARPETA
+from ..menu_contextual import (ARG_ARCHIVOS, ARG_CARPETA, ARG_SUBCARPETAS, SUBMENU, SUBMENU_INGLES, TEXTO_ARCHIVOS,
+                               TEXTO_ARCHIVOS_INGLES, TEXTO_CARPETA, en_ingles)
 
 CLAVE = 'BajarSubtitulosESP'
+CLAVE_INGLES = 'BajarSubtitulosESPIngles'     # «Bajar subtítulos en inglés» en los vídeos
 RAIZ = r'Software\Classes'           # las pruebas lo cambian por una clave propia
 
 # %V es la carpeta en las tres (en el fondo de una carpeta, %1 no existe).
@@ -26,6 +29,7 @@ CARPETAS = (r'Directory\shell', r'Directory\Background\shell', r'Drive\shell')
 
 # Subclaves del submenú de las carpetas (el Explorador las ordena por nombre).
 SUBCLAVES = {ARG_CARPETA: '1solo', ARG_SUBCARPETAS: '2todo'}
+SUBCLAVES_INGLES = {ARG_CARPETA: '3solo-ingles', ARG_SUBCARPETAS: '4todo-ingles'}
 
 # .ts también es la extensión de TypeScript: ahí el menú estorbaría (la app sí los busca en carpetas).
 SIN_MENU = {'.ts'}
@@ -51,18 +55,24 @@ def entradas(prog):
         for texto, arg in SUBMENU:
             claves[rf'{k}\shell\{SUBCLAVES[arg]}'] = {'MUIVerb': tr(texto)}
             claves[rf'{k}\shell\{SUBCLAVES[arg]}\command'] = {'': comando(prog, arg, '%V')}
+        for texto, arg in SUBMENU_INGLES:
+            claves[rf'{k}\shell\{SUBCLAVES_INGLES[arg]}'] = {'MUIVerb': tr(texto)}
+            claves[rf'{k}\shell\{SUBCLAVES_INGLES[arg]}\command'] = {'': comando(prog, en_ingles(arg), '%V')}
     for base in _archivos():
-        k = rf'{base}\{CLAVE}'
         # Player: que aparezca también con más de 15 vídeos seleccionados.
-        claves[k] = {'MUIVerb': tr(TEXTO_ARCHIVOS), 'MultiSelectModel': 'Player', **icono}
-        claves[rf'{k}\command'] = {'': comando(prog, ARG_ARCHIVOS, '%1')}
+        for clave, texto, arg in ((CLAVE, TEXTO_ARCHIVOS, ARG_ARCHIVOS),
+                                  (CLAVE_INGLES, TEXTO_ARCHIVOS_INGLES, en_ingles(ARG_ARCHIVOS))):
+            k = rf'{base}\{clave}'
+            claves[k] = {'MUIVerb': tr(texto), 'MultiSelectModel': 'Player', **icono}
+            claves[rf'{k}\command'] = {'': comando(prog, arg, '%1')}
     return claves
 
 
 def _raices():
     """Las claves superiores que pertenecen a la app (se borran enteras al quitar el menú)."""
     # Todas las extensiones: así también se borra lo que dejara una versión que las incluía.
-    return [rf'{base}\{CLAVE}' for base in CARPETAS + tuple(_archivos(todas=True))]
+    return ([rf'{base}\{CLAVE}' for base in CARPETAS + tuple(_archivos(todas=True))]
+            + [rf'{base}\{CLAVE_INGLES}' for base in _archivos(todas=True)])
 
 
 def registrar(prog):
@@ -99,10 +109,11 @@ def quitar():
     _avisar_explorador()
 
 
-def comando_registrado():
-    """El comando de «Bajar subtítulos aquí › Solo esta carpeta», o '' si el menú no está."""
+def comando_registrado(subclave=None):
+    """El comando de «Bajar subtítulos aquí › Solo esta carpeta» (u otra opción de ese submenú), o '' si
+    el menú no está."""
     import winreg
-    sub = rf'{RAIZ}\{CARPETAS[0]}\{CLAVE}\shell\{SUBCLAVES[ARG_CARPETA]}\command'
+    sub = rf'{RAIZ}\{CARPETAS[0]}\{CLAVE}\shell\{subclave or SUBCLAVES[ARG_CARPETA]}\command'
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, sub) as k:
             return winreg.QueryValueEx(k, '')[0]
@@ -123,8 +134,10 @@ def programa_registrado():
 
 
 def al_dia(prog):
-    """True si el menú es exactamente el que pondría `prog` (mismo programa y mismos argumentos)."""
-    return comando_registrado() == comando(prog, ARG_CARPETA, '%V')
+    """True si el menú es exactamente el que pondría `prog` (mismo programa y mismos argumentos; el de las
+    versiones anteriores a la 3.0.0 no tenía las opciones «en inglés»)."""
+    return (comando_registrado() == comando(prog, ARG_CARPETA, '%V') and
+            comando_registrado(SUBCLAVES_INGLES[ARG_CARPETA]) == comando(prog, en_ingles(ARG_CARPETA), '%V'))
 
 
 def misma(a, b):

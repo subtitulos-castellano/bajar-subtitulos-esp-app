@@ -1,0 +1,72 @@
+# Prepara y publica el traductor inglés → español que la app descarga la primera vez que traduce
+# (subtitulos/modelo.py), en su propia Release (preliminar, para que nunca sea la «Latest» ni la vea el
+# actualizador). Se lanza a mano, una vez por cada traductor nuevo (modelo.NOMBRE):
+#     gh workflow run traductor.yml
+# Después hay que poner en subtitulos/modelo.py su SHA256 y su TAMANO.
+name: Traductor
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  traductor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # crear la Release
+      id-token: write      # atestación: identidad del workflow ante Sigstore
+      attestations: write  # atestación: guardarla en el repositorio
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+
+      - name: Herramientas para convertir el modelo
+        run: |
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.15.0
+          python -m pip install transformers==5.24.1 ctranslate2==4.9.1 sentencepiece==0.2.3
+
+      - name: Nombre del traductor
+        id: nombre
+        run: echo "nombre=$(python -I -c 'import sys; sys.path.insert(0, "."); from subtitulos import modelo; print(modelo.NOMBRE)')" >> "$GITHUB_OUTPUT"
+
+      - name: No sustituir uno ya publicado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ steps.nombre.outputs.nombre }}" > /dev/null 2>&1; then
+            echo "La Release ${{ steps.nombre.outputs.nombre }} ya existe: cambia modelo.NOMBRE para publicar otro."
+            exit 1
+          fi
+
+      - name: Convertir, probar y comprimir
+        run: python -I packaging/traductor.py dist
+
+      - name: Suma SHA-256
+        working-directory: dist
+        run: |
+          sha256sum *.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          stat -c '%s %n' *.zip
+
+      - name: Atestación de procedencia
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: dist/*.zip
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          n="${{ steps.nombre.outputs.nombre }}"
+          gh release create "$n" "dist/$n.zip" dist/SHA256SUMS.txt --prerelease --latest=false \
+            --title "Traductor inglés → español ($n)" \
+            --notes "Traductor que descarga Bajar Subtítulos ESP la primera vez que traduce un subtítulo (Configuración › Idioma de los subtítulos › Castellano traducido automáticamente del inglés). No hace falta descargarlo a mano.
+
+          Es el modelo Opus-MT [Helsinki-NLP/opus-mt-tc-big-en-es](https://huggingface.co/Helsinki-NLP/opus-mt-tc-big-en-es) (Universidad de Helsinki, licencia CC BY 4.0), convertido a CTranslate2 (int8) por este workflow.
+
+          Comprobar la descarga: \`sha256sum -c SHA256SUMS.txt\` y \`gh attestation verify $n.zip -R ${{ github.repository }}\`."

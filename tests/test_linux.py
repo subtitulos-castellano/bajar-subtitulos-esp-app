@@ -299,9 +299,9 @@ class MenuContextualLinux(unittest.TestCase):
             'kio/servicemenus/bajar-subtitulos-esp-carpetas.desktop',
             'kio/servicemenus/bajar-subtitulos-esp-videos.desktop',
             'nautilus/scripts/Bajar subtítulos', 'nautilus/scripts/Bajar subtítulos (solo esta carpeta)',
-            'nemo/actions/bajar-subtitulos-esp-1.nemo_action', 'nemo/actions/bajar-subtitulos-esp-2.nemo_action',
-            'nemo/actions/bajar-subtitulos-esp-3.nemo_action', 'nemo/actions/bajar-subtitulos-esp-4.nemo_action',
-            'nemo/actions/bajar-subtitulos-esp-5.nemo_action'])
+            'nautilus/scripts/Bajar subtítulos en inglés',
+            'nautilus/scripts/Bajar subtítulos en inglés (solo esta carpeta)']
+            + sorted(f'nemo/actions/bajar-subtitulos-esp-{n}.nemo_action' for n in range(1, 11)))
         datos = self.d / 'datos'
         for ejecutable in ('kio/servicemenus/bajar-subtitulos-esp-carpetas.desktop', 'nautilus/scripts/Bajar subtítulos',
                            'bajar-subtitulos-esp/menu-contextual'):

@@ -4,9 +4,9 @@ import threading
 from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QDesktopServices, QFont, QFontMetrics
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-                               QScrollArea, QSpinBox, QVBoxLayout, QWidget)
+                               QRadioButton, QScrollArea, QSpinBox, QVBoxLayout, QWidget)
 
-from subtitulos import idioma
+from subtitulos import idioma, modelo
 from subtitulos.archivos import HOME
 from subtitulos.idioma import tr
 from subtitulos.opciones import MAX_DESCARGAS, MAX_VIDEOS, Opciones
@@ -78,6 +78,12 @@ class Limite(QWidget):
 
 class _Llavero(QObject):
     contesto = Signal()            # el llavero del sistema ha terminado algo que tardaba (Linux)
+
+
+class _Descarga(QObject):
+    """Recibe en el hilo de la ventana el avance de la descarga del traductor."""
+    avance = Signal(int, int)
+    hecha = Signal(str)            # '' si ha ido bien; si no, el motivo
 
 
 class _Prueba(QObject):
@@ -253,25 +259,33 @@ class VistaAjustes(QWidget):
         lay.addSpacing(12)
 
         # Qué guardar
-        t = Tarjeta('subtitulos', tr('Qué subtítulos guardar'),
-                    tr('Siempre se prefiere castellano de España. Nunca se sustituye un subtítulo por otro peor.'))
-        self.latino = t.fila(FilaOpcion(tr('Si no hay castellano, guardar latino'),
-                                        tr('El resumen lo marca como Latino para que sepas que no es '
-                                           'castellano.'))).control
-        self.ingles = t.fila(FilaOpcion(tr('Si no hay nada en español, guardar inglés'),
-                                        tr('Primero la pista inglesa del propio vídeo (mejor si es SDH); si no '
-                                           'hay, de los proveedores.'))).control
-        self.ingles_extra = t.fila(FilaOpcion(tr('Extraer también la pista inglesa incrustada'),
-                                              tr('Se guarda aparte como <vídeo>.en.srt, además del subtítulo '
-                                                 'principal.'))).control
+        self._descarga = _Descarga(self)
+        self._descarga.avance.connect(self._descarga_avance)
+        self._descarga.hecha.connect(self._descarga_hecha)
+        self._descargando = False
+        t = Tarjeta('subtitulos', tr('Qué subtítulos guardar'))
+        t.fila(self._fila_modo())
+        self.fila_latino = t.fila(FilaOpcion(tr('Si no hay castellano, guardar latino'),
+                                             tr('El resumen lo marca como Latino para que sepas que no es '
+                                                'castellano.')))
+        self.latino = self.fila_latino.control
+        self.fila_ingles = t.fila(FilaOpcion(tr('Si no hay nada en español, guardar inglés'),
+                                             tr('Primero la pista inglesa del propio vídeo (mejor si es SDH); si no '
+                                                'hay, de los proveedores.')))
+        self.ingles = self.fila_ingles.control
+        self.fila_ingles_extra = t.fila(FilaOpcion(tr('Extraer también la pista inglesa incrustada'),
+                                                   tr('Se guarda aparte como <vídeo>.en.srt, además del subtítulo '
+                                                      'principal.')))
+        self.ingles_extra = self.fila_ingles_extra.control
         lay.addWidget(t)
         lay.addSpacing(12)
 
         # Cómo trabajar
         t = Tarjeta('ajustes', tr('Cómo trabajar'))
-        self.force = t.fila(FilaOpcion(tr('Rehacer aunque ya haya castellano'),
-                                       tr('Vuelve a buscar en todos los vídeos. El subtítulo anterior se copia a '
-                                          'la carpeta de copias de seguridad.'))).control
+        self.force = t.fila(FilaOpcion(tr('Rehacer aunque ya tengan subtítulo'),
+                                       tr('Vuelve a buscar en todos los vídeos, aunque ya tengan el subtítulo '
+                                          'elegido. El anterior se copia a la carpeta de copias de '
+                                          'seguridad.'))).control
         self.simulacion = t.fila(FilaOpcion(tr('Modo simulación'),
                                             tr('Muestra qué se haría, sin escribir ni renombrar ningún '
                                                'archivo.'))).control
@@ -373,6 +387,7 @@ class VistaAjustes(QWidget):
         self.botones_tema.get(config.tema, self.botones_tema['sistema']).setChecked(True)
         for c in (self.latino, self.ingles, self.ingles_extra, self.force, self.simulacion):
             c.toggled.connect(self._opciones_cambiadas)
+        self.grupo_modo.buttonClicked.connect(lambda _: self._opciones_cambiadas())
         self.max_videos.cambiado.connect(self._opciones_cambiadas)
         self.max_descargas.cambiado.connect(self._opciones_cambiadas)
 
@@ -387,17 +402,23 @@ class VistaAjustes(QWidget):
         self.simulacion.setChecked(o.dry_run)
         self.max_videos.poner(o.max_videos)
         self.max_descargas.poner(o.max_descargas)
+        self.botones_modo[o.modo].setChecked(True)
+        self._modo_elegido()
         self._cargando = False
+
+    def modo(self):
+        return next((m for m, b in self.botones_modo.items() if b.isChecked()), 'castellano')
 
     def opciones(self):
         return Opciones(force=self.force.isChecked(), solo_castellano=not self.latino.isChecked(),
                         sin_ingles=not self.ingles.isChecked(), ingles=self.ingles_extra.isChecked(),
                         dry_run=self.simulacion.isChecked(), max_videos=self.max_videos.valor(),
-                        max_descargas=self.max_descargas.valor())
+                        max_descargas=self.max_descargas.valor(), modo=self.modo())
 
     def _opciones_cambiadas(self):
         if self._cargando:
             return
+        self._modo_elegido()
         self.config.opciones = self.opciones()
         self.config.guardar()
         self.cambiado.emit()
@@ -405,6 +426,110 @@ class VistaAjustes(QWidget):
     def restaurar(self):
         self._poner_opciones(Opciones())
         self._opciones_cambiadas()
+
+    # ---------- Idioma de los subtítulos ----------
+
+    def _fila_modo(self):
+        """Castellano (con latino o inglés de reserva) / Solo inglés / Castellano traducido del inglés."""
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(16, 12, 16, 12)
+        v.setSpacing(4)
+        v.addWidget(QLabel(tr('Idioma de los subtítulos')))
+        self.grupo_modo = QButtonGroup(self)
+        self.botones_modo = {}
+        textos = (
+            ('castellano', tr('Castellano de España (con latino o inglés de reserva)'),
+             tr('Lo recomendado. Si no hay castellano, guarda latino o inglés según las opciones de abajo. '
+                'Nunca sustituye un subtítulo por otro peor.')),
+            ('ingles', tr('Solo inglés'),
+             tr('Busca directamente subtítulos en inglés y los guarda como <vídeo>.srt. Si el vídeo ya tenía un '
+                '.srt en otro idioma, lo sustituye (antes guarda una copia de seguridad).')),
+            ('traducido', tr('Castellano traducido automáticamente del inglés'),
+             tr('Baja el inglés y lo traduce en tu ordenador, sin enviar nada a ningún servicio. Es una traducción '
+                'automática: se entiende, pero no es tan buena como un subtítulo hecho por personas y a veces usa '
+                'palabras de Latinoamérica. Se guarda como <vídeo>.srt, con un aviso de unos segundos al '
+                'principio, y el inglés como <vídeo>.en.srt. Sustituye el .srt que hubiera (antes guarda una '
+                'copia de seguridad).')),
+        )
+        for modo, titulo, ayuda in textos:
+            b = QRadioButton(titulo)
+            b.setCursor(Qt.PointingHandCursor)
+            self.grupo_modo.addButton(b)
+            self.botones_modo[modo] = b
+            v.addSpacing(6)
+            v.addWidget(b)
+            e = etiqueta(ayuda, 'ayuda', envolver=True)
+            e.setContentsMargins(28, 0, 0, 0)
+            v.addWidget(e)
+        # El traductor: se descarga una sola vez.
+        fila = QHBoxLayout()
+        fila.setContentsMargins(28, 4, 0, 0)
+        fila.setSpacing(10)
+        self.estado_modelo = etiqueta('', 'ayuda', envolver=True)
+        self.estado_modelo.setTextFormat(Qt.PlainText)
+        fila.addWidget(self.estado_modelo, 1)
+        self.b_modelo = boton(tr('Descargar ahora'))
+        self.b_modelo.clicked.connect(self._descargar_modelo)
+        self.b_borrar_modelo = boton(tr('Borrar'), nombre='plano')
+        self.b_borrar_modelo.setToolTip(tr('Borra el traductor descargado para liberar espacio. Si vuelves a '
+                                           'necesitarlo, se descarga otra vez.'))
+        self.b_borrar_modelo.clicked.connect(self._borrar_modelo)
+        fila.addWidget(self.b_modelo, 0, Qt.AlignTop)
+        fila.addWidget(self.b_borrar_modelo, 0, Qt.AlignTop)
+        v.addLayout(fila)
+        self._poner_estado_modelo()
+        return w
+
+    def _modo_elegido(self):
+        """Las opciones de latino e inglés solo cuentan para el castellano."""
+        castellano = self.modo() == 'castellano'
+        for fila in (self.fila_latino, self.fila_ingles, self.fila_ingles_extra):
+            fila.setEnabled(castellano)
+            fila.setToolTip('' if castellano else tr('Solo se usa con «Castellano de España».'))
+        if self.modo() == 'traducido' and not modelo.instalado() and not self._cargando:
+            self._descargar_modelo()
+
+    def _poner_estado_modelo(self, texto=None):
+        instalado = modelo.instalado()
+        if texto is None:
+            if instalado:
+                texto = tr('Traductor descargado, en {carpeta}.', carpeta=modelo.carpeta())
+            else:
+                texto = tr('El traductor se descarga una sola vez (unos {n} MB) al elegir esta opción o al '
+                           'traducir por primera vez.', n=modelo.tamano_mb())
+        self.estado_modelo.setText(texto)
+        self.b_modelo.setVisible(not instalado)
+        self.b_modelo.setEnabled(not self._descargando)
+        self.b_borrar_modelo.setVisible(instalado and not self._descargando)
+
+    def _descargar_modelo(self):
+        if self._descargando or modelo.instalado():
+            return
+        self._descargando = True
+        self._poner_estado_modelo(tr('Descargando el traductor…'))
+
+        def trabajo():
+            try:
+                modelo.descargar(progreso=self._descarga.avance.emit)
+                self._descarga.hecha.emit('')
+            except Exception as e:  # noqa: BLE001 - se muestra en la pantalla
+                self._descarga.hecha.emit(str(e) or type(e).__name__)
+        threading.Thread(target=trabajo, name='descarga-traductor', daemon=True).start()
+
+    def _descarga_avance(self, hecho, total):
+        if total:
+            self.estado_modelo.setText(tr('Descargando el traductor: {pct} % de {n} MB…',
+                                          pct=hecho * 100 // total, n=round(total / 1e6)))
+
+    def _descarga_hecha(self, error):
+        self._descargando = False
+        self._poner_estado_modelo(tr('No se ha podido descargar el traductor: {error} Se volverá a intentar al '
+                                     'traducir.', error=error) if error else None)
+
+    def _borrar_modelo(self):
+        modelo.borrar()
+        self._poner_estado_modelo()
 
     def _tema(self, b):
         self.config.tema = b.clave
@@ -710,10 +835,15 @@ class VistaAjustes(QWidget):
 
 def resumen_preferencias(o):
     """Texto corto con las preferencias activas, para la pantalla Inicio."""
-    partes = [tr('Latino si no hay castellano') if not o.solo_castellano else tr('Solo castellano'),
-              tr('inglés como último recurso') if not o.sin_ingles else tr('sin inglés')]
-    if o.ingles:
-        partes.append(tr('también .en.srt'))
+    if o.modo == 'ingles':
+        partes = [tr('Solo inglés')]
+    elif o.modo == 'traducido':
+        partes = [tr('Castellano traducido automáticamente del inglés')]
+    else:
+        partes = [tr('Latino si no hay castellano') if not o.solo_castellano else tr('Solo castellano'),
+                  tr('inglés como último recurso') if not o.sin_ingles else tr('sin inglés')]
+        if o.ingles:
+            partes.append(tr('también .en.srt'))
     if o.force:
         partes.append(tr('rehacer todo'))
     partes.append(tr('máx. {n} vídeos por tanda', n=o.max_videos) if o.max_videos else tr('sin límite de vídeos'))

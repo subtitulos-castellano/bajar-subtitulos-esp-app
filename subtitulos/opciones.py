@@ -8,6 +8,12 @@ from dataclasses import dataclass
 MAX_VIDEOS = 40     # vídeos que buscan en internet por ejecución (0 = sin límite)
 MAX_DESCARGAS = 5   # candidatos que se descargan por vídeo (0 = sin límite)
 
+# Qué subtítulo se busca:
+# - 'castellano': castellano de España; si no hay, latino y, si tampoco, inglés (según las opciones).
+# - 'ingles': solo inglés (--solo-ingles).
+# - 'traducido': inglés traducido automáticamente al castellano, sin conexión (--traducir).
+MODOS = ('castellano', 'ingles', 'traducido')
+
 
 @dataclass
 class Opciones:
@@ -18,9 +24,12 @@ class Opciones:
     dry_run: bool = False           # --dry-run: no escribir nada
     max_videos: int = MAX_VIDEOS    # --max-videos N
     max_descargas: int = MAX_DESCARGAS  # --max-descargas N
+    modo: str = 'castellano'        # --solo-ingles / --traducir (ver MODOS)
 
     def __post_init__(self):
         for campo in ('max_videos', 'max_descargas'):
             valor = getattr(self, campo)
             if not isinstance(valor, int) or isinstance(valor, bool) or valor < 0:
                 raise ValueError(f'{campo} debe ser 0 (sin límite) o un número positivo')
+        if self.modo not in MODOS:
+            raise ValueError(f'modo debe ser uno de {", ".join(MODOS)}')

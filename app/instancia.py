@@ -182,11 +182,11 @@ class Agrupador(QObject):
     """Junta las rutas que llegan seguidas (una por cada vídeo seleccionado) en una sola búsqueda:
     espera a que pase `pausa` ms sin que llegue nada más, como mucho `maximo` ms desde la primera (con
     muchos vídeos seleccionados, las aperturas tardan en llegar todas)."""
-    listo = Signal(list, bool, bool)    # rutas, recursivo, desde el menú contextual
+    listo = Signal(list, bool, bool, str)    # rutas, recursivo, desde el menú contextual, modo ('' = el de siempre)
 
     def __init__(self, pausa=700, maximo=10_000, parent=None):
         super().__init__(parent)
-        self.pendientes = {}            # (recursivo, menu) -> [rutas]
+        self.pendientes = {}            # (recursivo, menu, modo) -> [rutas]
         self._primera = None
         self._maximo = maximo
         self._timer = QTimer(self)
@@ -194,8 +194,8 @@ class Agrupador(QObject):
         self._timer.setInterval(pausa)
         self._timer.timeout.connect(self.soltar)
 
-    def agregar(self, rutas, recursivo=True, menu=False):
-        lista = self.pendientes.setdefault((recursivo, menu), [])
+    def agregar(self, rutas, recursivo=True, menu=False, modo=None):
+        lista = self.pendientes.setdefault((recursivo, menu, modo or ''), [])
         for r in rutas:
             if r not in lista:
                 lista.append(r)
@@ -210,5 +210,5 @@ class Agrupador(QObject):
         self._timer.stop()
         self._primera = None
         pendientes, self.pendientes = self.pendientes, {}
-        for (recursivo, menu), rutas in pendientes.items():
-            self.listo.emit(rutas, recursivo, menu)
+        for (recursivo, menu, modo), rutas in pendientes.items():
+            self.listo.emit(rutas, recursivo, menu, modo)

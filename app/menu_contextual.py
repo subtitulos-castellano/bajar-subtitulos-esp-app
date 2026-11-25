@@ -4,8 +4,11 @@ Cómo se pone en cada sistema está en app/plataforma (en Windows, menu_windows.
 menu_linux.py: Dolphin, Nautilus y Nemo).
 
 - En una carpeta: «Bajar subtítulos aquí», con un submenú «Solo esta carpeta» / «Esta carpeta y sus
-  subcarpetas».
-- En uno o varios vídeos: «Bajar subtítulos».
+  subcarpetas», y lo mismo «en inglés».
+- En uno o varios vídeos: «Bajar subtítulos» y «Bajar subtítulos en inglés».
+
+Las opciones «en inglés» buscan solo inglés (como «Solo inglés» en Configuración) sin cambiar la
+configuración: añaden ARG_INGLES delante del argumento de siempre.
 
 Con varios vídeos seleccionados, el Explorador de Windows abre la app una vez por vídeo: la primera recoge
 los de las demás y lo busca todo junto (ver instancia.py). Los gestores de archivos de Linux los pasan
@@ -23,6 +26,7 @@ from .plataforma import LINUX, WINDOWS
 ARG_CARPETA = '--menu-carpeta'              # solo los vídeos de la propia carpeta
 ARG_SUBCARPETAS = '--menu-subcarpetas'      # la carpeta y sus subcarpetas
 ARG_ARCHIVOS = '--menu-archivos'            # vídeos (en Windows, uno por proceso si se seleccionan varios)
+ARG_INGLES = '--menu-ingles'                # delante de uno de los anteriores: solo inglés
 
 # Textos del menú, en el idioma de la app (si cambia, asegurar() los rehace al abrirla).
 TEXTO_CARPETA = N_('Bajar subtítulos aquí')
@@ -30,6 +34,15 @@ TEXTO_ARCHIVOS = N_('Bajar subtítulos')
 SUBMENU = ((N_('Solo esta carpeta'), ARG_CARPETA),
            (N_('Esta carpeta y sus subcarpetas'), ARG_SUBCARPETAS))
 TEXTO_SOLO_CARPETA = N_('Bajar subtítulos (solo esta carpeta)')     # Nautilus (sin submenús)
+TEXTO_ARCHIVOS_INGLES = N_('Bajar subtítulos en inglés')
+SUBMENU_INGLES = ((N_('Solo esta carpeta, en inglés'), ARG_CARPETA),
+                  (N_('Esta carpeta y sus subcarpetas, en inglés'), ARG_SUBCARPETAS))
+TEXTO_SOLO_CARPETA_INGLES = N_('Bajar subtítulos en inglés (solo esta carpeta)')   # Nautilus
+
+
+def en_ingles(argumento):
+    """El argumento de una opción «en inglés»: '--menu-ingles --menu-carpeta'."""
+    return f'{ARG_INGLES} {argumento}'
 
 
 def _sistema():

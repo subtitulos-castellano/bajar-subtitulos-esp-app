@@ -26,6 +26,30 @@ def nucleo():
         return n
 
 
+_motor = None          # el traductor cargado (modo 'traducido'): se reutiliza en las siguientes búsquedas
+
+
+def traductor(detalle, cancelado):
+    """El traductor listo, descargándolo antes si hace falta (solo la primera vez)."""
+    global _motor
+    from subtitulos import modelo
+    from subtitulos.idioma import tr
+    if not modelo.instalado():
+        detalle(tr('Descargando el traductor (unos {n} MB, solo la primera vez)...', n=modelo.tamano_mb()))
+        ultimo = [-1]
+
+        def progreso(hecho, total):
+            pct = hecho * 100 // total if total else 0
+            if pct >= ultimo[0] + 10:
+                ultimo[0] = pct
+                detalle(f'  {pct} %')
+        modelo.descargar(progreso, cancelado)
+    with _carga:
+        if _motor is None:
+            _motor = modelo.motor()
+        return _motor
+
+
 def precargar():
     """Carga el núcleo en segundo plano tras abrir la ventana, para que el primer arrastre sea rápido."""
     threading.Thread(target=nucleo, name='precarga-nucleo', daemon=True).start()
@@ -139,10 +163,19 @@ class Trabajador(QObject):
                     trabajador.resultado.emit(r)
 
             _Avisos.destinos[threading.get_ident()] = lambda linea: self._emitir(self.detalle, linea)
+            motor = None
+            if self.opciones.modo == 'traducido':
+                motor = traductor(lambda linea: self._emitir(self.detalle, linea), self._cancelar.is_set)
             n.procesar(self.ruta, self.opciones, Puente(), self._cancelar.is_set, self.credenciales,
-                       self.recursivo)
+                       self.recursivo, traductor=motor)
         except Exception as e:  # noqa: BLE001 - se muestra en la interfaz; lo ya guardado se queda
-            self._emitir(self.error, f'{type(e).__name__}: {e}')
+            from subtitulos import modelo
+            if isinstance(e, modelo.Cancelado):
+                pass
+            elif isinstance(e, modelo.ErrorModelo):
+                self._emitir(self.error, str(e).rstrip('.'))
+            else:
+                self._emitir(self.error, f'{type(e).__name__}: {e}')
         finally:
             _Avisos.destinos.pop(threading.get_ident(), None)
         if self._cerrar():

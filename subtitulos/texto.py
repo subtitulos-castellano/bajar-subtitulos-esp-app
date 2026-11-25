@@ -29,6 +29,16 @@ LATINO_NOMBRE = re.compile(r'\b(la|lat|latam|latino\w*|latinoam\w*|latin|419|mx|
 ESPANA_NOMBRE = re.compile(r'\b(es|esp|españa|spain|castellano|castilian|european|eur)\b', re.IGNORECASE)
 
 
+# Primer bloque de los subtítulos que traduce este programa (traducir.py): lo ve quien mira el vídeo y
+# sirve para reconocerlos después.
+AVISO_TRADUCCION = 'Subtítulos traducidos automáticamente del inglés'
+
+
+def es_traduccion(texto):
+    """True si el .srt es una traducción automática de este programa."""
+    return AVISO_TRADUCCION in texto[:600]
+
+
 def limpiar_texto(texto):
     """Quita del subtítulo los caracteres de control, de ancho cero y de dirección del texto."""
     return CONTROL.sub('', texto)
@@ -46,9 +56,12 @@ def dialecto(texto):
 
 
 def idioma_srt(texto):
-    """'castellano', 'latino', 'ingles', 'otro' o None (vacío)."""
+    """'castellano', 'latino', 'ingles', 'traducido' (traducción automática de este programa), 'otro' o
+    None (vacío)."""
     if not texto.strip():
         return None
+    if es_traduccion(texto):
+        return 'traducido'
     if dialecto(texto)[2]:
         return 'castellano'
     n_en, n_sp = len(EN_PALABRAS.findall(texto)), len(SP_PALABRAS.findall(texto))

@@ -22,7 +22,9 @@ from . import tema
 # Cada categoría dentro de una frase del aviso: «3 vídeos: 2 castellano, 1 latino.»
 EN_FRASE = {ev.CASTELLANO: N_('castellano'), ev.YA_CASTELLANO: N_('ya lo tenían'), ev.LATINO: N_('latino'),
             ev.INGLES: N_('inglés'), ev.SIN_CAMBIOS: N_('sin cambios'), ev.PENDIENTE: N_('pendientes'),
-            ev.NO_ENCONTRADO: N_('sin subtítulos'), tema.NO_REVISADO: N_('no revisados')}
+            ev.NO_ENCONTRADO: N_('sin subtítulos'), tema.NO_REVISADO: N_('no revisados'),
+            ev.SOLO_INGLES: N_('inglés'), ev.YA_INGLES: N_('ya lo tenían'), ev.TRADUCIDO: N_('traducidos'),
+            ev.YA_TRADUCIDO: N_('ya lo tenían')}
 
 ESPERA_FINAL = 60_000      # ms que sigue el icono tras el aviso final, por si se pulsa
 TITULO = 'Bajar Subtítulos ESP'
@@ -40,7 +42,7 @@ def resumen(resultados, cancelado, errores):
                                           tr('{n} vídeos revisados antes de cancelar.', n=n))
     if n == 0:
         return tr('No hay vídeos'), tr('No se ha encontrado ningún vídeo.')
-    buenos = conteo[ev.CASTELLANO] + conteo[ev.YA_CASTELLANO]
+    buenos = sum(conteo[c] for c in ev.CORRECTAS)
     titulo = tr('Subtítulos listos') if buenos == n else tr('Subtítulos listos, con avisos')
     partes = []
     for cat in tema.ORDEN_ESTADOS:

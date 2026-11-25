@@ -275,17 +275,23 @@ def capturar(app, ventana, carpeta):
 
 
 def _pedido(args):
-    """Lo que hay que buscar al abrirse: {'rutas', 'recursivo', 'menu'}, o None si no hay nada."""
+    """Lo que hay que buscar al abrirse: {'rutas', 'recursivo', 'menu', 'modo'}, o None si no hay nada.
+    'modo': 'ingles' desde las opciones «en inglés» del menú; None = el de Configuración."""
     from app import menu_contextual as mc
     for opcion, recursivo in ((args.menu_carpeta, False), (args.menu_subcarpetas, True),
                               (args.menu_archivos, True)):
         if opcion:
             opciones = [opcion] if isinstance(opcion, str) else opcion     # Linux: todos los seleccionados
             return {'rutas': [str(mc.ruta_de_argumento(o)) for o in opciones], 'recursivo': recursivo,
-                    'menu': True}
+                    'menu': True, 'modo': 'ingles' if args.menu_ingles else None}
     if args.rutas:
         return {'rutas': [str(Path(r).resolve()) for r in args.rutas], 'recursivo': True, 'menu': False}
     return None
+
+
+def modo_del_pedido(pedido):
+    """'ingles' o None (lo que llega por el canal local también se comprueba)."""
+    return 'ingles' if isinstance(pedido, dict) and pedido.get('modo') == 'ingles' else None
 
 
 def rutas_del_pedido(pedido):
@@ -382,6 +388,7 @@ def main(argv=None):
     ap.add_argument('--menu-carpeta', nargs='+', metavar='CARPETA', help=argparse.SUPPRESS)
     ap.add_argument('--menu-subcarpetas', nargs='+', metavar='CARPETA', help=argparse.SUPPRESS)
     ap.add_argument('--menu-archivos', nargs='+', metavar='VÍDEO', help=argparse.SUPPRESS)
+    ap.add_argument('--menu-ingles', action='store_true', help=argparse.SUPPRESS)
     ap.add_argument('--menu-contextual-instalar', action='store_true', help=argparse.SUPPRESS)
     ap.add_argument('--menu-contextual-quitar', action='store_true', help=argparse.SUPPRESS)
     # Linux, al desinstalar (los .deb y .rpm, para cada usuario; el AppImage y el .tar.gz, a mano): ver
@@ -461,9 +468,9 @@ def main(argv=None):
         if unica and LINUX and not args.medir_arranque:
             _menu_aplicaciones(ventana, config)
     if pedido and unica:
-        app.agrupador.agregar(rutas_del_pedido(pedido), pedido['recursivo'], pedido['menu'])
+        app.agrupador.agregar(rutas_del_pedido(pedido), pedido['recursivo'], pedido['menu'], modo_del_pedido(pedido))
     elif pedido and rutas_del_pedido(pedido):
-        ventana.procesar(rutas_del_pedido(pedido), pedido['recursivo'])
+        ventana.procesar(rutas_del_pedido(pedido), pedido['recursivo'], modo_del_pedido(pedido))
     if not args.demo:
         from app.trabajador import precargar
         QTimer.singleShot(300, precargar)     # subliminal se carga cuando la ventana ya se ve
@@ -574,9 +581,9 @@ def _atender_pedidos(app, ventana, config, args):
             ventana.traer_al_frente()
             return
         app.agrupador.agregar(rutas_del_pedido(pedido), pedido.get('recursivo') is not False,
-                              pedido.get('menu') is True)
+                              pedido.get('menu') is True, modo_del_pedido(pedido))
 
-    def buscar(rutas, recursivo, menu):
+    def buscar(rutas, recursivo, menu, modo):
         if not rutas:
             if not ventana.isVisible() and ventana.trabajador is None:
                 ventana.mostrar()          # nada válido que buscar: al menos se abre la app
@@ -587,7 +594,7 @@ def _atender_pedidos(app, ventana, config, args):
             app.bandeja.empezar()
         elif not segundo_plano:
             ventana.traer_al_frente()
-        ventana.procesar(rutas, recursivo)
+        ventana.procesar(rutas, recursivo, modo or None)
 
     app.servidor.pedido.connect(recibido)
     app.agrupador.listo.connect(buscar)
