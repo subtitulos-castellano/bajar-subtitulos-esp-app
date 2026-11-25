@@ -668,5 +668,45 @@ class AccesosAlDesinstalar(unittest.TestCase):
                          'launchers=preferred://browser\n')
 
 
+    def test_con_usuario_sin_ser_root_no_hace_nada(self):
+        import subprocess
+        if os.geteuid() == 0:
+            self.skipTest('como root')
+        (self.escritorio / 'bajar-subtitulos-esp.desktop').symlink_to('/usr/share/applications/bajar-subtitulos-esp.desktop')
+        entorno = {k: v for k, v in os.environ.items() if k not in ('DISPLAY', 'WAYLAND_DISPLAY')}
+        entorno.update(self.entorno)
+        r = subprocess.run([sys.executable, '-m', 'app.main', '--desinstalar', '--usuario', 'nadie'],
+                           cwd=Path(__file__).resolve().parent.parent, env=entorno, timeout=60,
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 1, r.stderr)
+        self.assertTrue((self.escritorio / 'bajar-subtitulos-esp.desktop').is_symlink())
+
+    def test_hacerse_usuario(self):
+        import pwd
+        casa = self.casa
+        pw = pwd.struct_passwd(('ana', 'x', 1234, 1234, '', str(casa), '/bin/sh'))
+        ids = {'uid': 0, 'gid': 0}
+        hechos = []
+        os.environ.update(XDG_RUNTIME_DIR='/run/user/0', DBUS_SESSION_BUS_ADDRESS='unix:path=/run/user/0/bus')
+        with mock.patch.object(pwd, 'getpwnam', return_value=pw), \
+                mock.patch.object(os, 'initgroups', side_effect=lambda n, g: hechos.append(('grupos', n, g))), \
+                mock.patch.object(os, 'setgid', side_effect=lambda g: ids.update(gid=g)), \
+                mock.patch.object(os, 'setuid', side_effect=lambda u: ids.update(uid=u)), \
+                mock.patch.object(os, 'getuid', side_effect=lambda: ids['uid']), \
+                mock.patch.object(os, 'geteuid', side_effect=lambda: ids['uid']), \
+                mock.patch.object(os, 'getegid', side_effect=lambda: ids['gid']), \
+                mock.patch.object(os, 'chdir'):
+            linux.hacerse_usuario('ana')
+        self.assertEqual(ids, {'uid': 1234, 'gid': 1234})
+        self.assertEqual(hechos, [('grupos', 'ana', 1234)])
+        self.assertEqual(os.environ['HOME'], str(casa))
+        self.assertEqual(os.environ['USER'], 'ana')
+        for v in ('XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_RUNTIME_DIR', 'DBUS_SESSION_BUS_ADDRESS'):
+            self.assertNotIn(v, os.environ)                       # sin sesión abierta: sin su D-Bus
+        root = pwd.struct_passwd(('root', 'x', 0, 0, '', '/root', '/bin/sh'))
+        with mock.patch.object(pwd, 'getpwnam', return_value=root), self.assertRaises(OSError):
+            linux.hacerse_usuario('root')
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

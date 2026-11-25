@@ -337,6 +337,15 @@ def _desinstalar(args):
     aplicaciones (si no, al reinstalarla no volvería a aparecer) y, con el AppImage, su entrada en ese
     menú. En Windows, lo mismo que --menu-contextual-quitar. Cada paso va por su cuenta: si uno falla,
     se hacen los demás. Devuelve 1 si alguno ha fallado."""
+    if args.usuario:            # los paquetes, como root: antes de nada, se pasa a ser ese usuario
+        import os
+        if not LINUX or os.geteuid() != 0:
+            return 1
+        from app.plataforma import linux
+        try:
+            linux.hacerse_usuario(args.usuario)
+        except (KeyError, OSError):
+            return 1
     from app import menu_contextual
     from app.config import Config
     fallos = 0
@@ -378,6 +387,7 @@ def main(argv=None):
     # Linux, al desinstalar (los .deb y .rpm, para cada usuario; el AppImage y el .tar.gz, a mano): ver
     # _desinstalar.
     ap.add_argument('--desinstalar', action='store_true', help=argparse.SUPPRESS)
+    ap.add_argument('--usuario', metavar='NOMBRE', help=argparse.SUPPRESS)   # con --desinstalar, como root
     ap.add_argument('--idioma-inicial', choices=('es', 'en'), help=argparse.SUPPRESS)
     ap.add_argument('--pagina', choices=('ajustes',), help=argparse.SUPPRESS)
     args = ap.parse_args(argv)

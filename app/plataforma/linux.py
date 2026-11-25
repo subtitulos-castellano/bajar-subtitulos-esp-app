@@ -121,6 +121,33 @@ def usar_token_activacion(token):
         os.environ['XDG_ACTIVATION_TOKEN'] = token
 
 
+def hacerse_usuario(nombre):
+    """Deja de ser administrador y pasa a ser el usuario `nombre`, con su carpeta personal y, si tiene la
+    sesión abierta, su D-Bus. Para --desinstalar --usuario, que ejecutan los .deb y .rpm al quitarse
+    (antes_de_quitar.sh) sin depender de runuser, que no traen todas las distribuciones.
+    Lanza KeyError si no existe y OSError si no se puede."""
+    import pwd
+    pw = pwd.getpwnam(nombre)
+    if pw.pw_uid == 0:
+        raise OSError('no se hace como root')
+    os.initgroups(pw.pw_name, pw.pw_gid)
+    os.setgid(pw.pw_gid)
+    os.setuid(pw.pw_uid)
+    if os.getuid() != pw.pw_uid or os.geteuid() != pw.pw_uid or os.getegid() != pw.pw_gid:
+        raise OSError('no se ha podido cambiar de usuario')
+    for variable in ('XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_RUNTIME_DIR',
+                     'DBUS_SESSION_BUS_ADDRESS'):
+        os.environ.pop(variable, None)
+    os.environ.update(HOME=pw.pw_dir, USER=pw.pw_name, LOGNAME=pw.pw_name)
+    sesion = f'/run/user/{pw.pw_uid}'
+    if os.path.exists(f'{sesion}/bus'):
+        os.environ.update(XDG_RUNTIME_DIR=sesion, DBUS_SESSION_BUS_ADDRESS=f'unix:path={sesion}/bus')
+    try:
+        os.chdir(pw.pw_dir)
+    except OSError:
+        os.chdir('/')
+
+
 def entorno_para_otros_programas():
     """El programa compilado (PyInstaller) arranca con LD_LIBRARY_PATH apuntando a sus propias librerías. Los
     programas que abra (xdg-open, el gestor de paquetes…) deben usar las del sistema: se deja como estaba
