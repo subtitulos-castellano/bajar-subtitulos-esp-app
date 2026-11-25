@@ -43,7 +43,7 @@ a = Analysis(
               'guessit.test', 'rebulk.test', 'babelfish.tests', 'subliminal.cli', 'click', 'tomlkit',
               'setuptools', 'stevedore.example', 'stevedore.example2', 'stevedore.sphinxext',
               'stevedore.tests', 'docutils', 'sphinx',
-              'numpy', 'yaml', 'torch', 'transformers', 'ctranslate2.converters', 'ctranslate2.specs'],
+              'numpy', 'torch', 'transformers', 'ctranslate2.converters', 'ctranslate2.specs'],
     noarchive=False,
     optimize=0,     # sin -O: las librerías se comportan exactamente igual que en la skill (con sus assert)
 )

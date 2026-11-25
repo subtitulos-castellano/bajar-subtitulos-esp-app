@@ -84,7 +84,7 @@ def avisos():
     """Nombre, versión y licencia de cada librería instalada que acaba dentro del programa."""
     excluir = {'pip', 'setuptools', 'wheel', 'pyinstaller', 'pyinstaller-hooks-contrib', 'altgraph',
                'pefile', 'packaging', 'pywin32-ctypes',
-               'numpy', 'pyyaml'}      # dependencias de ctranslate2 que solo usa para convertir modelos
+               'numpy'}      # dependencia de ctranslate2 que solo usa para convertir modelos (no va dentro)
     filas = []
     for d in sorted(metadata.distributions(), key=lambda d: d.metadata['Name'].lower()):
         nombre = d.metadata['Name']
