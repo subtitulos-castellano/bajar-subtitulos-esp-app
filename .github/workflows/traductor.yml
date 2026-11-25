@@ -1,12 +1,13 @@
 # Prepara y publica el traductor inglés → español que la app descarga la primera vez que traduce
 # (subtitulos/modelo.py), en su propia Release (preliminar, para que nunca sea la «Latest» ni la vea el
-# actualizador). Se lanza a mano, una vez por cada traductor nuevo (modelo.NOMBRE):
-#     gh workflow run traductor.yml
+# actualizador). Se lanza al subir la etiqueta con su nombre (modelo.NOMBRE), una vez por cada traductor nuevo:
+#     git tag traductor-en-es-1 && git push origin traductor-en-es-1
 # Después hay que poner en subtitulos/modelo.py su SHA256 y su TAMANO.
 name: Traductor
 
 on:
-  workflow_dispatch:
+  push:
+    tags: ['traductor-*']
 
 permissions:
   contents: read
@@ -33,6 +34,13 @@ jobs:
       - name: Nombre del traductor
         id: nombre
         run: echo "nombre=$(python -I -c 'import sys; sys.path.insert(0, "."); from subtitulos import modelo; print(modelo.NOMBRE)')" >> "$GITHUB_OUTPUT"
+
+      - name: La etiqueta es la del traductor
+        run: |
+          if [ "$GITHUB_REF_NAME" != "${{ steps.nombre.outputs.nombre }}" ]; then
+            echo "La etiqueta ($GITHUB_REF_NAME) no coincide con modelo.NOMBRE (${{ steps.nombre.outputs.nombre }})"
+            exit 1
+          fi
 
       - name: No sustituir uno ya publicado
         env:
