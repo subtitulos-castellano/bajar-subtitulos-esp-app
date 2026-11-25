@@ -1,5 +1,25 @@
 # Cambios
 
+## 2.0.0
+
+Primera versión que sale a la vez para **Windows y Linux**: desde ahora, cada versión nueva es para los
+dos sistemas, con el mismo número. Lo que trae para quien venga de la 1.x:
+
+- **Ya disponible para Linux** (PC de 64 bits con una distribución de 2022 o posterior): `.deb` (Ubuntu,
+  Debian, Linux Mint…), `.rpm` (Fedora, AlmaLinux, Rocky Linux, openSUSE…), AppImage (cualquier
+  distribución, sin instalar nada) y `.tar.gz`. Hace lo mismo que en Windows: arrastrar vídeos y
+  carpetas, castellano o inglés, cuentas de OpenSubtitles en el llavero del escritorio, tema y tamaño del
+  texto, icono junto al reloj, menú contextual en Dolphin, Nemo y Nautilus, y actualizaciones automáticas
+  que comprueban siempre la huella SHA-256.
+- [Linux] Al desinstalarla se quitan también su menú contextual y los accesos del escritorio y de la
+  barra de tareas; y si la habías quitado a mano del menú de aplicaciones, al reinstalarla vuelve a él.
+- Los archivos de descarga llevan el sistema en el nombre (`…-windows-instalador.exe`,
+  `…-linux-amd64.deb`…) y, en GitHub, una etiqueta que dice para qué son. Cada versión trae además
+  `INSTALAR-<versión>.txt` e `INSTALAR-<versión>.md`: cómo instalar y desinstalar, con la línea exacta
+  que pegar en el terminal de Linux.
+- Las versiones anteriores a la 1.5.1 no reconocen esos nombres: avisan de la 2.0.0, pero hay que
+  descargarla a mano una vez.
+
 ## 1.5.4
 
 - [Linux] Al **desinstalar** la app (el `.deb` o el `.rpm`), se quitan también los accesos que le hayas

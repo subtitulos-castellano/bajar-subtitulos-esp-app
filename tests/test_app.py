@@ -603,7 +603,7 @@ class TamanoDelTexto(unittest.TestCase):
 NOVEDAD = actualizar.Novedad(
     '99.0.0', 'https://github.com/subtitulos-castellano/bajar-subtitulos-esp-app/releases/tag/v99.0.0',
     '• Actualizaciones automáticas\n• <b>no es HTML</b>',
-    actualizar.Archivo('BajarSubtitulosESP-99.0.0-instalador.exe', 'https://github.com/x', 'ab' * 32, 10))
+    actualizar.Archivo('BajarSubtitulosESP-99.0.0-windows-instalador.exe', 'https://github.com/x', 'ab' * 32, 10))
 
 
 class Actualizaciones(unittest.TestCase):
@@ -773,7 +773,7 @@ class Actualizaciones(unittest.TestCase):
 class ActualizacionesLinux(unittest.TestCase):
     """.deb y .rpm: lo instala el gestor de paquetes (con la contraseña) y la app se vuelve a abrir."""
     NOVEDAD = actualizar.Novedad('99.0.0', NOVEDAD.pagina, NOVEDAD.notas,
-                                 actualizar.Archivo('BajarSubtitulosESP-99.0.0-x86_64.rpm', 'https://github.com/x',
+                                 actualizar.Archivo('BajarSubtitulosESP-99.0.0-linux-x86_64.rpm', 'https://github.com/x',
                                                     'ab' * 32, 10))
 
     def setUp(self):

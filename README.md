@@ -1,10 +1,9 @@
 # Bajar Subtítulos ESP
 
-Aplicación de escritorio para **Windows 10 y 11** y, desde la versión 1.5.0, para **Linux**, que
-descarga subtítulos en **castellano (español de España)** para tus series y películas. Arrastras un
-vídeo o una carpeta a la ventana y se ocupa de todo, sin preguntas. También funciona con el botón
-derecho del ratón en el Explorador de Windows o en el gestor de archivos de Linux, sin abrir antes la
-app.
+Aplicación de escritorio para **Windows 10 y 11** y para **Linux** que descarga subtítulos en
+**castellano (español de España)** para tus series y películas. Arrastras un vídeo o una carpeta a la
+ventana y se ocupa de todo, sin preguntas. También funciona con el botón derecho del ratón en el
+Explorador de Windows o en el gestor de archivos de Linux, sin abrir antes la app.
 
 La app está en **castellano o en inglés** (*English*): se elige al instalarla y se cambia en
 Configuración.
@@ -39,17 +38,18 @@ segundos para extraer la pista de un vídeo en un disco lento.
 ## Instalar
 
 Descarga la última versión desde **Releases**. Windows y Linux tienen siempre el mismo número de
-versión. Cada Release trae **`INSTALAR-<versión>.txt`**, con estas mismas instrucciones resumidas
-(también las de desinstalar, en castellano y en inglés) y los nombres de los archivos de esa versión
-ya escritos: en Linux basta con copiar la línea de tu distribución y pegarla en un terminal abierto en
-la carpeta de la descarga.
+versión, y el nombre de cada archivo empieza por el sistema (`…-windows-…` o `…-linux-…`). Cada
+Release trae estas mismas instrucciones resumidas (también las de desinstalar, en castellano y en
+inglés) en dos formatos, **`INSTALAR-<versión>.txt`** (para abrirlo con cualquier editor) e
+**`INSTALAR-<versión>.md`**, con los nombres de los archivos de esa versión ya escritos: en Linux basta
+con copiar la línea de tu distribución y pegarla en un terminal abierto en la carpeta de la descarga.
 
 ### Windows
 
-- **`BajarSubtitulosESP-<versión>-instalador.exe`**: lo instala para tu usuario (no pide permisos de
-  administrador) y crea los accesos directos. Se desinstala desde *Configuración de Windows ›
-  Aplicaciones*.
-- **`BajarSubtitulosESP-<versión>-portable.zip`**: descomprímelo donde quieras y abre
+- **`BajarSubtitulosESP-<versión>-windows-instalador.exe`**: lo instala para tu usuario (no pide
+  permisos de administrador) y crea los accesos directos. Se desinstala desde *Configuración de
+  Windows › Aplicaciones*.
+- **`BajarSubtitulosESP-<versión>-windows-portable.zip`**: descomprímelo donde quieras y abre
   `BajarSubtitulosESP.exe`. No instala nada.
 
 La primera vez que se instala, el instalador pregunta el idioma (**Español** o **English**; propone el
@@ -66,10 +66,10 @@ el archivo según tu distribución:
 
 | Distribución | Archivo | Cómo instalarlo |
 |---|---|---|
-| Ubuntu 22.04 o posterior, Debian 12 o posterior, Linux Mint 21 o posterior y derivadas | `BajarSubtitulosESP-<versión>-amd64.deb` | `sudo apt install ./BajarSubtitulosESP-<versión>-amd64.deb` |
-| Fedora, AlmaLinux, Rocky Linux o RHEL 9 o posterior | `BajarSubtitulosESP-<versión>-x86_64.rpm` | `sudo dnf install ./BajarSubtitulosESP-<versión>-x86_64.rpm` |
-| openSUSE Tumbleweed | `BajarSubtitulosESP-<versión>-x86_64.rpm` | `sudo zypper install --allow-unsigned-rpm ./BajarSubtitulosESP-<versión>-x86_64.rpm` |
-| Cualquier otra (Arch, Manjaro…), o si no quieres instalar nada | `BajarSubtitulosESP-<versión>-x86_64.AppImage` | `chmod +x` y ábrelo (abajo) |
+| Ubuntu 22.04 o posterior, Debian 12 o posterior, Linux Mint 21 o posterior y derivadas | `BajarSubtitulosESP-<versión>-linux-amd64.deb` | `sudo apt install ./BajarSubtitulosESP-<versión>-linux-amd64.deb` |
+| Fedora, AlmaLinux, Rocky Linux o RHEL 9 o posterior | `BajarSubtitulosESP-<versión>-linux-x86_64.rpm` | `sudo dnf install ./BajarSubtitulosESP-<versión>-linux-x86_64.rpm` |
+| openSUSE Tumbleweed | `BajarSubtitulosESP-<versión>-linux-x86_64.rpm` | `sudo zypper install --allow-unsigned-rpm ./BajarSubtitulosESP-<versión>-linux-x86_64.rpm` |
+| Cualquier otra (Arch, Manjaro…), o si no quieres instalar nada | `BajarSubtitulosESP-<versión>-linux-x86_64.AppImage` | `chmod +x` y ábrelo (abajo) |
 
 - **`.deb` y `.rpm`:** el gestor de paquetes instala también lo que haga falta del sistema. La app
   queda en el menú de aplicaciones (*Bajar Subtítulos ESP*) y en la orden `bajar-subtitulos-esp`. Se
@@ -81,14 +81,14 @@ el archivo según tu distribución:
 - **AppImage:** un solo archivo con todo dentro. Dale permiso de ejecución y ábrelo:
 
   ```bash
-  chmod +x BajarSubtitulosESP-<versión>-x86_64.AppImage
-  ./BajarSubtitulosESP-<versión>-x86_64.AppImage
+  chmod +x BajarSubtitulosESP-<versión>-linux-x86_64.AppImage
+  ./BajarSubtitulosESP-<versión>-linux-x86_64.AppImage
   ```
 
   No necesita `libfuse2`. La primera vez pregunta si lo añades al menú de aplicaciones. Para
-  desinstalarlo, en su carpeta, `./BajarSubtitulosESP-<versión>-x86_64.AppImage --desinstalar` (quita lo
-  mismo que el `.deb` y el `.rpm`, y su entrada del menú de aplicaciones) y bórralo. La línea exacta está
-  en `INSTALAR-<versión>.txt`.
+  desinstalarlo, en su carpeta, `./BajarSubtitulosESP-<versión>-linux-x86_64.AppImage --desinstalar`
+  (quita lo mismo que el `.deb` y el `.rpm`, y su entrada del menú de aplicaciones) y bórralo. La línea
+  exacta está en `INSTALAR-<versión>.txt` y `.md`.
 - **`BajarSubtitulosESP-<versión>-linux-x86_64.tar.gz`:** la misma carpeta, comprimida. Descomprímela y
   abre `bajar-subtitulos-esp/bajar-subtitulos-esp`. No se actualiza sola.
 
@@ -106,7 +106,7 @@ Cada Release incluye **`SHA256SUMS.txt`** con la huella SHA-256 de cada archivo.
 PowerShell:
 
 ```powershell
-Get-FileHash .\BajarSubtitulosESP-<versión>-instalador.exe
+Get-FileHash .\BajarSubtitulosESP-<versión>-windows-instalador.exe
 ```
 
 En Linux, en la carpeta de la descarga (con `SHA256SUMS.txt` al lado):
@@ -124,13 +124,13 @@ atestación demuestra que el archivo lo compiló GitHub Actions a partir del có
 repositorio, y no lo subió nadie a mano. Para comprobarla, con [GitHub CLI](https://cli.github.com/):
 
 ```powershell
-gh attestation verify .\BajarSubtitulosESP-<versión>-instalador.exe -R subtitulos-castellano/bajar-subtitulos-esp-app
+gh attestation verify .\BajarSubtitulosESP-<versión>-windows-instalador.exe -R subtitulos-castellano/bajar-subtitulos-esp-app
 ```
 
 En Linux, igual con el archivo que hayas descargado:
 
 ```bash
-gh attestation verify BajarSubtitulosESP-<versión>-x86_64.rpm -R subtitulos-castellano/bajar-subtitulos-esp-app
+gh attestation verify BajarSubtitulosESP-<versión>-linux-x86_64.rpm -R subtitulos-castellano/bajar-subtitulos-esp-app
 ```
 
 ## Usar
@@ -523,7 +523,7 @@ el AppImage y, con nfpm, el `.deb` y el `.rpm`.
    desinstalar sin restos.
 3. Con una etiqueta `vX.Y.Z`, publica la Release con las notas de `CHANGELOG.md` y, tras la marca
    `<!-- en -->`, las de `CHANGELOG.en.md` (la app enseña las de su idioma). Junto con
-   `INSTALAR-<versión>.txt` (`packaging/INSTALAR.txt` con `@VERSION@` cambiado por la versión),
+   `INSTALAR-<versión>.txt` y `.md` (los genera `packaging/instalar.py`, con un solo texto para los dos),
    `SHA256SUMS.txt` y la atestación de procedencia de cada archivo. Cada archivo lleva una etiqueta
    (*Windows · …*, *Linux · …*), que GitHub muestra en lugar del nombre.
 

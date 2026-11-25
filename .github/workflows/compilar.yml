@@ -237,35 +237,34 @@ jobs:
         working-directory: dist
         run: |
           v="${GITHUB_REF_NAME#v}"
-          for f in "BajarSubtitulosESP-$v-instalador.exe" "BajarSubtitulosESP-$v-portable.zip" \
-                   "BajarSubtitulosESP-$v-amd64.deb" "BajarSubtitulosESP-$v-x86_64.rpm" \
-                   "BajarSubtitulosESP-$v-x86_64.AppImage" "BajarSubtitulosESP-$v-linux-x86_64.tar.gz"; do
+          for f in "BajarSubtitulosESP-$v-windows-instalador.exe" "BajarSubtitulosESP-$v-windows-portable.zip" \
+                   "BajarSubtitulosESP-$v-linux-amd64.deb" "BajarSubtitulosESP-$v-linux-x86_64.rpm" \
+                   "BajarSubtitulosESP-$v-linux-x86_64.AppImage" "BajarSubtitulosESP-$v-linux-x86_64.tar.gz"; do
             [ -f "$f" ] || { echo "Falta $f"; ls -l; exit 1; }
           done
 
-      - name: Instrucciones de instalación (INSTALAR-<versión>.txt, con los nombres de esta versión)
-        run: |
-          f="dist/INSTALAR-${GITHUB_REF_NAME#v}.txt"
-          sed "s/@VERSION@/${GITHUB_REF_NAME#v}/g" packaging/INSTALAR.txt > "$f"
-          if grep -q @VERSION@ "$f"; then echo 'Queda @VERSION@ sin sustituir'; exit 1; fi
+      - name: Instrucciones de instalar y desinstalar (INSTALAR-<versión>.txt y .md, con los nombres de esta versión)
+        run: python3 -I packaging/instalar.py "${GITHUB_REF_NAME#v}" dist
 
       - name: Sumas SHA-256
         working-directory: dist
         run: |
-          sha256sum *-instalador.exe *-portable.zip *.deb *.rpm *.AppImage *-linux-x86_64.tar.gz INSTALAR-*.txt > SHA256SUMS.txt
+          sha256sum *-windows-instalador.exe *-windows-portable.zip *.deb *.rpm *.AppImage *-linux-x86_64.tar.gz \
+            INSTALAR-*.txt INSTALAR-*.md > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Atestación de procedencia
         uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
-            dist/*-instalador.exe
-            dist/*-portable.zip
+            dist/*-windows-instalador.exe
+            dist/*-windows-portable.zip
             dist/*.deb
             dist/*.rpm
             dist/*.AppImage
             dist/*-linux-x86_64.tar.gz
             dist/INSTALAR-*.txt
+            dist/INSTALAR-*.md
 
       - name: Release
         env:
@@ -282,12 +281,13 @@ jobs:
           # que se vea de un vistazo cuál es de Windows y cuál de Linux. La descarga conserva el nombre.
           a="dist/BajarSubtitulosESP-${GITHUB_REF_NAME#v}"
           gh release create "$GITHUB_REF_NAME" \
-            "$a-instalador.exe#Windows · Instalador (.exe)" \
-            "$a-portable.zip#Windows · Portable, sin instalar (.zip)" \
-            "$a-amd64.deb#Linux · Ubuntu, Debian, Linux Mint… (.deb)" \
-            "$a-x86_64.rpm#Linux · Fedora, AlmaLinux, Rocky, openSUSE… (.rpm)" \
-            "$a-x86_64.AppImage#Linux · AppImage, cualquier distribución" \
+            "$a-windows-instalador.exe#Windows · Instalador (.exe)" \
+            "$a-windows-portable.zip#Windows · Portable, sin instalar (.zip)" \
+            "$a-linux-amd64.deb#Linux · Ubuntu, Debian, Linux Mint… (.deb)" \
+            "$a-linux-x86_64.rpm#Linux · Fedora, AlmaLinux, Rocky, openSUSE… (.rpm)" \
+            "$a-linux-x86_64.AppImage#Linux · AppImage, cualquier distribución" \
             "$a-linux-x86_64.tar.gz#Linux · Comprimido (.tar.gz)" \
-            "dist/INSTALAR-${GITHUB_REF_NAME#v}.txt#Cómo instalar y desinstalar · How to install and uninstall" \
+            "dist/INSTALAR-${GITHUB_REF_NAME#v}.txt#Cómo instalar y desinstalar · How to install and uninstall (.txt)" \
+            "dist/INSTALAR-${GITHUB_REF_NAME#v}.md#Cómo instalar y desinstalar · How to install and uninstall (.md)" \
             "dist/SHA256SUMS.txt#Sumas SHA-256 de todos los archivos" \
             --title "Bajar Subtítulos ESP $GITHUB_REF_NAME" --notes "${notas:-Ver CHANGELOG.md}"

@@ -171,10 +171,10 @@ case "$orden" in
         echo "Paquete actualizado a la revisión 2"
         config_intacta ;;
     actualizar-appimage)
-        version="$(basename "$1" | sed -E 's/^BajarSubtitulosESP-([0-9.]+)-x86_64\.AppImage$/\1/')"
+        version="$(basename "$1" | sed -E 's/^BajarSubtitulosESP-([0-9.]+)-linux-x86_64\.AppImage$/\1/')"
         mkdir -p "$TMP/apps"
-        viejo="$TMP/apps/BajarSubtitulosESP-$version-x86_64.AppImage"
-        nuevo="$TMP/apps/BajarSubtitulosESP-99.0.0-x86_64.AppImage"    # como lo deja la descarga, al lado
+        viejo="$TMP/apps/BajarSubtitulosESP-$version-linux-x86_64.AppImage"
+        nuevo="$TMP/apps/BajarSubtitulosESP-99.0.0-linux-x86_64.AppImage"    # como lo deja la descarga, al lado
         cp "$1" "$viejo"; cp "$1" "$nuevo"
         chmod +x "$viejo"; chmod -x "$nuevo"
         config_ingles

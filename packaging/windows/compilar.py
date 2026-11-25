@@ -5,8 +5,8 @@
 1. Genera el icono, la versión del .exe y los avisos de licencias (generar_recursos.py).
 2. PyInstaller: dist/BajarSubtitulosESP/ (el .exe y su carpeta _internal).
 3. Autoprueba del .exe empaquetado (proveedores, idiomas, keyring, lectura de MKV...).
-4. dist/BajarSubtitulosESP-<versión>-portable.zip
-5. Si está Inno Setup (ISCC.exe): dist/BajarSubtitulosESP-<versión>-instalador.exe
+4. dist/BajarSubtitulosESP-<versión>-windows-portable.zip
+5. Si está Inno Setup (ISCC.exe): dist/BajarSubtitulosESP-<versión>-windows-instalador.exe
 """
 import os
 import shutil
@@ -73,7 +73,7 @@ def main():
         print(f'autoprueba correcta en {time.monotonic() - t0:.1f} s')
 
     paso('Versión portable (zip)')
-    portable = DIST / f'BajarSubtitulosESP-{__version__}-portable.zip'
+    portable = DIST / f'BajarSubtitulosESP-{__version__}-windows-portable.zip'
     portable.unlink(missing_ok=True)
     with zipfile.ZipFile(portable, 'w', zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for p in sorted(CARPETA.rglob('*')):
@@ -88,7 +88,7 @@ def main():
         return
     ejecutar(compilador, '/Q', f'/DVersion={__version__}', f'/DOrigen={CARPETA}', f'/DSalida={DIST}',
              'packaging/windows/instalador.iss')
-    instalador = DIST / f'BajarSubtitulosESP-{__version__}-instalador.exe'
+    instalador = DIST / f'BajarSubtitulosESP-{__version__}-windows-instalador.exe'
     print(f'{instalador.name}: {mb(tamano(instalador))}')
 
 

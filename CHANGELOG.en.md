@@ -3,6 +3,26 @@
 English version of the release notes, shown by the app when it is in English. Earlier versions are
 only in Spanish: see [CHANGELOG.md](CHANGELOG.md).
 
+## 2.0.0
+
+The first version released for **Windows and Linux** at the same time: from now on, every new version is
+for both systems, with the same number. What it brings if you come from 1.x:
+
+- **Now available for Linux** (64-bit PCs with a 2022 or newer distribution): `.deb` (Ubuntu, Debian,
+  Linux Mint…), `.rpm` (Fedora, AlmaLinux, Rocky Linux, openSUSE…), AppImage (any distribution, nothing to
+  install) and `.tar.gz`. It does the same as on Windows: drag videos and folders, Spanish or English,
+  OpenSubtitles accounts in the desktop keyring, theme and text size, icon next to the clock, context menu
+  in Dolphin, Nemo and Nautilus, and automatic updates that always check the SHA-256 fingerprint.
+- [Linux] Uninstalling it also removes its context menu and the shortcuts on the desktop and the
+  taskbar; and if you had removed it from the applications menu by hand, it is back there when you
+  reinstall it.
+- Download files carry the system in their name (`…-windows-instalador.exe`, `…-linux-amd64.deb`…) and,
+  on GitHub, a label saying what they are for. Each version also includes `INSTALAR-<version>.txt` and
+  `INSTALAR-<version>.md`: how to install and uninstall, with the exact line to paste into the Linux
+  terminal.
+- Versions before 1.5.1 do not recognise those names: they announce 2.0.0, but it has to be downloaded
+  by hand once.
+
 ## 1.5.4
 
 - [Linux] When you **uninstall** the app (the `.deb` or the `.rpm`), the shortcuts you gave it on the

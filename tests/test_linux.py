@@ -446,7 +446,7 @@ class MenuDeAplicaciones(unittest.TestCase):
         entorno.start()
         self.addCleanup(entorno.stop)
         self.plantilla = self.PLANTILLA.read_text(encoding='utf-8')
-        self.appimage = self.d / 'Mis programas' / 'BajarSubtitulosESP-1.5.0-x86_64.AppImage'
+        self.appimage = self.d / 'Mis programas' / 'BajarSubtitulosESP-1.5.0-linux-x86_64.AppImage'
         self.config = Config(self.d / 'config.json')
 
     def test_anadir_y_quitar(self):
@@ -599,7 +599,7 @@ class AccesosAlDesinstalar(unittest.TestCase):
         copia.write_text(self.SISTEMA.read_text(encoding='utf-8'), encoding='utf-8')
         appimage = self.escritorio / 'subtitulos.desktop'
         appimage.write_text('[Desktop Entry]\nType=Application\nName=Bajar Subtítulos ESP\n'
-                            'Exec="/home/x/Apps/BajarSubtitulosESP-1.5.4-x86_64.AppImage" %F\n'
+                            'Exec="/home/x/Apps/BajarSubtitulosESP-1.5.4-linux-x86_64.AppImage" %F\n'
                             'Icon=bajar-subtitulos-esp\n', encoding='utf-8')
         otros = {
             'firefox.desktop': '[Desktop Entry]\nType=Application\nExec=firefox %u\nIcon=firefox\n',

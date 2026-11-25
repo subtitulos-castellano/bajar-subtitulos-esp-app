@@ -183,10 +183,12 @@ def _texto_plano(texto):
     return re.sub(r'\n{3,}', '\n\n', texto)
 
 
-# Linux: el archivo de la Release para cada forma de instalar la app.
-SUFIJOS_LINUX = {'deb': 'amd64.deb', 'rpm': 'x86_64.rpm', 'appimage': 'x86_64.AppImage'}
+# Los archivos de la Release llevan el sistema delante (desde la 2.0.0), para que en GitHub salgan agrupados.
+# Linux: el archivo para cada forma de instalar la app.
+SUFIJO_WINDOWS = 'windows-instalador.exe'
+SUFIJOS_LINUX = {'deb': 'linux-amd64.deb', 'rpm': 'linux-x86_64.rpm', 'appimage': 'linux-x86_64.AppImage'}
 _DESCARGABLE = re.compile(r'BajarSubtitulosESP-[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}-'
-                          r'((windows-)?instalador\.exe|(linux-)?(amd64\.deb|x86_64\.rpm|x86_64\.AppImage))')
+                          r'(windows-instalador\.exe|linux-(amd64\.deb|x86_64\.rpm|x86_64\.AppImage))')
 
 
 def nombre_instalador(v, sistema=SISTEMA, tipo=None):
@@ -194,22 +196,11 @@ def nombre_instalador(v, sistema=SISTEMA, tipo=None):
     no se actualiza sola (solo avisa y abre la página de descarga). En Linux depende de cómo se instaló
     (`tipo`; por defecto, el de esta copia: ver tipo_linux)."""
     if sistema == 'windows':
-        return f'BajarSubtitulosESP-{v}-instalador.exe'
+        return f'BajarSubtitulosESP-{v}-{SUFIJO_WINDOWS}'
     if sistema == 'linux':
         sufijo = SUFIJOS_LINUX.get(tipo or tipo_linux())
         return f'BajarSubtitulosESP-{v}-{sufijo}' if sufijo else None
     return None
-
-
-def nombres_aceptados(v, sistema=SISTEMA, tipo=None):
-    """Los nombres con los que se reconoce el archivo de nombre_instalador en una Release: el de siempre y
-    el mismo con el sistema delante (…-windows-instalador.exe, …-linux-amd64.deb…), por si las Releases
-    pasan a llevarlo para que Windows y Linux salgan agrupados en GitHub."""
-    nombre = nombre_instalador(v, sistema, tipo)
-    if nombre is None:
-        return ()
-    resto = nombre[len(f'BajarSubtitulosESP-{v}-'):]
-    return nombre, f'BajarSubtitulosESP-{v}-{sistema}-{resto}'
 
 
 def interpretar(datos, actual=__version__, sistema=SISTEMA, tipo=None):
@@ -243,7 +234,7 @@ def interpretar(datos, actual=__version__, sistema=SISTEMA, tipo=None):
     if not (isinstance(pagina, str) and pagina.startswith(PREFIJO_PAGINA)):
         pagina = PREFIJO_PAGINA + 'latest'
     instalador, sumas = None, None
-    aceptados = nombres_aceptados(texto_v, sistema, tipo)
+    buscado = nombre_instalador(texto_v, sistema, tipo)
     for a in ultima.get('assets') or []:
         if not isinstance(a, dict):
             continue
@@ -252,7 +243,7 @@ def interpretar(datos, actual=__version__, sistema=SISTEMA, tipo=None):
             continue                                     # solo archivos de las Releases de este repositorio
         if nombre == 'SHA256SUMS.txt':
             sumas = url
-        elif nombre in aceptados:
+        elif buscado and nombre == buscado:
             digest = a.get('digest')
             sha = digest[7:].lower() if isinstance(digest, str) and digest.lower().startswith('sha256:') else ''
             tamano = a.get('size') if isinstance(a.get('size'), int) and not isinstance(a.get('size'), bool) else 0

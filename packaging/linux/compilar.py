@@ -8,9 +8,9 @@
    (bibliotecas.py) y que no pide una glibc más nueva que la 2.34.
 4. Autoprueba del programa compilado (proveedores, idiomas, llavero, lectura de MKV...), sin pantalla.
 5. dist/BajarSubtitulosESP-<versión>-linux-x86_64.tar.gz: la carpeta tal cual.
-6. dist/BajarSubtitulosESP-<versión>-x86_64.AppImage: con el runtime nuevo de AppImage (no necesita
+6. dist/BajarSubtitulosESP-<versión>-linux-x86_64.AppImage: con el runtime nuevo de AppImage (no necesita
    libfuse2) y squashfs (mksquashfs, del paquete squashfs-tools).
-7. dist/BajarSubtitulosESP-<versión>-amd64.deb y -x86_64.rpm, con nfpm (y en dist/prueba, los mismos como
+7. dist/BajarSubtitulosESP-<versión>-linux-amd64.deb y -linux-x86_64.rpm, con nfpm (y en dist/prueba, los mismos como
    revisión 2, para probar la actualización).
 
 El runtime de AppImage y nfpm se descargan (en packaging/build/herramientas) solo si coinciden con su
@@ -174,7 +174,7 @@ def appimage():
     imagen.unlink(missing_ok=True)
     ejecutar('mksquashfs', appdir, imagen, '-root-owned', '-noappend', '-no-xattrs', '-no-progress',
              '-comp', 'zstd', '-Xcompression-level', '19', '-b', '1M')
-    salida = DIST / f'{NOMBRE}-x86_64.AppImage'
+    salida = DIST / f'{NOMBRE}-linux-x86_64.AppImage'
     with open(salida, 'wb') as f:
         f.write(descargar(*RUNTIME).read_bytes())
         with open(imagen, 'rb') as s:
@@ -227,7 +227,7 @@ def paquetes(sistema):
         archivo = BUILD / f'nfpm-{revision}.yaml'
         archivo.write_text(json.dumps(dict(config, release=revision), ensure_ascii=False, indent=1),
                            encoding='utf-8')                                  # JSON es YAML
-        for formato, nombre in (('deb', f'{NOMBRE}-amd64.deb'), ('rpm', f'{NOMBRE}-x86_64.rpm')):
+        for formato, nombre in (('deb', f'{NOMBRE}-linux-amd64.deb'), ('rpm', f'{NOMBRE}-linux-x86_64.rpm')):
             salida = carpeta / nombre
             salida.unlink(missing_ok=True)
             ejecutar(binario, 'package', '--config', archivo, '--packager', formato, '--target', salida,

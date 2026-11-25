@@ -29,10 +29,10 @@ def release(tag='v1.0.2', digest=f'sha256:{SHA}', **extra):
         'html_url': f'{REPO}/releases/tag/{tag}',
         'body': '- **Actualizaciones** automáticas\n- Más `rápido`',
         'assets': [
-            {'name': f'BajarSubtitulosESP-{v}-instalador.exe', 'size': 1234, 'digest': digest,
-             'browser_download_url': f'{REPO}/releases/download/{tag}/BajarSubtitulosESP-{v}-instalador.exe'},
-            {'name': f'BajarSubtitulosESP-{v}-portable.zip', 'size': 99, 'digest': f'sha256:{"cd" * 32}',
-             'browser_download_url': f'{REPO}/releases/download/{tag}/BajarSubtitulosESP-{v}-portable.zip'},
+            {'name': f'BajarSubtitulosESP-{v}-windows-instalador.exe', 'size': 1234, 'digest': digest,
+             'browser_download_url': f'{REPO}/releases/download/{tag}/BajarSubtitulosESP-{v}-windows-instalador.exe'},
+            {'name': f'BajarSubtitulosESP-{v}-windows-portable.zip', 'size': 99, 'digest': f'sha256:{"cd" * 32}',
+             'browser_download_url': f'{REPO}/releases/download/{tag}/BajarSubtitulosESP-{v}-windows-portable.zip'},
             {'name': 'SHA256SUMS.txt', 'size': 10, 'digest': None,
              'browser_download_url': f'{REPO}/releases/download/{tag}/SHA256SUMS.txt'},
         ],
@@ -67,7 +67,7 @@ class Interpretar(unittest.TestCase):
         n, sumas = interpretar(release(), actual='1.0.1')
         self.assertEqual(n.version, '1.0.2')
         self.assertEqual(n.pagina, f'{REPO}/releases/tag/v1.0.2')
-        self.assertEqual(n.instalador.nombre, 'BajarSubtitulosESP-1.0.2-instalador.exe')
+        self.assertEqual(n.instalador.nombre, 'BajarSubtitulosESP-1.0.2-windows-instalador.exe')
         self.assertEqual(n.instalador.sha256, SHA)
         self.assertEqual(n.instalador.tamano, 1234)
         self.assertEqual(n.notas, '• Actualizaciones automáticas\n• Más rápido')
@@ -95,15 +95,15 @@ class Interpretar(unittest.TestCase):
     def test_la_mas_nueva_aunque_github_las_ordene_de_otra_forma(self):
         n, sumas = interpretar(release('v1.0.2'), release('v1.0.10'), release('v1.0.9'))
         self.assertEqual(n.version, '1.0.10')
-        self.assertEqual(n.instalador.nombre, 'BajarSubtitulosESP-1.0.10-instalador.exe')
+        self.assertEqual(n.instalador.nombre, 'BajarSubtitulosESP-1.0.10-windows-instalador.exe')
         self.assertIn('/v1.0.10/', sumas)
 
     def test_solo_descargas_de_este_repositorio_y_con_el_nombre_exacto(self):
         d = release()
-        d['assets'][0]['browser_download_url'] = 'https://ejemplo.com/BajarSubtitulosESP-1.0.2-instalador.exe'
+        d['assets'][0]['browser_download_url'] = 'https://ejemplo.com/BajarSubtitulosESP-1.0.2-windows-instalador.exe'
         self.assertIsNone(interpretar(d)[0].instalador)
         d = release()
-        d['assets'][0]['name'] = 'BajarSubtitulosESP-1.0.3-instalador.exe'    # otra versión que la etiqueta
+        d['assets'][0]['name'] = 'BajarSubtitulosESP-1.0.3-windows-instalador.exe'    # otra versión que la etiqueta
         self.assertIsNone(interpretar(d)[0].instalador)
         d = release(html_url='https://ejemplo.com/engaño')
         self.assertEqual(interpretar(d)[0].pagina, f'{REPO}/releases/latest')
@@ -122,11 +122,12 @@ class Interpretar(unittest.TestCase):
 
     def test_en_linux_segun_como_se_instalo(self):
         d = release()
-        for sufijo in ('amd64.deb', 'x86_64.rpm', 'x86_64.AppImage', 'linux-x86_64.tar.gz'):
+        for sufijo in ('linux-amd64.deb', 'linux-x86_64.rpm', 'linux-x86_64.AppImage', 'linux-x86_64.tar.gz'):
             d['assets'].append({'name': f'BajarSubtitulosESP-1.0.2-{sufijo}', 'size': 5, 'digest': f'sha256:{SHA}',
                                 'browser_download_url': f'{REPO}/releases/download/v1.0.2/BajarSubtitulosESP-1.0.2-{sufijo}'})
-        for tipo, nombre in (('deb', 'BajarSubtitulosESP-1.0.2-amd64.deb'), ('rpm', 'BajarSubtitulosESP-1.0.2-x86_64.rpm'),
-                             ('appimage', 'BajarSubtitulosESP-1.0.2-x86_64.AppImage')):
+        for tipo, nombre in (('deb', 'BajarSubtitulosESP-1.0.2-linux-amd64.deb'),
+                             ('rpm', 'BajarSubtitulosESP-1.0.2-linux-x86_64.rpm'),
+                             ('appimage', 'BajarSubtitulosESP-1.0.2-linux-x86_64.AppImage')):
             n, _ = act.interpretar([d], actual='1.0.0', sistema='linux', tipo=tipo)
             self.assertEqual(n.instalador.nombre, nombre)
         with mock.patch.object(act, 'tipo_linux', return_value=None):      # .tar.gz o desde el código
@@ -134,28 +135,26 @@ class Interpretar(unittest.TestCase):
         self.assertEqual(n.version, '1.0.2')
         self.assertIsNone(n.instalador)                     # solo se ofrece abrir la página
 
-    def test_tambien_con_el_sistema_en_el_nombre(self):
-        """Las Releases pueden pasar a llamarse …-windows-instalador.exe, …-linux-amd64.deb… (para que en
-        GitHub salgan agrupados): esta versión ya los reconoce."""
-        tag, v = 'v2.0.0', '2.0.0'
-        win = f'BajarSubtitulosESP-{v}-windows-instalador.exe'
-        linux = [f'BajarSubtitulosESP-{v}-linux-{s}' for s in ('amd64.deb', 'x86_64.rpm', 'x86_64.AppImage')]
+    def test_los_nombres_de_antes_de_la_2_ya_no_valen(self):
+        """Desde la 2.0.0 los archivos llevan el sistema delante (…-windows-instalador.exe, …-linux-amd64.deb):
+        los de antes (…-instalador.exe, …-amd64.deb) ya no se reconocen, ni uno de otro sistema."""
+        tag, v = 'v2.0.1', '2.0.1'
 
         def con(*nombres):
             return release(tag=tag, assets=[{'name': n, 'size': 5, 'digest': f'sha256:{SHA}',
                                              'browser_download_url': f'{REPO}/releases/download/{tag}/{n}'}
                                             for n in nombres])
-        n, _ = act.interpretar([con(win, *linux)], actual='1.5.1', sistema='windows')
-        self.assertEqual(n.instalador.nombre, win)
-        for tipo, nombre in zip(('deb', 'rpm', 'appimage'), linux):
-            n, _ = act.interpretar([con(win, *linux)], actual='1.5.1', sistema='linux', tipo=tipo)
-            self.assertEqual(n.instalador.nombre, nombre)
-        n, _ = act.interpretar([con(f'BajarSubtitulosESP-{v}-linux-instalador.exe')], actual='1.5.1', sistema='windows')
-        self.assertIsNone(n.instalador)                     # el sistema del nombre tiene que ser el suyo
+        viejos = con(*(f'BajarSubtitulosESP-{v}-{s}' for s in ('instalador.exe', 'amd64.deb', 'x86_64.rpm',
+                                                                 'x86_64.AppImage')))
+        self.assertIsNone(act.interpretar([viejos], actual='2.0.0', sistema='windows')[0].instalador)
+        for tipo in ('deb', 'rpm', 'appimage'):
+            self.assertIsNone(act.interpretar([viejos], actual='2.0.0', sistema='linux', tipo=tipo)[0].instalador)
+        otro = con(f'BajarSubtitulosESP-{v}-linux-instalador.exe')
+        self.assertIsNone(act.interpretar([otro], actual='2.0.0', sistema='windows')[0].instalador)
 
     def test_leer_sumas(self):
-        texto = f'{SHA}  BajarSubtitulosESP-1.0.2-instalador.exe\n{"cd" * 32} *otro.zip\nbasura\n'
-        self.assertEqual(act.leer_sumas(texto, 'BajarSubtitulosESP-1.0.2-instalador.exe'), SHA)
+        texto = f'{SHA}  BajarSubtitulosESP-1.0.2-windows-instalador.exe\n{"cd" * 32} *otro.zip\nbasura\n'
+        self.assertEqual(act.leer_sumas(texto, 'BajarSubtitulosESP-1.0.2-windows-instalador.exe'), SHA)
         self.assertEqual(act.leer_sumas(texto, 'otro.zip'), 'cd' * 32)
         self.assertEqual(act.leer_sumas(texto, 'no-esta.exe'), '')
 
@@ -202,7 +201,7 @@ class NovedadesPorSistema(unittest.TestCase):
         self.assertEqual(n.notas, '• Para Linux.\n• Para todos.')
         n, _ = act.interpretar(lista, actual='1.0.0', sistema='windows')
         self.assertEqual(n.version, '1.0.3')
-        self.assertEqual(n.instalador.nombre, 'BajarSubtitulosESP-1.0.3-instalador.exe')
+        self.assertEqual(n.instalador.nombre, 'BajarSubtitulosESP-1.0.3-windows-instalador.exe')
         self.assertEqual(n.notas, 'Versión 1.0.3\n• Solo Windows.\n\nVersión 1.0.2\n• Para todos.\n\n'
                                   'Versión 1.0.1\n• Otro de Windows.')
 
@@ -226,7 +225,7 @@ class Consultar(unittest.TestCase):
     def test_usa_sha256sums_si_falta_la_huella(self):
         respuestas = {act.URL_API: lista(release(digest=None)),
                       f'{REPO}/releases/download/v1.0.2/SHA256SUMS.txt':
-                          f'{SHA}  BajarSubtitulosESP-1.0.2-instalador.exe\n'.encode()}
+                          f'{SHA}  BajarSubtitulosESP-1.0.2-windows-instalador.exe\n'.encode()}
         with mock.patch.object(act, '_leer', side_effect=lambda url, *a, **k: respuestas[url]):
             n = act.consultar('1.0.0', 'windows')
         self.assertEqual(n.instalador.sha256, SHA)
@@ -278,7 +277,7 @@ class Descargar(unittest.TestCase):
         _Servidor.contenido = b'instalador de prueba ' * 50000           # ~1 MB
         cls.httpd = http.server.ThreadingHTTPServer(('127.0.0.1', 0), _Servidor)
         threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
-        cls.url = f'http://127.0.0.1:{cls.httpd.server_address[1]}/BajarSubtitulosESP-1.0.2-instalador.exe'
+        cls.url = f'http://127.0.0.1:{cls.httpd.server_address[1]}/BajarSubtitulosESP-1.0.2-windows-instalador.exe'
         cls.sha = hashlib.sha256(_Servidor.contenido).hexdigest()
 
     @classmethod
@@ -291,13 +290,13 @@ class Descargar(unittest.TestCase):
         self.carpeta = Path(self._d.name)
         self.addCleanup(self._d.cleanup)
 
-    def archivo(self, sha=None, tamano=0, nombre='BajarSubtitulosESP-1.0.2-instalador.exe'):
+    def archivo(self, sha=None, tamano=0, nombre='BajarSubtitulosESP-1.0.2-windows-instalador.exe'):
         return act.Archivo(nombre, self.url, self.sha if sha is None else sha, tamano)
 
     def test_descarga_y_comprueba_la_huella(self):
         avances = []
         ruta = act.descargar(self.archivo(), self.carpeta, progreso=lambda h, t: avances.append((h, t)))
-        self.assertEqual(ruta, self.carpeta / 'BajarSubtitulosESP-1.0.2-instalador.exe')
+        self.assertEqual(ruta, self.carpeta / 'BajarSubtitulosESP-1.0.2-windows-instalador.exe')
         self.assertEqual(ruta.read_bytes(), _Servidor.contenido)
         self.assertEqual(avances[-1], (len(_Servidor.contenido), len(_Servidor.contenido)))
         self.assertEqual([f.name for f in self.carpeta.iterdir()], [ruta.name])
@@ -309,7 +308,7 @@ class Descargar(unittest.TestCase):
 
     def test_sin_huella_o_nombre_raro_no_descarga(self):
         for archivo in (self.archivo(sha=''), self.archivo(nombre='..\\..\\otro.exe'),
-                        self.archivo(nombre='BajarSubtitulosESP-1.0.2-instalador.bat')):
+                        self.archivo(nombre='BajarSubtitulosESP-1.0.2-windows-instalador.bat')):
             with self.assertRaises(act.ErrorActualizacion):
                 act.descargar(archivo, self.carpeta)
         self.assertEqual(list(self.carpeta.iterdir()), [])
@@ -328,7 +327,7 @@ class Descargar(unittest.TestCase):
         self.assertEqual(list(self.carpeta.iterdir()), [])
 
     def test_sin_conexion(self):
-        a = act.Archivo('BajarSubtitulosESP-1.0.2-instalador.exe', 'http://127.0.0.1:9/x', self.sha, 0)
+        a = act.Archivo('BajarSubtitulosESP-1.0.2-windows-instalador.exe', 'http://127.0.0.1:9/x', self.sha, 0)
         with self.assertRaisesRegex(act.ErrorActualizacion, 'interrumpido'):
             act.descargar(a, self.carpeta)
         self.assertEqual(list(self.carpeta.iterdir()), [])
@@ -341,17 +340,17 @@ class Descargar(unittest.TestCase):
         self.assertEqual(act.descargar(self.archivo(), self.carpeta).read_bytes(), _Servidor.contenido)
 
     def test_nombres_de_linux(self):
-        for sufijo in ('amd64.deb', 'x86_64.rpm', 'x86_64.AppImage', 'linux-amd64.deb', 'linux-x86_64.rpm',
-                       'linux-x86_64.AppImage', 'windows-instalador.exe'):
+        for sufijo in ('linux-amd64.deb', 'linux-x86_64.rpm', 'linux-x86_64.AppImage', 'windows-instalador.exe'):
             self.assertTrue(act.descargar(self.archivo(nombre=f'BajarSubtitulosESP-1.0.2-{sufijo}'), self.carpeta)
                             .is_file())
-        for malo in ('BajarSubtitulosESP-1.0.2-amd64.deb.sh', 'BajarSubtitulosESP-1.0.2-x86_64.AppImage/../x',
-                     'otro-1.0.2-amd64.deb', 'BajarSubtitulosESP-1.0.2-mac-amd64.deb'):
+        for malo in ('BajarSubtitulosESP-1.0.2-linux-amd64.deb.sh', 'BajarSubtitulosESP-1.0.2-linux-x86_64.AppImage/../x',
+                     'otro-1.0.2-linux-amd64.deb', 'BajarSubtitulosESP-1.0.2-mac-amd64.deb',
+                     'BajarSubtitulosESP-1.0.2-amd64.deb', 'BajarSubtitulosESP-1.0.2-instalador.exe'):
             with self.assertRaises(act.ErrorActualizacion):
                 act.descargar(self.archivo(nombre=malo), self.carpeta)
 
     def test_limpiar_descargas(self):
-        for nombre in ('BajarSubtitulosESP-1.0.1-instalador.exe', 'x.exe.part', 'instalacion.log'):
+        for nombre in ('BajarSubtitulosESP-1.0.1-windows-instalador.exe', 'x.exe.part', 'instalacion.log'):
             (self.carpeta / nombre).write_text('x')
         act.limpiar_descargas(self.carpeta)
         self.assertEqual([f.name for f in self.carpeta.iterdir()], ['instalacion.log'])
@@ -360,11 +359,11 @@ class Descargar(unittest.TestCase):
 
 class Instalar(unittest.TestCase):
     def test_nombre_del_instalador(self):
-        self.assertEqual(act.nombre_instalador('1.4.0', 'windows'), 'BajarSubtitulosESP-1.4.0-instalador.exe')
-        self.assertEqual(act.nombre_instalador('1.4.0', 'linux', 'deb'), 'BajarSubtitulosESP-1.4.0-amd64.deb')
-        self.assertEqual(act.nombre_instalador('1.4.0', 'linux', 'rpm'), 'BajarSubtitulosESP-1.4.0-x86_64.rpm')
+        self.assertEqual(act.nombre_instalador('1.4.0', 'windows'), 'BajarSubtitulosESP-1.4.0-windows-instalador.exe')
+        self.assertEqual(act.nombre_instalador('1.4.0', 'linux', 'deb'), 'BajarSubtitulosESP-1.4.0-linux-amd64.deb')
+        self.assertEqual(act.nombre_instalador('1.4.0', 'linux', 'rpm'), 'BajarSubtitulosESP-1.4.0-linux-x86_64.rpm')
         self.assertEqual(act.nombre_instalador('1.4.0', 'linux', 'appimage'),
-                         'BajarSubtitulosESP-1.4.0-x86_64.AppImage')
+                         'BajarSubtitulosESP-1.4.0-linux-x86_64.AppImage')
         with mock.patch.object(act, 'tipo_linux', return_value=None):
             self.assertIsNone(act.nombre_instalador('1.4.0', 'linux'))
 
@@ -378,9 +377,9 @@ class Instalar(unittest.TestCase):
 
     def test_lanzar(self):
         with mock.patch.object(act.subprocess, 'Popen') as popen:
-            act.lanzar_instalador(Path('/tmp/BajarSubtitulosESP-1.0.2-instalador.exe'), 'usuario')
+            act.lanzar_instalador(Path('/tmp/BajarSubtitulosESP-1.0.2-windows-instalador.exe'), 'usuario')
         args = popen.call_args.args[0]
-        self.assertEqual(args[0], str(Path('/tmp/BajarSubtitulosESP-1.0.2-instalador.exe')))
+        self.assertEqual(args[0], str(Path('/tmp/BajarSubtitulosESP-1.0.2-windows-instalador.exe')))
         self.assertIn('/REABRIR=1', args)
 
     def test_instalada_o_portable(self):
@@ -425,7 +424,7 @@ class InstalarEnLinux(unittest.TestCase):
         return mock.Mock(returncode=codigo, stdout='', stderr=stderr)
 
     def test_paquete(self):
-        paquete = self.d / 'BajarSubtitulosESP-1.5.0-x86_64.rpm'
+        paquete = self.d / 'BajarSubtitulosESP-1.5.0-linux-x86_64.rpm'
         with mock.patch.object(act.os, 'geteuid', return_value=1000), self.which('dnf', 'pkexec'):
             with mock.patch.object(act.subprocess, 'run', return_value=self.resultado(0)) as run, \
                     mock.patch('app.menu_contextual.programa', return_value=['/opt/bajar-subtitulos-esp/x']):
@@ -443,9 +442,9 @@ class InstalarEnLinux(unittest.TestCase):
     def test_appimage(self):
         """Se escribe al lado, se renombra encima y, si el nombre llevaba la versión, se borra el viejo."""
         from app.plataforma import linux
-        viejo = self.d / f'BajarSubtitulosESP-{act.__version__}-x86_64.AppImage'
+        viejo = self.d / f'BajarSubtitulosESP-{act.__version__}-linux-x86_64.AppImage'
         viejo.write_text('viejo')
-        nuevo = self.d / 'BajarSubtitulosESP-99.0.0-x86_64.AppImage'
+        nuevo = self.d / 'BajarSubtitulosESP-99.0.0-linux-x86_64.AppImage'
         nuevo.write_text('nuevo')
         with mock.patch.object(linux, 'appimage', return_value=viejo):
             self.assertEqual(act.instalar_linux(nuevo, '99.0.0', 'appimage'), [str(nuevo)])
@@ -455,7 +454,7 @@ class InstalarEnLinux(unittest.TestCase):
         # Con otro nombre (sin la versión), se queda con ese nombre.
         propio = self.d / 'Subtitulos.AppImage'
         propio.write_text('viejo')
-        otro = self.d / 'BajarSubtitulosESP-99.0.1-x86_64.AppImage'
+        otro = self.d / 'BajarSubtitulosESP-99.0.1-linux-x86_64.AppImage'
         otro.write_text('nuevo')
         with mock.patch.object(linux, 'appimage', return_value=propio):
             self.assertEqual(act.instalar_linux(otro, '99.0.1', 'appimage'), [str(propio)])
@@ -485,30 +484,59 @@ class InstalarEnLinux(unittest.TestCase):
 
 
 class InstruccionesDeLaRelease(unittest.TestCase):
-    """packaging/INSTALAR.txt (el workflow pone la versión y lo sube a cada Release como INSTALAR-<versión>.txt)
-    nombra exactamente los archivos que se publican: si cambia un nombre, hay que cambiarlo también ahí."""
-    PLANTILLA = Path(__file__).resolve().parent.parent / 'packaging' / 'INSTALAR.txt'
+    """packaging/instalar.py (el workflow lo ejecuta y sube a cada Release INSTALAR-<versión>.txt y .md) nombra
+    exactamente los archivos que se publican: si cambia un nombre, hay que cambiarlo también ahí."""
+    RAIZ = Path(__file__).resolve().parent.parent
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('instalar', cls.RAIZ / 'packaging' / 'instalar.py')
+        cls.inst = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.inst)
+
+    def nombres(self, v):
+        nombres = {act.nombre_instalador(v, 'windows')}
+        nombres |= {act.nombre_instalador(v, 'linux', t) for t in act.SUFIJOS_LINUX}
+        return nombres | {f'BajarSubtitulosESP-{v}-windows-portable.zip', f'BajarSubtitulosESP-{v}-linux-x86_64.tar.gz'}
 
     def test_nombra_los_archivos_de_la_release(self):
-        texto = self.PLANTILLA.read_text(encoding='utf-8').replace('@VERSION@', '9.8.7')
-        self.assertNotIn('\r', texto)          # con retornos de carro, las órdenes pegadas en Linux fallan
-        nombres = {act.nombre_instalador('9.8.7', 'windows')}
-        nombres |= {act.nombre_instalador('9.8.7', 'linux', t) for t in act.SUFIJOS_LINUX}
-        nombres |= {'BajarSubtitulosESP-9.8.7-portable.zip', 'BajarSubtitulosESP-9.8.7-linux-x86_64.tar.gz'}
-        for nombre in nombres:
-            self.assertIn(nombre, texto)
-        # y ningún otro (una errata en un nombre dejaría una orden que no funciona)
-        citados = set(re.findall(r'BajarSubtitulosESP-9\.8\.7-[A-Za-z0-9_.-]*[A-Za-z0-9]', texto))
-        self.assertEqual(citados, nombres)
-        self.assertNotRegex(texto, r'BajarSubtitulosESP-(?!9\.8\.7-)[0-9]')    # sin versiones escritas a mano
+        for formato in ('txt', 'md'):
+            with self.subTest(formato=formato):
+                texto = getattr(self.inst, formato)('9.8.7')
+                self.assertNotIn('\r', texto)       # con retornos de carro, las órdenes pegadas en Linux fallan
+                citados = set(re.findall(r'BajarSubtitulosESP-9\.8\.7-[A-Za-z0-9_.-]*[A-Za-z0-9]', texto))
+                self.assertEqual(citados, self.nombres('9.8.7'))          # todos y ninguno más (una errata
+                self.assertNotRegex(texto, r'BajarSubtitulosESP-(?!9\.8\.7-)[0-9]')   # dejaría una orden rota)
+
+    def test_los_dos_formatos_dicen_lo_mismo(self):
+        """Las mismas órdenes, una por línea, en los dos (en el .txt con sangría; en el .md, en bloques)."""
+        def ordenes(texto):
+            return [ln.strip() for ln in texto.splitlines()
+                    if ln.startswith('    ') or (ln and not ln.startswith(('```', '|', '#', '*', '-', ' ')) and
+                                                 ln.split(' ', 1)[0] in ('sudo', 'chmod', 'tar', 'for', './bajar-subtitulos-esp/bajar-subtitulos-esp',
+                                                                         'rm', 'sha256sum', 'Get-FileHash'))]
+        txt, md = self.inst.txt('9.8.7'), self.inst.md('9.8.7')
+        self.assertEqual(ordenes(txt), ordenes(md))
+        self.assertEqual(len(ordenes(txt)), 2 * 13)           # instalar (5), desinstalar (5), borrar, 2 sumas: por idioma
+
+    def test_genera_los_dos_archivos(self):
+        with tempfile.TemporaryDirectory() as d:
+            import contextlib
+            import io
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.inst.main(['9.8.7', d])
+            self.assertEqual(sorted(p.name for p in Path(d).iterdir()), ['INSTALAR-9.8.7.md', 'INSTALAR-9.8.7.txt'])
 
     def test_el_workflow_lo_publica(self):
-        wf = (self.PLANTILLA.parent.parent / '.github' / 'workflows' / 'compilar.yml').read_text(encoding='utf-8')
-        self.assertIn('f="dist/INSTALAR-${GITHUB_REF_NAME#v}.txt"', wf)
-        self.assertIn('packaging/INSTALAR.txt > "$f"', wf)
-        self.assertIn('"dist/INSTALAR-${GITHUB_REF_NAME#v}.txt#', wf)
-        self.assertIn('INSTALAR-*.txt > SHA256SUMS.txt', wf)
-
+        wf = (self.RAIZ / '.github' / 'workflows' / 'compilar.yml').read_text(encoding='utf-8')
+        self.assertIn('python3 -I packaging/instalar.py "${GITHUB_REF_NAME#v}" dist', wf)
+        for ext in ('txt', 'md'):
+            self.assertIn(f'"dist/INSTALAR-${{GITHUB_REF_NAME#v}}.{ext}#', wf)
+            self.assertIn(f'dist/INSTALAR-*.{ext}\n', wf)
+        self.assertIn('INSTALAR-*.txt INSTALAR-*.md > SHA256SUMS.txt', wf)
+        for nombre in self.nombres('$v'):
+            self.assertIn(f'"{nombre}"', wf)                   # el workflow comprueba que estén todos
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
