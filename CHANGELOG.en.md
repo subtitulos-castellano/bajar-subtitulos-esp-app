@@ -3,6 +3,14 @@
 English version of the release notes, shown by the app when it is in English. Earlier versions are
 only in Spanish: see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.5.4
+
+- [Linux] When you **uninstall** the app (the `.deb` or the `.rpm`), the shortcuts you gave it on the
+  desktop and on the Plasma taskbar, and its context menu, are removed too. And if you had removed it
+  from the applications menu by hand, it appears there again when you reinstall it.
+- [Linux] With the AppImage and the `.tar.gz`, the same with the uninstall line in
+  `INSTALAR-<version>.txt`.
+
 ## 1.5.3
 
 - The install and uninstall instructions on the downloads page are now plain text,

@@ -1,5 +1,13 @@
 # Cambios
 
+## 1.5.4
+
+- [Linux] Al **desinstalar** la app (el `.deb` o el `.rpm`), se quitan también los accesos que le hayas
+  puesto en el escritorio y en la barra de tareas de Plasma, y su menú contextual. Y si la habías quitado
+  a mano del menú de aplicaciones, al volver a instalarla aparece otra vez en él.
+- [Linux] Con el AppImage y el `.tar.gz`, lo mismo con la línea de desinstalar de
+  `INSTALAR-<versión>.txt`.
+
 ## 1.5.3
 
 - Las instrucciones de instalar y desinstalar de la página de descargas son ahora un texto sin formato,
