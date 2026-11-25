@@ -1,5 +1,11 @@
 # Cambios
 
+## 1.5.2
+
+- Las instrucciones de la página de descargas se llaman ahora **`INSTALAR-<versión>.md`** y explican
+  también cómo **desinstalar**. En Linux, con la línea que hay que pegar en el terminal, que quita
+  también el menú contextual.
+
 ## 1.5.1
 
 - En la página de descargas de GitHub, cada archivo dice si es de **Windows** o de **Linux** y para qué

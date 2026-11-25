@@ -3,6 +3,12 @@
 English version of the release notes, shown by the app when it is in English. Earlier versions are
 only in Spanish: see [CHANGELOG.md](CHANGELOG.md).
 
+## 1.5.2
+
+- The instructions on the downloads page are now called **`INSTALAR-<version>.md`** and also explain
+  how to **uninstall**. On Linux, with the line to paste into the terminal, which also removes the
+  context menu.
+
 ## 1.5.1
 
 - On the GitHub downloads page, each file now says whether it is for **Windows** or **Linux** and which
