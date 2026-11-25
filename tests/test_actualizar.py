@@ -485,8 +485,8 @@ class InstalarEnLinux(unittest.TestCase):
 
 
 class InstruccionesDeLaRelease(unittest.TestCase):
-    """packaging/INSTALAR.md (el workflow pone la versión y lo sube a cada Release) nombra exactamente los
-    archivos que se publican: si cambia un nombre, hay que cambiarlo también ahí."""
+    """packaging/INSTALAR.md (el workflow pone la versión y lo sube a cada Release como INSTALAR-<versión>.md)
+    nombra exactamente los archivos que se publican: si cambia un nombre, hay que cambiarlo también ahí."""
     PLANTILLA = Path(__file__).resolve().parent.parent / 'packaging' / 'INSTALAR.md'
 
     def test_nombra_los_archivos_de_la_release(self):
@@ -503,8 +503,10 @@ class InstruccionesDeLaRelease(unittest.TestCase):
 
     def test_el_workflow_lo_publica(self):
         wf = (self.PLANTILLA.parent.parent / '.github' / 'workflows' / 'compilar.yml').read_text(encoding='utf-8')
-        self.assertIn('packaging/INSTALAR.md > dist/INSTALAR.md', wf)
-        self.assertIn('"dist/INSTALAR.md#', wf)
+        self.assertIn('f="dist/INSTALAR-${GITHUB_REF_NAME#v}.md"', wf)
+        self.assertIn('packaging/INSTALAR.md > "$f"', wf)
+        self.assertIn('"dist/INSTALAR-${GITHUB_REF_NAME#v}.md#', wf)
+        self.assertIn('INSTALAR-*.md > SHA256SUMS.txt', wf)
 
 
 if __name__ == '__main__':

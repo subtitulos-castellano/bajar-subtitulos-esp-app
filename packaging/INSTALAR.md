@@ -1,4 +1,4 @@
-# Bajar Subtítulos ESP @VERSION@: cómo instalar
+# Bajar Subtítulos ESP @VERSION@: cómo instalar y desinstalar
 
 *English below.*
 
@@ -53,6 +53,44 @@ E. Carpeta comprimida (la descomprime ahí mismo y abre la app):
 Con A, B y C, la app queda en el menú de aplicaciones (*Bajar Subtítulos ESP*). En Ubuntu, si al final
 sale «N: Download is performed unsandboxed as root…», no pasa nada: es un aviso normal de apt.
 
+## Desinstalar
+
+**Windows:** *Configuración de Windows › Aplicaciones › Bajar Subtítulos ESP › Desinstalar*. La versión
+portable se borra sin más.
+
+**Linux:** cierra antes la app (también el icono junto al reloj, si lo tiene). Copia la línea de la
+misma letra con la que la instalaste y pégala en un terminal. Cada línea quita primero el menú
+contextual (Dolphin, Nemo, Nautilus) y después la app.
+
+A. Ubuntu, Debian, Linux Mint:
+
+    bajar-subtitulos-esp --menu-contextual-quitar; sudo apt remove bajar-subtitulos-esp
+
+B. Fedora, AlmaLinux, Rocky Linux, RHEL:
+
+    bajar-subtitulos-esp --menu-contextual-quitar; sudo dnf remove bajar-subtitulos-esp
+
+C. openSUSE Tumbleweed:
+
+    bajar-subtitulos-esp --menu-contextual-quitar; sudo zypper remove bajar-subtitulos-esp
+
+D. AppImage, en la carpeta donde lo tengas (sirve aunque se haya actualizado y su nombre lleve otra
+versión; también lo quita del menú de aplicaciones):
+
+    for a in BajarSubtitulosESP-*-x86_64.AppImage; do "./$a" --menu-contextual-quitar; rm -f "$a"; done; rm -f ~/.local/share/applications/bajar-subtitulos-esp.desktop ~/.local/share/icons/hicolor/scalable/apps/bajar-subtitulos-esp.svg
+
+E. Carpeta comprimida, en la carpeta donde la descomprimiste:
+
+    ./bajar-subtitulos-esp/bajar-subtitulos-esp --menu-contextual-quitar; rm -rf bajar-subtitulos-esp
+
+Tus preferencias se conservan por si vuelves a instalarla. Para borrarlas también:
+
+    rm -rf ~/.config/BajarSubtitulosEsp ~/.cache/bajar-subtitulos-esp
+
+Las contraseñas de OpenSubtitles se guardan en el llavero del escritorio: si quieres quitarlas, vacía
+las cuentas en *Configuración* antes de desinstalar. Las copias de los subtítulos sustituidos
+(~/.subtitulos-esp) no se tocan: las comparte la skill.
+
 ## Comprobar la descarga (opcional)
 
 Descarga también SHA256SUMS.txt en la misma carpeta. En Linux:
@@ -64,12 +102,12 @@ línea de ese archivo en SHA256SUMS.txt:
 
     Get-FileHash .\BajarSubtitulosESP-@VERSION@-instalador.exe
 
-Más detalles, cómo desinstalar y preguntas frecuentes:
+Más detalles y preguntas frecuentes:
 https://github.com/subtitulos-castellano/bajar-subtitulos-esp-app#instalar
 
 ---
 
-# Bajar Subtítulos ESP @VERSION@: how to install
+# Bajar Subtítulos ESP @VERSION@: how to install and uninstall
 
 Download only the file for your system. Windows and Linux always share the same version number.
 
@@ -125,6 +163,44 @@ notice.
 
 The app starts in Spanish; change the language in Settings (*Configuración › Idioma*).
 
+## Uninstall
+
+**Windows:** *Windows Settings › Apps › Bajar Subtítulos ESP › Uninstall*. The portable version is
+simply deleted.
+
+**Linux:** close the app first (including the icon next to the clock, if it has one). Copy the line with
+the same letter you installed it with and paste it into a terminal. Each line first removes the context
+menu (Dolphin, Nemo, Nautilus) and then the app.
+
+A. Ubuntu, Debian, Linux Mint:
+
+    bajar-subtitulos-esp --menu-contextual-quitar; sudo apt remove bajar-subtitulos-esp
+
+B. Fedora, AlmaLinux, Rocky Linux, RHEL:
+
+    bajar-subtitulos-esp --menu-contextual-quitar; sudo dnf remove bajar-subtitulos-esp
+
+C. openSUSE Tumbleweed:
+
+    bajar-subtitulos-esp --menu-contextual-quitar; sudo zypper remove bajar-subtitulos-esp
+
+D. AppImage, in the folder where you keep it (it works even if it has updated itself and its name has
+another version; it also removes it from the applications menu):
+
+    for a in BajarSubtitulosESP-*-x86_64.AppImage; do "./$a" --menu-contextual-quitar; rm -f "$a"; done; rm -f ~/.local/share/applications/bajar-subtitulos-esp.desktop ~/.local/share/icons/hicolor/scalable/apps/bajar-subtitulos-esp.svg
+
+E. Compressed folder, in the folder where you unpacked it:
+
+    ./bajar-subtitulos-esp/bajar-subtitulos-esp --menu-contextual-quitar; rm -rf bajar-subtitulos-esp
+
+Your settings are kept in case you install it again. To delete them too:
+
+    rm -rf ~/.config/BajarSubtitulosEsp ~/.cache/bajar-subtitulos-esp
+
+OpenSubtitles passwords are stored in the desktop keyring: to remove them, clear the accounts in
+*Configuración* (Settings) before uninstalling. Backups of replaced subtitles (~/.subtitulos-esp) are
+left alone: they are shared with the skill.
+
 ## Check the download (optional)
 
 Also download SHA256SUMS.txt into the same folder. On Linux:
@@ -136,5 +212,5 @@ SHA256SUMS.txt:
 
     Get-FileHash .\BajarSubtitulosESP-@VERSION@-instalador.exe
 
-More details, how to uninstall and FAQ:
+More details and FAQ:
 https://github.com/subtitulos-castellano/bajar-subtitulos-esp-app#instalar

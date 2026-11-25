@@ -39,9 +39,10 @@ segundos para extraer la pista de un vídeo en un disco lento.
 ## Instalar
 
 Descarga la última versión desde **Releases**. Windows y Linux tienen siempre el mismo número de
-versión. Cada Release trae **`INSTALAR.md`**, con estas mismas instrucciones resumidas (en castellano y
-en inglés) y los nombres de los archivos de esa versión ya escritos: en Linux basta con copiar la línea
-de tu distribución y pegarla en un terminal abierto en la carpeta de la descarga.
+versión. Cada Release trae **`INSTALAR-<versión>.md`**, con estas mismas instrucciones resumidas
+(también las de desinstalar, en castellano y en inglés) y los nombres de los archivos de esa versión
+ya escritos: en Linux basta con copiar la línea de tu distribución y pegarla en un terminal abierto en
+la carpeta de la descarga.
 
 ### Windows
 
@@ -73,7 +74,8 @@ el archivo según tu distribución:
 - **`.deb` y `.rpm`:** el gestor de paquetes instala también lo que haga falta del sistema. La app
   queda en el menú de aplicaciones (*Bajar Subtítulos ESP*) y en la orden `bajar-subtitulos-esp`. Se
   desinstala con `sudo apt remove bajar-subtitulos-esp`, `sudo dnf remove bajar-subtitulos-esp` o
-  `sudo zypper remove bajar-subtitulos-esp`.
+  `sudo zypper remove bajar-subtitulos-esp` (en `INSTALAR-<versión>.md`, la línea que quita también el
+  menú contextual).
 - **AppImage:** un solo archivo con todo dentro. Dale permiso de ejecución y ábrelo:
 
   ```bash
@@ -516,9 +518,9 @@ el AppImage y, con nfpm, el `.deb` y el `.rpm`.
    desinstalar sin restos.
 3. Con una etiqueta `vX.Y.Z`, publica la Release con las notas de `CHANGELOG.md` y, tras la marca
    `<!-- en -->`, las de `CHANGELOG.en.md` (la app enseña las de su idioma). Junto con
-   `INSTALAR.md` (`packaging/INSTALAR.md` con `@VERSION@` cambiado por la versión), `SHA256SUMS.txt` y
-   la atestación de procedencia de cada archivo. Cada archivo lleva una etiqueta (*Windows · …*,
-   *Linux · …*), que GitHub muestra en lugar del nombre.
+   `INSTALAR-<versión>.md` (`packaging/INSTALAR.md` con `@VERSION@` cambiado por la versión),
+   `SHA256SUMS.txt` y la atestación de procedencia de cada archivo. Cada archivo lleva una etiqueta
+   (*Windows · …*, *Linux · …*), que GitHub muestra en lugar del nombre.
 
 Para publicar una versión:
 
