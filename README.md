@@ -26,14 +26,14 @@ Configuración.
   hay latino, o solo inglés, lo guarda y te lo marca en el resumen.
 - Guarda el subtítulo como **`<vídeo>.srt`**, con el mismo nombre que el vídeo, para que cualquier
   reproductor lo cargue solo. Si sustituye uno que ya existía, guarda antes una copia de seguridad.
-- **Respeta a los proveedores**: como mucho 40 vídeos buscan en internet en cada tanda y como
-  mucho 5 descargas por vídeo, con una pausa entre vídeos. Lo que pase del límite queda como
-  *Pendiente* para la próxima vez.
+- **Respeta a los proveedores**: como mucho se buscan en internet 40 vídeos por tanda (los que ya
+  tienen subtítulo o lo traen dentro no cuentan), de cada uno se bajan como mucho 5 subtítulos para
+  elegir el mejor, y entre un vídeo y el siguiente hay una pausa de 3 segundos. Lo que pase del
+  límite queda como *Pendiente* para la próxima vez.
 
-Hace lo mismo que la skill
+Este programa se ha creado utilizando como base la skill
 [`bajar-subtitulos-esp`](https://github.com/subtitulos-castellano/bajar-subtitulos-esp) (para Claude
-Code, Codex y OpenCode), de la que parte este proyecto. La única diferencia es ese límite de 15
-segundos para extraer la pista de un vídeo en un disco lento.
+Code, Codex y OpenCode).
 
 ## Instalar
 
@@ -56,6 +56,10 @@ La primera vez que se instala, el instalador pregunta el idioma (**Español** o 
 de Windows), que es también el de la app. Al actualizar ya no pregunta: se queda el de antes. La
 versión portable empieza en castellano.
 
+Para actualizar basta con abrir el instalador de una versión nueva: la instala encima, en la misma
+carpeta, sin volver a enseñar la licencia y conservando tus preferencias y tus cuentas (no hace falta
+desinstalar antes). Si la que abres es **más antigua** que la instalada, pregunta antes de sustituirla.
+
 El programa no está firmado digitalmente, así que la primera vez Windows puede mostrar
 **"Windows protegió su PC"**. Pulsa *Más información › Ejecutar de todas formas*.
 
@@ -72,7 +76,10 @@ el archivo según tu distribución:
 | Cualquier otra (Arch, Manjaro…), o si no quieres instalar nada | `BajarSubtitulosESP-<versión>-linux-x86_64.AppImage` | `chmod +x` y ábrelo (abajo) |
 
 - **`.deb` y `.rpm`:** el gestor de paquetes instala también lo que haga falta del sistema. La app
-  queda en el menú de aplicaciones (*Bajar Subtítulos ESP*) y en la orden `bajar-subtitulos-esp`. Se
+  queda en el menú de aplicaciones (*Bajar Subtítulos ESP*) y en la orden `bajar-subtitulos-esp` (en un
+  terminal, `bajar-subtitulos-esp &` la abre y deja el terminal libre). En Ubuntu, si `apt` termina con
+  *N: Download is performed unsandboxed as root…*, no es un error: es un aviso normal cuando el archivo
+  está en tu carpeta personal, y la app queda instalada. Se
   desinstala con `sudo apt remove bajar-subtitulos-esp`, `sudo dnf remove bajar-subtitulos-esp` o
   `sudo zypper remove bajar-subtitulos-esp`. Al desinstalarse del todo (no al actualizar), quita además,
   a cada usuario del equipo, el menú contextual, los accesos que le haya puesto en el escritorio y en la
@@ -366,7 +373,10 @@ En GNOME, instala la extensión *AppIndicator and KStatusNotifierItem Support* (
 `gnome-shell-extension-appindicator`) y vuelve a abrir la app.
 
 **Linux en WSL (Windows 11):** la app funciona con WSLg, pero no se pueden arrastrar archivos desde el
-Explorador de Windows (usa *Elegir carpeta…* o *Elegir vídeo…*) ni hay icono junto al reloj.
+Explorador de Windows (usa *Elegir carpeta…* o *Elegir vídeo…*) ni hay icono junto al reloj. Como no
+hay escritorio de Linux, ábrela escribiendo `bajar-subtitulos-esp &` en el terminal de WSL (o, con el
+AppImage, su nombre); la ventana se abre en Windows como cualquier otra. Windows suele añadirla
+también a su menú Inicio, en la carpeta de tu distribución (por ejemplo, *Ubuntu*).
 
 **¿Sube o comparte algo de mis vídeos?** No. Solo consulta a los proveedores el nombre del
 episodio o de la película, y lee los vídeos desde tu disco.

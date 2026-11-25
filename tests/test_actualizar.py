@@ -515,10 +515,12 @@ class InstruccionesDeLaRelease(unittest.TestCase):
             return [ln.strip() for ln in texto.splitlines()
                     if ln.startswith('    ') or (ln and not ln.startswith(('```', '|', '#', '*', '-', ' ')) and
                                                  ln.split(' ', 1)[0] in ('sudo', 'chmod', 'tar', 'for', './bajar-subtitulos-esp/bajar-subtitulos-esp',
-                                                                         'rm', 'sha256sum', 'Get-FileHash'))]
+                                                                         'rm', 'sha256sum', 'Get-FileHash',
+                                                                         'bajar-subtitulos-esp',
+                                                                         './BajarSubtitulosESP-9.8.7-linux-x86_64.AppImage'))]
         txt, md = self.inst.txt('9.8.7'), self.inst.md('9.8.7')
         self.assertEqual(ordenes(txt), ordenes(md))
-        self.assertEqual(len(ordenes(txt)), 2 * 13)           # instalar (5), desinstalar (5), borrar, 2 sumas: por idioma
+        self.assertEqual(len(ordenes(txt)), 2 * 16)   # instalar (5), abrir (3), desinstalar (5), borrar, 2 sumas: por idioma
 
     def test_genera_los_dos_archivos(self):
         with tempfile.TemporaryDirectory() as d:

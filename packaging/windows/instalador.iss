@@ -17,6 +17,8 @@
 ; hasta que su proceso termina.
 #define MutexApp "BajarSubtitulosESP"
 #define MutexProceso "BajarSubtitulosESP-proceso"
+; Donde Windows apunta la versión instalada (DisplayVersion). Sale de AppId: cambiarlos a la vez.
+#define ClaveDesinstalar "Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F0C2D8E-3B7A-4E51-9C2F-8A1D5E7B4C93}_is1"
 
 [Setup]
 ; No cambiar nunca AppId: identifica la app para actualizar y desinstalar.
@@ -60,6 +62,10 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 es.SelectLanguageLabel=Elige el idioma de la instalación y del programa:
 en.SelectLanguageLabel=Select the language for the installation and for the app:
 
+[CustomMessages]
+es.VersionMasNueva=Ya tienes instalada la versión %1, más nueva que esta (%2).%n%n¿Quieres sustituirla por esta versión anterior? Tus preferencias se conservan.
+en.VersionMasNueva=You already have version %1 installed, which is newer than this one (%2).%n%nDo you want to replace it with this older version? Your settings are kept.
+
 [Tasks]
 Name: "escritorio"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
@@ -98,12 +104,61 @@ begin
   Result := ExpandConstant('{param:REABRIR|0}') = '1';
 end;
 
-// Al actualizar desde la app, esperar (como mucho 30 s) a que termine de cerrarse antes de tocar
-// sus archivos.
+var
+  VersionAnterior: String;   // la que ya está instalada ('' si no hay ninguna)
+
+function LeerVersionAnterior(): String;
+begin
+  if not RegQueryStringValue(HKA, '{#ClaveDesinstalar}', 'DisplayVersion', Result) then
+    if not RegQueryStringValue(HKCU, '{#ClaveDesinstalar}', 'DisplayVersion', Result) then
+      if not RegQueryStringValue(HKLM, '{#ClaveDesinstalar}', 'DisplayVersion', Result) then
+        Result := '';
+end;
+
+// Quita y devuelve el primer número de una versión «X.Y.Z».
+function PrimerNumero(var Version: String): Integer;
+var
+  P: Integer;
+begin
+  P := Pos('.', Version);
+  if P = 0 then
+  begin
+    Result := StrToIntDef(Version, 0);
+    Version := '';
+  end
+  else
+  begin
+    Result := StrToIntDef(Copy(Version, 1, P - 1), 0);
+    Version := Copy(Version, P + 1, Length(Version));
+  end;
+end;
+
+// 1 si A es más nueva que B, -1 si es más antigua y 0 si son la misma.
+function CompararVersiones(A, B: String): Integer;
+var
+  I, X, Y: Integer;
+begin
+  Result := 0;
+  for I := 1 to 3 do
+  begin
+    X := PrimerNumero(A);
+    Y := PrimerNumero(B);
+    if X <> Y then
+    begin
+      if X > Y then Result := 1 else Result := -1;
+      Exit;
+    end;
+  end;
+end;
+
 function InitializeSetup(): Boolean;
 var
   Espera: Integer;
 begin
+  Result := True;
+  VersionAnterior := LeerVersionAnterior();
+  // Al actualizar desde la app, esperar (como mucho 30 s) a que termine de cerrarse antes de tocar
+  // sus archivos.
   if Reabrir() then
   begin
     Espera := 0;
@@ -112,6 +167,16 @@ begin
       Sleep(100);
       Espera := Espera + 1;
     end;
-  end;
-  Result := True;
+  end
+  // Instalar una versión más antigua encima de una más nueva: solo si se confirma (en silencio con
+  // /SUPPRESSMSGBOXES, no).
+  else if (VersionAnterior <> '') and (CompararVersiones(VersionAnterior, '{#Version}') > 0) then
+    Result := SuppressibleMsgBox(FmtMessage(CustomMessage('VersionMasNueva'), [VersionAnterior, '{#Version}']),
+                                 mbConfirmation, MB_YESNO or MB_DEFBUTTON2, IDNO) = IDYES;
+end;
+
+// Al actualizar (ya hay una versión instalada), la licencia ya se aceptó: no se vuelve a enseñar.
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := (PageID = wpLicense) and (VersionAnterior <> '');
 end;

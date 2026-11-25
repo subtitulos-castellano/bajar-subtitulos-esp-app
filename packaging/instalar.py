@@ -37,7 +37,12 @@ def ordenes(v):
         'D': 'for a in BajarSubtitulosESP-*.AppImage; do "./$a" --desinstalar; rm -f "$a"; done',
         'E': './bajar-subtitulos-esp/bajar-subtitulos-esp --desinstalar; rm -rf bajar-subtitulos-esp',
     }
-    return instalar, desinstalar
+    abrir = {
+        'ABC': 'bajar-subtitulos-esp &',
+        'D': f'./{f["app"]} &',
+        'E': './bajar-subtitulos-esp/bajar-subtitulos-esp &',
+    }
+    return instalar, desinstalar, abrir
 
 
 BORRAR = 'rm -rf ~/.config/BajarSubtitulosEsp ~/.cache/bajar-subtitulos-esp'
@@ -69,9 +74,24 @@ def textos(v):
               'C': 'openSUSE Tumbleweed:',
               'D': 'AppImage (la abre; la primera vez pregunta si la añades al menú de aplicaciones):',
               'E': 'Carpeta comprimida (la descomprime ahí mismo y abre la app):'},
-        tras=['Con A, B y C, la app queda en el menú de aplicaciones («Bajar Subtítulos ESP»). En Ubuntu, '
-              'si al final sale «N: Download is performed unsandboxed as root...», no pasa nada: es un '
-              'aviso normal de apt.'],
+        nota_inst={'A': 'Si al final sale una línea que empieza por «N: Download is performed unsandboxed as '
+                        'root...», no es un error: la app ya está instalada. Es un aviso normal de apt cuando el '
+                        'archivo está en tu carpeta personal.'},
+        tras=[],
+        h_abrir='Cómo abrirla',
+        abrir_win='Windows: desde el menú Inicio («Bajar Subtítulos ESP») o el icono del escritorio, si lo '
+                  'pediste al instalarla. La versión portable, con BajarSubtitulosESP.exe.',
+        abrir_linux='Linux: desde el menú de aplicaciones («Bajar Subtítulos ESP»; con D, si la añadiste '
+                    'cuando lo preguntó) o escribiendo en un terminal la línea de la misma letra con la que la '
+                    'instalaste (el «&» final deja el terminal libre mientras la usas):',
+        abrir={'ABC': 'Paquete de tu distribución, en cualquier carpeta:',
+               'D': 'AppImage, en su carpeta (o doble clic en el archivo; si se ha actualizado sola, su nombre '
+                    'lleva la versión nueva):',
+               'E': 'Carpeta comprimida, en la carpeta donde la descomprimiste:'},
+        wsl='En WSL (Linux dentro de Windows) no hay escritorio de Linux: instálala con A, B o C y ábrela con '
+            'esa línea en el terminal de WSL. La ventana se abre en Windows como cualquier otra. Con WSLg, '
+            'Windows suele añadirla también a su menú Inicio, en la carpeta de tu distribución (por ejemplo, '
+            '«Ubuntu»).',
         h_des='Desinstalar',
         des_win='Windows: «Configuración de Windows > Aplicaciones > Bajar Subtítulos ESP > Desinstalar». '
                 'La versión portable se borra sin más.',
@@ -116,10 +136,23 @@ def textos(v):
               'C': 'openSUSE Tumbleweed:',
               'D': 'AppImage (opens it; the first time it asks whether to add it to the applications menu):',
               'E': 'Compressed folder (unpacks it right there and opens the app):'},
-        tras=['With A, B and C, the app appears in the applications menu («Bajar Subtítulos ESP»). On '
-              'Ubuntu, if «N: Download is performed unsandboxed as root...» appears at the end, it is fine: '
-              'it is a normal apt notice.',
-              'The app starts in Spanish; change the language in Settings («Configuración > Idioma»).'],
+        nota_inst={'A': 'If a line starting with «N: Download is performed unsandboxed as root...» appears at '
+                        'the end, it is not an error: the app is already installed. It is a normal apt notice '
+                        'when the file is in your home folder.'},
+        tras=['The app starts in Spanish; change the language in Settings («Configuración > Idioma»).'],
+        h_abrir='How to open it',
+        abrir_win='Windows: from the Start menu («Bajar Subtítulos ESP») or the desktop icon, if you asked for '
+                  'it when installing. The portable version, with BajarSubtitulosESP.exe.',
+        abrir_linux='Linux: from the applications menu («Bajar Subtítulos ESP»; with D, if you added it when '
+                    'asked) or by typing in a terminal the line with the same letter you installed it with (the '
+                    'final «&» keeps the terminal free while you use it):',
+        abrir={'ABC': 'Your distribution\'s package, in any folder:',
+               'D': 'AppImage, in its folder (or double-click the file; if it has updated itself, its name has the '
+                    'new version):',
+               'E': 'Compressed folder, in the folder where you unpacked it:'},
+        wsl='On WSL (Linux inside Windows) there is no Linux desktop: install it with A, B or C and open it with '
+            'that line in the WSL terminal. The window opens in Windows like any other. With WSLg, Windows '
+            'usually also adds it to its Start menu, in your distribution\'s folder (for example, «Ubuntu»).',
         h_des='Uninstall',
         des_win='Windows: «Windows Settings > Apps > Bajar Subtítulos ESP > Uninstall». The portable version '
                 'is simply deleted.',
@@ -149,9 +182,10 @@ def textos(v):
 
 # ---------- Texto sin formato ----------
 
-def _parrafo(texto, ancho=96, sangria=''):
+def _parrafo(texto, ancho=96, sangria='', inicial=''):
     import textwrap
-    return textwrap.fill(texto, ancho, subsequent_indent=sangria, break_long_words=False, break_on_hyphens=False)
+    return textwrap.fill(texto, ancho, initial_indent=inicial, subsequent_indent=sangria, break_long_words=False,
+                         break_on_hyphens=False)
 
 
 def _tabla_txt(cab, filas):
@@ -164,22 +198,26 @@ def _tabla_txt(cab, filas):
 
 
 def _txt(t, v):
-    instalar, desinstalar = ordenes(v)
+    instalar, desinstalar, abrir = ordenes(v)
 
     def titulo(s, c):
         return f'{s}\n{c * len(s)}'
 
-    def bloque(titulos, cmds):
-        return '\n\n'.join(f'{_parrafo(f"{k}. {titulos[k]}", sangria="   ")}\n\n    {cmds[k]}' for k in 'ABCDE')
+    def bloque(titulos, cmds, notas={}):
+        return '\n\n'.join(f'{_parrafo(f"{", ".join(k)}. {titulos[k]}", sangria="   ")}\n\n    {cmds[k]}'
+                           + (f'\n\n{_parrafo(notas[k], sangria="   ", inicial="   ")}' if k in notas else '')
+                           for k in titulos)
     p = [titulo(t['titulo'].upper(), '='), t['version']]
     if t['otro_idioma']:
         p += ['', t['otro_idioma']]
     p += ['', _parrafo(t['intro']), '', '', titulo('WINDOWS', '-'), '', _tabla_txt(t['cab_win'], t['filas_win']), '',
           _parrafo(t['firma']), '', '', titulo('LINUX', '-'), '', _parrafo(t['linux']), '',
           _tabla_txt(t['cab_linux'], t['filas_linux']), '', _parrafo(t['terminal']), '',
-          bloque(t['inst'], instalar), '']
+          bloque(t['inst'], instalar, t['nota_inst']), '']
     for parrafo in t['tras']:
         p += [_parrafo(parrafo), '']
+    p += ['', titulo(t['h_abrir'].upper(), '-'), '', _parrafo(t['abrir_win']), '', _parrafo(t['abrir_linux']), '',
+          bloque(t['abrir'], abrir), '', _parrafo(t['wsl']), '']
     p += ['', titulo(t['h_des'].upper(), '-'), '', _parrafo(t['des_win']), '', _parrafo(t['des_linux']), '',
           bloque(t['des'], desinstalar), '', _parrafo(t['pref']), '', f'    {BORRAR}', '', _parrafo(t['llavero']),
           '', '', titulo(t['h_sumas'].upper(), '-'), '', _parrafo(t['sumas']), '', f'    {SUMAS}', '',
@@ -208,18 +246,21 @@ def _tabla_md(cab, filas):
 
 
 def _md(t, v):
-    instalar, desinstalar = ordenes(v)
+    instalar, desinstalar, abrir = ordenes(v)
 
-    def bloque(titulos, cmds):
-        return '\n\n'.join(f'**{k}.** {_md_en_linea(titulos[k])}\n\n```bash\n{cmds[k]}\n```' for k in 'ABCDE')
+    def bloque(titulos, cmds, notas={}):
+        return '\n\n'.join(f'**{", ".join(k)}.** {_md_en_linea(titulos[k])}\n\n```bash\n{cmds[k]}\n```'
+                           + (f'\n\n> {_md_en_linea(notas[k])}' if k in notas else '') for k in titulos)
     p = [f'# {t["titulo"]}', '', f'**{t["version"]}**']
     if t['otro_idioma']:
         p += ['', f'*{t["otro_idioma"].strip("()")}*']
     p += ['', t['intro'], '', '## Windows', '', _tabla_md(t['cab_win'], t['filas_win']), '',
           _md_en_linea(t['firma']), '', '## Linux', '', t['linux'], '', _tabla_md(t['cab_linux'], t['filas_linux']),
-          '', _md_en_linea(t['terminal']), '', bloque(t['inst'], instalar), '']
+          '', _md_en_linea(t['terminal']), '', bloque(t['inst'], instalar, t['nota_inst']), '']
     for parrafo in t['tras']:
         p += [_md_en_linea(parrafo), '']
+    p += [f'## {t["h_abrir"]}', '', _md_en_linea(t['abrir_win']), '', _md_en_linea(t['abrir_linux']), '',
+          bloque(t['abrir'], abrir), '', _md_en_linea(t['wsl']), '']
     p += [f'## {t["h_des"]}', '', _md_en_linea(t['des_win']), '', _md_en_linea(t['des_linux']), '',
           bloque(t['des'], desinstalar), '', t['pref'], '', f'```bash\n{BORRAR}\n```', '', _md_en_linea(t['llavero']),
           '', f'## {t["h_sumas"]}', '', _md_en_linea(t['sumas']), '', f'```bash\n{SUMAS}\n```', '',
